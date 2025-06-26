@@ -1,0 +1,145 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "mysql"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id            Int      @id @default(autoincrement())
+  image         String?
+  firstname     String
+  lastname      String
+  middleInitial String
+  email         String   @unique
+  designation   String
+  department    String
+  password      String
+  role          UserRole
+  status        Status
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  roomSchedules RoomSchedules[]
+  units_loads   Units_Loads[]
+
+  @@map("users")
+}
+
+model CurriculumCourse {
+  id             Int      @id @default(autoincrement())
+  curriculumYear String
+  programCode    String
+  programName    String
+  courseCode     String
+  courseName     String
+  lec            Int?
+  lab            Int?
+  units          Int
+  hours          Int
+  period         String
+  yearLevel      String
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  courseOfferings CourseOffering[]
+
+  @@map("curriculum_courses")
+}
+
+model CourseOffering {
+  id           Int      @id @default(autoincrement())
+  courseType   String
+  curriculumId Int
+  description  String?
+  sectionName  String
+  yearLevel    String
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  curriculumCourse CurriculumCourse @relation(fields: [curriculumId], references: [id], onUpdate: Cascade)
+
+  @@map("course_offerings")
+}
+
+model RoomSchedules {
+  id           Int      @id @default(autoincrement())
+  day          String
+  timeStarts   String
+  timeEnds     String
+  room         String
+  offeringId   Int?
+  instructorId Int?
+  isActive     Boolean
+  isLoaded     Int
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  instructor User? @relation(fields: [instructorId], references: [id], onUpdate: Cascade)
+
+  @@map("room_schedules")
+}
+
+model AcademicProgram {
+  id          Int      @id @default(autoincrement())
+  department  String?
+  programCode String?
+  programName String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@map("academic_programs")
+}
+
+model Otp {
+  id        Int      @id @default(autoincrement())
+  otp       String
+  email     String
+  createdAt DateTime @default(now())
+  expiresAt DateTime
+
+  @@map("otps")
+}
+
+model Room {
+  id        Int      @id @default(autoincrement())
+  name      String
+  capacity  Int
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@map("rooms")
+}
+
+model Units_Loads {
+  id           Int      @id @default(autoincrement())
+  instructorId Int?
+  units        Int
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+  instructor   User?    @relation(fields: [instructorId], references: [id], onUpdate: Cascade)
+
+  @@map("units_loads")
+}
+
+model notifications {
+  id        Int      @id @default(autoincrement())
+  content   String
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+enum UserRole {
+  CAMPUS_ADMIN
+  REGISTRAR
+  DEPARTMENT_HEAD
+  FACULTY
+}
+
+enum Status {
+  PENDING
+  VERIFIED
+  APPROVED
+}
