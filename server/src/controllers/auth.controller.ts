@@ -6,6 +6,7 @@ import { hashPassword, comparePassword } from "../utils/bcryptHandler";
 import { setTokens } from "../utils/jwtHandler";
 import { statusList } from "../constants/constants";
 import { User } from "@prisma/client";
+import { sendOTPController } from "./otp.controller";
 
 export const register = async (req: Request, res: Response) => {
   try {
@@ -47,6 +48,14 @@ export const register = async (req: Request, res: Response) => {
     }
 
     const user = await UserService.createUser(userRequest as User);
+
+    if (userRequest.status === statusList.PENDING) {
+      await sendOTPController(userRequest.email);
+      res.status(200).json({
+        message: `Verification OTP sent to ${userRequest.email}`,
+      });
+      return;
+    }
 
     res.status(201).json({
       message: "User created successfully",

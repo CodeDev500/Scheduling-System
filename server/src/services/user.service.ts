@@ -1,6 +1,6 @@
 import { db } from "../utils/db.server";
 import { User } from "@prisma/client";
-import { statusList } from "../constants/constants";
+import { statusList, UserStatus } from "../constants/constants";
 
 export const listUsers = async (): Promise<User[]> => {
   return db.user.findMany({
@@ -87,6 +87,31 @@ export const updateUser = async (id: number, data: User): Promise<User> => {
   return db.user.update({
     where: { id },
     data,
+    select: {
+      id: true,
+      image: true,
+      firstname: true,
+      lastname: true,
+      middleInitial: true,
+      email: true,
+      designation: true,
+      department: true,
+      role: true,
+      status: true,
+      password: true,
+      createdAt: true,
+      updatedAt: true,
+    },
+  });
+};
+
+export const updateStatus = async (
+  email: string,
+  status: UserStatus
+): Promise<User> => {
+  return db.user.update({
+    where: { email },
+    data: { status },
     select: {
       id: true,
       image: true,

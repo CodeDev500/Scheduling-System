@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { User } from "@prisma/client";
 
 // ✅ ENV SCHEMA
 export const envSchema = z.object({
@@ -14,6 +15,8 @@ export const envSchema = z.object({
   EMAIL_PASS: z.string().optional(),
   AUTH_GENERATED_PASS: z.string().optional(),
 });
+
+export type TUserRegister = Omit<User, "id" | "createdAt" | "updatedAt">;
 
 // ✅ Inferred TypeScript type from ENV schema
 export type EnvSchema = z.infer<typeof envSchema>;
