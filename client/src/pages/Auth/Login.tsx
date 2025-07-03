@@ -1,28 +1,40 @@
 import React, { useState } from "react";
-import InputFiled from "../../components/input_field/InputFiled";
+import InputFiled from "../../components/input_field/InputField";
 import Button from "../../components/buttons/Button";
+import { login } from "../../services/authSlice";
+import { useAppDispatch, useAppSelector } from "../../hooks/redux";
+import { useNavigate } from "react-router-dom";
 
 type LoginProps = {
   isOpen: boolean;
   closeModal: () => void;
+  toggleRegisterModal: () => void;
 };
-const Login: React.FC<LoginProps> = ({ isOpen, closeModal }) => {
+const Login: React.FC<LoginProps> = ({
+  isOpen,
+  closeModal,
+  toggleRegisterModal,
+}) => {
+  const navigate = useNavigate();
+  const dispatch = useAppDispatch();
+  const error = useAppSelector((state) => state.auth.error);
   const [email, setEmail] = useState<string>("");
   const [password, setPassword] = useState<string>("");
-  const [errorEmail, setErrorEmail] = useState<string>("");
-  const [errorPassword, setErrorPassword] = useState<string>("");
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    if (!email) setErrorEmail("Email is required");
-    if (!password) setErrorPassword("Password is required");
-    console.log("Form submitted with email:", email, "and password:", password);
+    const data = { email, password };
+    dispatch(login(data));
+
+    if (!error) {
+      navigate("/dashboard");
+    }
   };
   return (
     <>
       {isOpen && (
         <div
-          className="fixed inset-0 z-50 flex justify-center items-center bg-black/40"
+          className="fixed inset-0 z-50 flex justify-center items-center bg-black/40 overflow-y-auto"
           aria-hidden={!isOpen}
           tabIndex={-1}
         >
@@ -67,7 +79,7 @@ const Login: React.FC<LoginProps> = ({ isOpen, closeModal }) => {
                     value={email}
                     onChange={(e) => setEmail(e.target.value)}
                     placeholder="Enter your email"
-                    error={errorEmail}
+                    error={error?.email?.[0] || ""}
                     // required
                   />
                   <InputFiled
@@ -77,7 +89,7 @@ const Login: React.FC<LoginProps> = ({ isOpen, closeModal }) => {
                     value={password}
                     onChange={(e) => setPassword(e.target.value)}
                     placeholder="Enter your password"
-                    error={errorPassword}
+                    error={error?.password?.[0] || ""}
                     // required
                   />
                   <div className="flex justify-end">
@@ -103,7 +115,11 @@ const Login: React.FC<LoginProps> = ({ isOpen, closeModal }) => {
                   <Button label="Disabled" disabled /> */}
                   <div className="text-sm font-medium text-gray-500 ">
                     Not registered?{" "}
-                    <a href="#" className="text-blue-700 hover:underline ">
+                    <a
+                      onClick={toggleRegisterModal}
+                      href="#"
+                      className="text-blue-700 hover:underline "
+                    >
                       Create account
                     </a>
                   </div>
