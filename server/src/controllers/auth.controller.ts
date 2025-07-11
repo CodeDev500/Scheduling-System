@@ -5,7 +5,7 @@ import fs from "fs";
 import { hashPassword, comparePassword } from "../utils/bcryptHandler";
 import { setTokens } from "../utils/jwtHandler";
 import { statusList } from "../constants/constants";
-import { User } from "@prisma/client";
+import { UserRegisterInput } from "../schema/user.schema";
 import { sendOTPController } from "./otp.controller";
 
 export const register = async (req: Request, res: Response) => {
@@ -25,7 +25,7 @@ export const register = async (req: Request, res: Response) => {
     const userExists = await UserService.getUserByEmail(userRequest.email);
 
     if (userExists) {
-      res.status(409).json({ message: "User already exists" });
+      res.status(400).json({ message: "User already exists" });
       return;
     } else {
       await UserService.deleteUserByEmail(userRequest.email);
@@ -47,7 +47,7 @@ export const register = async (req: Request, res: Response) => {
       userRequest.password = await hashPassword(userRequest.password);
     }
 
-    const user = await UserService.createUser(userRequest as User);
+    const user = await UserService.createUser(userRequest as UserRegisterInput);
 
     if (userRequest.status === statusList.PENDING) {
       await sendOTPController(userRequest.email);
@@ -106,6 +106,16 @@ export const login = async (req: Request, res: Response): Promise<void> => {
       user,
       accessToken,
     });
+  } catch (error: any) {
+    res.status(500).json({ message: error.message });
+  }
+};
+
+export const logout = async (req: Request, res: Response): Promise<void> => {
+  try {
+    res.clearCookie("accessToken");
+    res.clearCookie("refreshToken");
+    res.status(200).json({ message: "Logout successfully" });
   } catch (error: any) {
     res.status(500).json({ message: error.message });
   }
