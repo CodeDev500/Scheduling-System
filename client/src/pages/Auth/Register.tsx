@@ -1,6 +1,17 @@
-import React, { useState } from "react";
-import InputFiled from "../../components/input_field/InputFiled";
+import React, { useEffect, useState } from "react";
+import InputField from "../../components/input_field/InputField";
+import SelectField from "../../components/input_field/SelectField";
 import Button from "../../components/buttons/Button";
+import {
+  designationList,
+  UserStatuses,
+  program,
+} from "../../constants/constants";
+import { register, clearRegisterError } from "../../services/authSlice";
+import { useAppDispatch, useAppSelector } from "../../hooks/redux";
+import Profile from "../../components/profile_image/Profile";
+import { useToast } from "../../hooks/useToast";
+import VerifyOTP from "../Verification/VerifyOTP";
 
 type RegisterProps = {
   isOpen: boolean;
@@ -13,7 +24,12 @@ const Register: React.FC<RegisterProps> = ({
   closeModal,
   toggleLoginModal,
 }) => {
+  const toast = useToast();
+  const [imagePreview, setImagePreview] = useState<string>("");
+  const [showOTPModal, setShowOTPModal] = useState(false);
+
   const [form, setForm] = useState({
+    image: null as File | null,
     firstname: "",
     lastname: "",
     middleInitial: "",
@@ -22,49 +38,74 @@ const Register: React.FC<RegisterProps> = ({
     department: "",
     password: "",
     confirmPassword: "",
+    role: "",
+    status: UserStatuses[0],
   });
 
-  const [errors, setErrors] = useState<{ [key: string]: string }>({});
+  const dispatch = useAppDispatch();
+  const error = useAppSelector((state) => state.auth.registerError);
 
-  const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    setForm({ ...form, [e.target.name]: e.target.value });
-    setErrors({ ...errors, [e.target.name]: "" });
-  };
+  useEffect(() => {
+    return () => {
+      dispatch(clearRegisterError());
+      if (imagePreview) URL.revokeObjectURL(imagePreview);
+    };
+  }, [dispatch, imagePreview]);
 
-  const validate = () => {
-    const newErrors: { [key: string]: string } = {};
-    Object.entries(form).forEach(([key, value]) => {
-      if (!value) newErrors[key] = `${key} is required`;
+  const handleChange = (
+    e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>
+  ) => {
+    const { name, value } = e.target;
+    setForm((prevForm) => {
+      const updatedForm = { ...prevForm, [name]: value };
+      const matched = designationList.find(
+        (d) => d.designation === updatedForm.designation
+      );
+      if (matched) updatedForm.role = matched.role;
+      return updatedForm;
     });
-
-    if (form.password !== form.confirmPassword) {
-      newErrors.confirmPassword = "Passwords do not match";
-    }
-
-    setErrors(newErrors);
-    return Object.keys(newErrors).length === 0;
   };
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (validate()) {
-      console.log("Form submitted", form);
-      // Submit to API here
+
+    const formData = new FormData();
+    for (const key in form) {
+      const value = form[key as keyof typeof form];
+      if (value !== null) {
+        formData.append(key, value);
+      }
+    }
+
+    try {
+      await dispatch(register(formData)).unwrap();
+      toast.success(`OTP sent to ${form.email}`);
+      setShowOTPModal(true);
+    } catch (err) {
+      toast.error(err as string);
+      console.error("Registration failed:", err);
     }
   };
+
+  if (!isOpen) return null;
 
   return (
     <>
-      {isOpen && (
-        <div
-          className="fixed inset-0 z-50 overflow-y-auto flex justify-center items-center bg-black/40"
-          aria-hidden={!isOpen}
-          tabIndex={-1}
-        >
-          <div className="absolute top-2 p-4 w-full max-w-xl ">
+      {showOTPModal ? (
+        <VerifyOTP
+          closeOTP={() => {
+            closeModal();
+            setShowOTPModal(false);
+          }}
+          email={form.email}
+          closeModal={closeModal}
+        />
+      ) : (
+        <div className="fixed inset-0 z-50 overflow-y-auto flex justify-center items-center bg-black/40">
+          <div className="absolute top-2 p-4 w-full max-w-xl">
             <div className="relative bg-white rounded-lg shadow">
               {/* Header */}
-              <div className="flex items-center justify-between p-4 md:p-5 border-b rounded-t border-gray-200 ">
+              <div className="flex items-center justify-between p-4 md:p-5 border-b rounded-t border-gray-200">
                 <h3 className="text-xl font-semibold text-gray-900">
                   Create an Account
                 </h3>
@@ -93,47 +134,61 @@ const Register: React.FC<RegisterProps> = ({
 
               {/* Body */}
               <div className="p-4 md:p-5">
-                <form onSubmit={handleSubmit} className="space-y-4 w-full">
+                <form
+                  encType="multipart/form-data"
+                  onSubmit={handleSubmit}
+                  className="space-y-4 w-full"
+                >
+                  <div className="flex justify-center items-center">
+                    <Profile
+                      setValue={(field, value) => {
+                        setForm((prev) => ({ ...prev, [field]: value }));
+                        if (field === "image" && value instanceof File) {
+                          const url = URL.createObjectURL(value);
+                          setImagePreview(url);
+                        }
+                      }}
+                      image={imagePreview}
+                    />
+                  </div>
+
                   <div className="w-full m-0 flex sm:flex-row flex-col items-center justify-center sm:gap-2">
                     <div className="w-full">
-                      <InputFiled
+                      <InputField
                         label="First Name"
                         id="firstname"
                         name="firstname"
                         value={form.firstname}
                         onChange={handleChange}
                         placeholder="Enter first name"
-                        error={errors.firstname}
+                        error={error?.firstname?.[0] || ""}
                       />
                     </div>
-
                     <div className="w-full">
-                      {" "}
-                      <InputFiled
+                      <InputField
                         label="Last Name"
                         id="lastname"
                         name="lastname"
                         value={form.lastname}
                         onChange={handleChange}
                         placeholder="Enter last name"
-                        error={errors.lastname}
+                        error={error?.lastname?.[0] || ""}
                       />
                     </div>
                     <div className="w-full">
-                      {" "}
-                      <InputFiled
+                      <InputField
                         label="Middle Initial"
                         id="middleInitial"
                         name="middleInitial"
                         value={form.middleInitial}
                         onChange={handleChange}
                         placeholder="Enter middle initial"
-                        error={errors.middleInitial}
+                        error={error?.middleInitial?.[0] || ""}
                       />
                     </div>
                   </div>
 
-                  <InputFiled
+                  <InputField
                     label="Email"
                     id="email"
                     name="email"
@@ -141,27 +196,36 @@ const Register: React.FC<RegisterProps> = ({
                     value={form.email}
                     onChange={handleChange}
                     placeholder="Enter email"
-                    error={errors.email}
+                    error={error?.email?.[0] || ""}
                   />
-                  <InputFiled
+
+                  <SelectField
                     label="Designation"
                     id="designation"
                     name="designation"
                     value={form.designation}
                     onChange={handleChange}
-                    placeholder="e.g. Instructor"
-                    error={errors.designation}
+                    error={error?.designation?.[0] || ""}
+                    options={designationList?.map((designation) => ({
+                      value: designation.designation,
+                      label: designation.designation,
+                    }))}
                   />
-                  <InputFiled
-                    label="Department"
+
+                  <SelectField
+                    label="Program"
                     id="department"
                     name="department"
                     value={form.department}
                     onChange={handleChange}
-                    placeholder="e.g. IT Department"
-                    error={errors.department}
+                    error={error?.department?.[0] || ""}
+                    options={program?.map((program) => ({
+                      value: program.programCode,
+                      label: program.programName,
+                    }))}
                   />
-                  <InputFiled
+
+                  <InputField
                     label="Password"
                     id="password"
                     name="password"
@@ -169,9 +233,10 @@ const Register: React.FC<RegisterProps> = ({
                     value={form.password}
                     onChange={handleChange}
                     placeholder="Enter password"
-                    error={errors.password}
+                    error={error?.password?.[0] || ""}
                   />
-                  <InputFiled
+
+                  <InputField
                     label="Confirm Password"
                     id="confirmPassword"
                     name="confirmPassword"
@@ -179,7 +244,7 @@ const Register: React.FC<RegisterProps> = ({
                     value={form.confirmPassword}
                     onChange={handleChange}
                     placeholder="Confirm password"
-                    error={errors.confirmPassword}
+                    error={error?.confirmPassword?.[0] || ""}
                   />
 
                   <Button

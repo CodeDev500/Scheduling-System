@@ -20,17 +20,21 @@ interface AuthState {
   user: User | null;
   loading: boolean;
   error: Record<string, string[]> | null;
+  loginError: Record<string, string[]> | null;
+  registerError: Record<string, string[]> | null;
 }
 
 const initialState: AuthState = {
   user: null,
   loading: false,
   error: null,
+  loginError: null,
+  registerError: null,
 };
 export const login = createAsyncThunk<
   LoginResponse,
   LoginProps,
-  { rejectValue: Record<string, string[]> } // custom type for form errors
+  { rejectValue: Record<string, string[]> | string }
 >("/auth/login", async (data, { rejectWithValue }) => {
   try {
     const response = await axios.post<LoginResponse>("/auth/login", data);
@@ -40,8 +44,9 @@ export const login = createAsyncThunk<
       if (error.response?.data?.errors) {
         return rejectWithValue(error.response.data.errors);
       }
+      return rejectWithValue(error.response?.data?.message || "Login failed");
     }
-    return rejectWithValue({ general: ["Login failed"] });
+    return rejectWithValue("Login failed");
   }
 });
 
@@ -64,21 +69,26 @@ export const fetchUser = createAsyncThunk<User, void, { rejectValue: string }>(
 
 export const register = createAsyncThunk<
   User,
-  Partial<User>,
+  FormData, // 🔄 changed from Partial<User> to FormData
   { rejectValue: Record<string, string[]> }
 >("/auth/register", async (data, { rejectWithValue }) => {
   try {
-    const response = await axios.post<User>("/auth/register", data);
+    const response = await axios.post<User>("/auth/register", data, {
+      headers: {
+        "Content-Type": "multipart/form-data", // ✅ important for file upload
+      },
+    });
     console.log(response.data);
     return response.data;
   } catch (error: unknown) {
-    console.log(error);
     if (isAxiosError(error)) {
       if (error.response?.data?.errors) {
         return rejectWithValue(error.response.data.errors);
       }
+      return rejectWithValue(error.response?.data?.message || "Login failed");
     }
-    return rejectWithValue({ general: ["Login failed"] });
+    console.log(error);
+    return rejectWithValue({ general: ["Registration failed"] });
   }
 });
 
@@ -101,19 +111,26 @@ export const logout = createAsyncThunk<void, void, { rejectValue: string }>(
 const authSlice = createSlice({
   name: "auth",
   initialState,
-  reducers: {},
+  reducers: {
+    clearRegisterError: (state) => {
+      state.registerError = null;
+    },
+    clearLoginError: (state) => {
+      state.loginError = null;
+    },
+  },
   extraReducers: (builder) => {
     builder
       .addCase(login.pending, (state) => {
         state.loading = true;
-        state.error = null;
+        state.loginError = null;
       })
       .addCase(
         login.fulfilled,
         (state, action: PayloadAction<LoginResponse>) => {
           state.loading = false;
           state.user = action.payload.user;
-          state.error = null;
+          state.loginError = null;
           if (action.payload.accessToken) {
             Cookies.set("accessToken", action.payload.accessToken);
           }
@@ -121,7 +138,7 @@ const authSlice = createSlice({
       )
       .addCase(login.rejected, (state, action) => {
         state.loading = false;
-        state.error = action.payload || { general: ["Login failed"] };
+        state.loginError = action.payload as Record<string, string[]>;
       })
       .addCase(fetchUser.pending, (state) => {
         state.loading = true;
@@ -143,19 +160,22 @@ const authSlice = createSlice({
       .addCase(register.fulfilled, (state, action) => {
         state.loading = false;
         state.user = action.payload;
-        state.error = null;
+        state.registerError = null;
       })
       .addCase(register.rejected, (state, action) => {
         state.loading = false;
-        state.error = action.payload || { general: ["Registration failed"] };
+        state.registerError = action.payload || {
+          general: ["Registration failed"],
+        };
       })
       .addCase(logout.fulfilled, (state) => {
         state.loading = false;
         state.user = null;
-        state.error = null;
+        state.registerError = null;
         Cookies.remove("accessToken");
       });
   },
 });
 
+export const { clearRegisterError, clearLoginError } = authSlice.actions;
 export default authSlice.reducer;

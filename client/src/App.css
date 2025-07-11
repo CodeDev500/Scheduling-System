@@ -1,8 +1,11 @@
 @import "tailwindcss";
 
 * {
-  padding: 0;
-  margin: 0;
   box-sizing: border-box;
   font-family: "Poppins", sans-serif;
+}
+
+@theme {
+  --color-primary: #aa0022;
+  --color-primary_hover: #8a001a;
 }

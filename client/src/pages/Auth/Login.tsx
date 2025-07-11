@@ -1,10 +1,10 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import InputFiled from "../../components/input_field/InputField";
 import Button from "../../components/buttons/Button";
-import { login } from "../../services/authSlice";
+import { login, clearLoginError } from "../../services/authSlice";
 import { useAppDispatch, useAppSelector } from "../../hooks/redux";
 import { useNavigate } from "react-router-dom";
-
+import { useToast } from "../../hooks/useToast";
 type LoginProps = {
   isOpen: boolean;
   closeModal: () => void;
@@ -15,21 +15,32 @@ const Login: React.FC<LoginProps> = ({
   closeModal,
   toggleRegisterModal,
 }) => {
+  const toast = useToast();
   const navigate = useNavigate();
   const dispatch = useAppDispatch();
-  const error = useAppSelector((state) => state.auth.error);
+  const error = useAppSelector((state) => state.auth.loginError);
   const [email, setEmail] = useState<string>("");
   const [password, setPassword] = useState<string>("");
 
-  const handleSubmit = (e: React.FormEvent) => {
+  useEffect(() => {
+    return () => {
+      dispatch(clearLoginError());
+    };
+  }, [dispatch]);
+
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     const data = { email, password };
-    dispatch(login(data));
 
-    if (!error) {
-      navigate("/dashboard");
+    try {
+      await dispatch(login(data)).unwrap();
+      toast.success("Login successful");
+      navigate("/dashboard"); // only runs on success
+    } catch (err) {
+      toast.error(err as string);
     }
   };
+
   return (
     <>
       {isOpen && (
