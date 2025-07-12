@@ -1,17 +1,8 @@
-// import { useNavigate } from "react-router-dom";
-// import Cookies from "js-cookie";
 import Img404 from "../../assets/images/undraw_page_not_found_re_e9o6 (2).svg";
+import { useNavigate } from "react-router-dom";
 
 function PageNotFound() {
-  //   const navigate = useNavigate();
-  //   const goBack = () => {
-  //     const userId = Cookies.get("userId");
-  //     if (!userId) {
-  //       navigate("/home");
-  //     } else {
-  //       window.history.back();
-  //     }
-  //   };
+  const navigate = useNavigate();
 
   return (
     <>
@@ -28,8 +19,8 @@ function PageNotFound() {
           <div className="mt-10 flex items-center justify-center gap-x-6">
             {/* Use the goBack function when the button is clicked */}
             <button
-              //   onClick={goBack}
-              className="rounded-md bg-[#AA0022] px-3.5 py-2.5 text-sm font-semibold text-white shadow-sm hover:bg-[#702d3b] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-indigo-600"
+              onClick={() => navigate(-1)}
+              className="rounded-md bg-[#AA0022] px-3.5 py-2.5 text-sm font-semibold text-white shadow-sm hover:bg-[#702d3b] focus-visible:outline-offset-2 focus-visible:outline-indigo-600"
             >
               Go back
             </button>

@@ -2,7 +2,6 @@ import React, { useEffect, useState } from "react";
 import type { ChangeEvent, FormEvent } from "react";
 import sentImage from "../../assets/images/send-email.jpg";
 import "./otp.css";
-import { useNavigate } from "react-router-dom";
 import api from "../../api/axios";
 import { toastUtils } from "../../hooks/useToast";
 
@@ -53,6 +52,7 @@ const VerifyOTP: React.FC<VerifyOTPProps> = ({ email, closeOTP }) => {
       }
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
     } catch (error: any) {
+      setLoading(false);
       setErrorMessage(error?.response.data.message);
       console.error("Registration failed:", error);
     }
@@ -105,10 +105,34 @@ const VerifyOTP: React.FC<VerifyOTPProps> = ({ email, closeOTP }) => {
         <button
           type="submit"
           className={`verifyButton ${
-            disableSubmit ? "cursor-not-allowed" : "cursor-pointer"
+            disableSubmit || loading ? "cursor-not-allowed" : "cursor-pointer"
           }`}
-          disabled={disableSubmit}
+          disabled={disableSubmit || loading}
         >
+          {loading && (
+            <svg
+              aria-hidden="true"
+              role="status"
+              className="inline w-4 h-4 text-white animate-spin"
+              viewBox="0 0 24 24"
+              fill="none"
+              xmlns="http://www.w3.org/2000/svg"
+            >
+              <circle
+                className="opacity-25"
+                cx="12"
+                cy="12"
+                r="10"
+                stroke="currentColor"
+                strokeWidth="4"
+              ></circle>
+              <path
+                className="opacity-75"
+                fill="currentColor"
+                d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"
+              ></path>
+            </svg>
+          )}
           Verify
         </button>
 

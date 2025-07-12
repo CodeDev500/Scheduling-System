@@ -3,6 +3,7 @@ import { useLocation } from "react-router-dom";
 import { FaBars } from "react-icons/fa";
 import { IoMdNotificationsOutline } from "react-icons/io";
 import userIcon from "../../assets/images/user (1).png";
+import NavProfile from "../NavProfile";
 
 interface NavDashboardProps {
   handleBurger: () => void;
@@ -12,6 +13,7 @@ interface NavDashboardProps {
 const NavDashboard: React.FC<NavDashboardProps> = ({ handleBurger }) => {
   const location = useLocation();
   const [unread, setUnread] = useState(2);
+  const [showProfile, setShowProfile] = useState(false);
 
   const pageTitles: { [key: string]: string } = {
     "/dashboard": "Dashboard",
@@ -54,8 +56,17 @@ const NavDashboard: React.FC<NavDashboardProps> = ({ handleBurger }) => {
             <img
               src={userIcon}
               alt="User"
+              onClick={() => setShowProfile(!showProfile)}
               className="h-10 w-10 rounded-full cursor-pointer bg-gray-100"
             />
+            {showProfile && (
+              <div
+                // onMouseLeave={handleProfile}
+                className="absolute top-12 right-5 text-sm"
+              >
+                <NavProfile />
+              </div>
+            )}
           </div>
         </div>
       </div>

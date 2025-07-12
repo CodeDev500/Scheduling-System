@@ -78,7 +78,6 @@ export const register = createAsyncThunk<
         "Content-Type": "multipart/form-data", // ✅ important for file upload
       },
     });
-    console.log(response.data);
     return response.data;
   } catch (error: unknown) {
     if (isAxiosError(error)) {
@@ -92,21 +91,14 @@ export const register = createAsyncThunk<
   }
 });
 
-export const logout = createAsyncThunk<void, void, { rejectValue: string }>(
-  "/auth/logout",
-  async (_, { rejectWithValue }) => {
-    try {
-      await axios.post("/auth/logout");
-    } catch (error: unknown) {
-      if (isAxiosError(error)) {
-        return rejectWithValue(
-          error.response?.data?.message || "Logout failed"
-        );
-      }
-      return rejectWithValue("Logout failed");
-    }
+export const logout = createAsyncThunk("/auth/logout", async () => {
+  try {
+    const response = await axios.post("/auth/logout");
+    return response.data;
+  } catch (error: unknown) {
+    console.error(error);
   }
-);
+});
 
 const authSlice = createSlice({
   name: "auth",

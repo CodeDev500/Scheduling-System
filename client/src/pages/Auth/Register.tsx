@@ -27,6 +27,7 @@ const Register: React.FC<RegisterProps> = ({
   const toast = useToast();
   const [imagePreview, setImagePreview] = useState<string>("");
   const [showOTPModal, setShowOTPModal] = useState(false);
+  const [loading, setLoading] = useState(false);
 
   const [form, setForm] = useState({
     image: null as File | null,
@@ -69,6 +70,7 @@ const Register: React.FC<RegisterProps> = ({
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
 
+    setLoading(true);
     const formData = new FormData();
     for (const key in form) {
       const value = form[key as keyof typeof form];
@@ -82,6 +84,7 @@ const Register: React.FC<RegisterProps> = ({
       toast.success(`OTP sent to ${form.email}`);
       setShowOTPModal(true);
     } catch (err) {
+      setLoading(false);
       toast.error(err as string);
       console.error("Registration failed:", err);
     }
@@ -251,6 +254,8 @@ const Register: React.FC<RegisterProps> = ({
                     type="submit"
                     label="Register"
                     className="w-full"
+                    isLoading={loading}
+                    disabled={loading}
                     onClick={handleSubmit}
                   />
 
