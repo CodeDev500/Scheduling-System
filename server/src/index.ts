@@ -7,8 +7,9 @@ import cookieParser from "cookie-parser";
 import bodyParser from "body-parser";
 
 import { verifyToken } from "./middlewares/verifyToken";
-import authRoutes from "./routes/auth.router";
 import { refreshToken } from "./middlewares/refreshToken";
+import authRoutes from "./routes/auth.router";
+import userRoutes from "./routes/user.router";
 
 dotenv.config();
 const PORT: number = process.env.PORT ? parseInt(process.env.PORT) : 3000;
@@ -36,15 +37,18 @@ app.get("/uploads/:filename", (req: Request, res: Response) => {
 });
 
 app.use("/auth", authRoutes);
-
 app.post("/refresh", refreshToken);
-
-app.use("/protected", verifyToken, async (req, res) => {
+app.use("/protected", verifyToken, async (req: Request, res: Response) => {
   res.json({
+    user: req.user?.user,
     message: "You are authorized to access this protected resouces",
   });
   return;
 });
+
+// check verify user middleware
+app.use(verifyToken);
+app.use("/user", userRoutes);
 
 app.listen(PORT, () => {
   console.log(`Server running on port ${PORT}`);

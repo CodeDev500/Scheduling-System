@@ -1,14 +1,24 @@
 import nodemailer, { Transporter, SendMailOptions } from "nodemailer";
 const { AUTH_EMAIL, AUTH_GENERATED_PASS } = process.env;
 
-const transporter: Transporter = nodemailer.createTransport({
-  service: "gmail",
+// const transporter: Transporter = nodemailer.createTransport({
+//   service: "gmail",
+//   host: "smtp.gmail.com",
+//   port: 465,
+//   secure: true,
+//   auth: {
+//     user: AUTH_EMAIL,
+//     pass: AUTH_GENERATED_PASS,
+//   },
+// });
+
+const transporter = nodemailer.createTransport({
   host: "smtp.gmail.com",
-  port: 465,
-  secure: true,
+  port: 587,
+  secure: false,
   auth: {
-    user: AUTH_EMAIL,
-    pass: AUTH_GENERATED_PASS,
+    user: process.env.AUTH_EMAIL,
+    pass: process.env.AUTH_GENERATED_PASS,
   },
 });
 

@@ -1,6 +1,7 @@
 import { db } from "../utils/db.server";
 import { User } from "@prisma/client";
 import { statusList, UserStatus } from "../constants/constants";
+import { UserRegisterInput } from "../schema/user.schema";
 
 export const listUsers = async (): Promise<User[]> => {
   return db.user.findMany({
@@ -39,7 +40,9 @@ export const getUserByEmail = async (email: string): Promise<User | null> => {
   });
 };
 
-export const createUser = async (data: User): Promise<User> => {
+export const createUser = async (
+  data: UserRegisterInput
+): Promise<UserRegisterInput> => {
   const {
     image,
     firstname,
@@ -83,7 +86,10 @@ export const createUser = async (data: User): Promise<User> => {
     },
   });
 };
-export const updateUser = async (id: number, data: User): Promise<User> => {
+export const updateUser = async (
+  id: number,
+  data: UserRegisterInput
+): Promise<UserRegisterInput> => {
   return db.user.update({
     where: { id },
     data,
@@ -102,6 +108,13 @@ export const updateUser = async (id: number, data: User): Promise<User> => {
       createdAt: true,
       updatedAt: true,
     },
+  });
+};
+
+export const updatePassword = async (email: string, password: string) => {
+  return db.user.update({
+    where: { email },
+    data: { password },
   });
 };
 

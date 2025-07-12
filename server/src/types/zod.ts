@@ -16,7 +16,5 @@ export const envSchema = z.object({
   AUTH_GENERATED_PASS: z.string().optional(),
 });
 
-export type TUserRegister = Omit<User, "id" | "createdAt" | "updatedAt">;
-
 // ✅ Inferred TypeScript type from ENV schema
 export type EnvSchema = z.infer<typeof envSchema>;

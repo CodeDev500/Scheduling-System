@@ -62,14 +62,17 @@ export const verifyOTP = async (req: Request, res: Response) => {
     if (updateStatus) {
       await sendNotification({
         email,
-        subject: "Account Verified",
-        message: "Your account has been verified successfully.",
+        subject: "WMSU OptiSched Account Verified",
+        message:
+          "Your account has been verified successfully. Please wait for admin approval.",
       });
     }
 
     await OtpService.deleteOTP(email);
 
-    res.status(200).json({ message: "OTP verified successfully" });
+    res
+      .status(200)
+      .json({ message: "OTP verified successfully", status: "success" });
     return;
   } catch (error: any) {
     console.error("verifyOTP error:", error);
@@ -91,7 +94,11 @@ export const resendOTP = async (req: Request, res: Response) => {
 
     const createdOTP = await sendOTPController(email);
 
-    res.status(200).json({ message: "OTP resent successfully", createdOTP });
+    res.status(200).json({
+      message: "OTP resent successfully",
+      createdOTP,
+      status: "success",
+    });
   } catch (error: any) {
     console.error("resendOTP error:", error);
     res.status(500).json({ message: error.message });
