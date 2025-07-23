@@ -6,7 +6,7 @@ require("dotenv").config();
 type TPayload = { user: User };
 
 export const generateToken = (payload: TPayload): string => {
-  return jwt.sign(payload, process.env.ACCESS_TOKEN!, { expiresIn: "1h" });
+  return jwt.sign(payload, process.env.ACCESS_TOKEN!, { expiresIn: "1d" });
 };
 
 export const generateRefreshToken = (payload: TPayload): string => {
@@ -19,7 +19,7 @@ export const setTokens = (res: Response, user: User): string => {
 
   res.cookie("accessToken", accessToken, {
     // httpOnly: true,
-    maxAge: 60 * 60 * 1000, // 1 hour in milliseconds
+    maxAge: 26 * 60 * 60 * 1000, // 1 day in milliseconds
     // secure: true,
     // sameSite: "none",
   });

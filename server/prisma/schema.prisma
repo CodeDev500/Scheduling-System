@@ -30,17 +30,17 @@ model User {
 
 model CurriculumCourse {
   id             Int      @id @default(autoincrement())
-  curriculumYear String
-  programCode    String
-  programName    String
-  courseCode     String
-  courseName     String
+  curriculumYear String?
+  programCode    String?
+  programName    String?
+  subjectCode     String?
+  subjectDescription     String?
   lec            Int?
   lab            Int?
-  units          Int
-  hours          Int
-  period         String
-  yearLevel      String
+  units          Int?
+  hours          Int?
+  period         String?
+  yearLevel      String?
   createdAt      DateTime @default(now())
   updatedAt      DateTime @updatedAt
 
@@ -59,7 +59,7 @@ model CourseOffering {
   createdAt    DateTime @default(now())
   updatedAt    DateTime @updatedAt
 
-  curriculumCourse CurriculumCourse @relation(fields: [curriculumId], references: [id], onUpdate: Cascade)
+  curriculumCourse CurriculumCourse @relation(fields: [curriculumId], references: [id], onUpdate: Cascade, onDelete: Cascade)
 
   @@map("course_offerings")
 }
