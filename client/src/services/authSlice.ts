@@ -54,10 +54,13 @@ export const fetchUser = createAsyncThunk<User, void, { rejectValue: string }>(
   "/auth/fetchUser",
   async (_, { rejectWithValue }) => {
     try {
-      const response = await axios.get<User>("/protected", {
-        withCredentials: true,
-      });
-      return response.data;
+      const response = await axios.get<{ user: User; message: string }>(
+        "/protected",
+        {
+          withCredentials: true,
+        }
+      );
+      return response.data.user;
     } catch (error: unknown) {
       if (isAxiosError(error)) {
         return rejectWithValue(error.response?.data?.message || "Unauthorized");
