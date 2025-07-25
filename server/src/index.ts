@@ -11,6 +11,8 @@ import { refreshToken } from "./middlewares/refreshToken";
 import authRoutes from "./routes/auth.router";
 import userRoutes from "./routes/user.router";
 import subjectRoutes from "./routes/subjects.router";
+import academicProgramRoutes from "./routes/academicProgram.router";
+import curriculumRoutes from "./routes/curriculumCourse.router";
 
 dotenv.config();
 const PORT: number = process.env.PORT ? parseInt(process.env.PORT) : 3000;
@@ -51,6 +53,8 @@ app.use("/protected", verifyToken, async (req: Request, res: Response) => {
 app.use(verifyToken);
 app.use("/user", userRoutes);
 app.use("/subject", subjectRoutes);
+app.use("/program", academicProgramRoutes);
+app.use("/curriculum", curriculumRoutes);
 
 app.listen(PORT, () => {
   console.log(`Server running on port ${PORT}`);

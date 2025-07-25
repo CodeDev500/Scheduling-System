@@ -28,6 +28,19 @@ model User {
   @@map("users")
 }
 
+model Subject {
+  id                 Int      @id @default(autoincrement())
+  subjectCode        String   @unique
+  subjectDescription String
+  lec                Int      @default(0)
+  lab                Int      @default(0)
+  units              Int      @default(0)
+  createdAt          DateTime @default(now())
+  updatedAt          DateTime @updatedAt
+
+  @@map("subjects")
+}
+
 model CurriculumCourse {
   id             Int      @id @default(autoincrement())
   curriculumYear String?
@@ -43,7 +56,6 @@ model CurriculumCourse {
   yearLevel      String?
   createdAt      DateTime @default(now())
   updatedAt      DateTime @updatedAt
-
   courseOfferings CourseOffering[]
 
   @@map("curriculum_courses")
@@ -51,36 +63,38 @@ model CurriculumCourse {
 
 model CourseOffering {
   id           Int      @id @default(autoincrement())
-  courseType   String
-  curriculumId Int
+  courseType   String?
+  curriculumId Int?
   description  String?
-  sectionName  String
+  sectionName  String?
   yearLevel    String
   createdAt    DateTime @default(now())
   updatedAt    DateTime @updatedAt
 
-  curriculumCourse CurriculumCourse @relation(fields: [curriculumId], references: [id], onUpdate: Cascade, onDelete: Cascade)
-
+  curriculumCourse CurriculumCourse? @relation(fields: [curriculumId], references: [id], onUpdate: Cascade, onDelete: Cascade)
+  roomSchedules     RoomSchedules[]
   @@map("course_offerings")
 }
 
 model RoomSchedules {
-  id           Int      @id @default(autoincrement())
-  day          String
-  timeStarts   String
-  timeEnds     String
-  room         String
-  offeringId   Int?
-  instructorId Int?
-  isActive     Boolean
-  isLoaded     Int
-  createdAt    DateTime @default(now())
-  updatedAt    DateTime @updatedAt
+  id             Int      @id @default(autoincrement())
+  day            String
+  timeStarts     String
+  timeEnds       String
+  room           String?
+  offeringId     Int? // Optional
+  instructorId   Int?
+  isActive       Boolean
+  isLoaded       Int
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
 
-  instructor User? @relation(fields: [instructorId], references: [id], onUpdate: Cascade)
+  instructor      User?           @relation(fields: [instructorId], references: [id], onUpdate: Cascade)
+  courseOffering  CourseOffering? @relation(fields: [offeringId], references: [id], onUpdate: Cascade, onDelete: Cascade)
 
   @@map("room_schedules")
 }
+
 
 model AcademicProgram {
   id          Int      @id @default(autoincrement())
