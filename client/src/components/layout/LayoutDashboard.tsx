@@ -14,15 +14,13 @@ const LayoutDashboard: React.FC<LayoutDashboardProps> = ({ children }) => {
   };
 
   return (
-    <div className="flex min-h-screen">
+    <div className="flex h-screen ">
       <div>
         <Sidebar sidebar={sidebar} handleBurger={handleBurger} />
       </div>
-      <div className="flex flex-col">
+      <div className="flex flex-col w-full">
         <NavbarDashboard handleBurger={handleBurger} sidebar={sidebar} />
-        <div
-          className={`flex-grow bg-white w-full p-4 mt-20 mx-2 overflow-y-auto`}
-        >
+        <div className={`flex-grow bg-white w-full p-4 mt-20 overflow-y-auto`}>
           {children}
         </div>
       </div>

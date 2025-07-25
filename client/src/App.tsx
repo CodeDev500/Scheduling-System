@@ -4,6 +4,8 @@ import { UserRoles } from "./constants/constants";
 import { Routes, Route } from "react-router-dom";
 import { ToastContainer } from "react-toastify";
 
+import ProtectedRoute from "./protected_route/ProtectedRoute";
+
 import PageNotFound from "./pages/PageNotFound/PageNotFound";
 import LayoutHome from "./components/layout/LayoutHome";
 import LayoutDashboard from "./components/layout/LayoutDashboard";
@@ -13,6 +15,17 @@ import About from "./pages/About/About";
 import ContactUs from "./pages/ContactUs/ContactUs";
 
 import Dashboard from "./pages/CampusAdmin/Dashboard/CampusAdminDashboard";
+import ViewSchedules from "./pages/CampusAdmin/ViewSchedules/ViewSchedules";
+import TeachingLoad from "./pages/CampusAdmin/TeachingLoad/TeachingLoad";
+import ManageUser from "./pages/CampusAdmin/ManageUser/ManageUser";
+import FacultyProfile from "./pages/CampusAdmin/FacultyProfile/FacultyProfile";
+
+import RegistrarDashboard from "./pages/Registrar/Dashboard/Dashboard";
+import Prospectus from "./pages/Registrar/ProspectusManagement/Prospectus";
+import Schedules from "./pages/Registrar/Schedules/Schedules";
+import Subjects from "./pages/Registrar/Subjects/Subjects";
+import CourseOffering from "./pages/Registrar/CourseEffering/CourseOffering";
+import ManageProspectus from "./pages/Registrar/ProspectusManagement/ManageProspectus";
 
 function App() {
   const sharedLinks: ArrayLink[] = [
@@ -44,6 +57,59 @@ function App() {
       path: "/admin-dashboard",
       component: <Dashboard />,
     },
+    {
+      title: "View Schedules",
+      path: "/view-schedules",
+      component: <Schedules />,
+    },
+    {
+      title: "Prospectus",
+      path: "/prospectus",
+      component: <Prospectus />,
+    },
+    {
+      title: "View Teaching Load",
+      path: "/teaching-load",
+      component: <TeachingLoad />,
+    },
+    {
+      title: "Manage User",
+      path: "/manage-user",
+      component: <ManageUser />,
+    },
+  ];
+
+  const registrarLinks: ArrayLink[] = [
+    {
+      title: "Registrar Dashboard",
+      path: "/registrar-dashboard",
+      component: <RegistrarDashboard />,
+    },
+    {
+      title: "Subjects",
+      path: "/subjects",
+      component: <Subjects />,
+    },
+    {
+      title: "Schedules",
+      path: "/registrar-schedules",
+      component: <Schedules />,
+    },
+    {
+      title: "Prospectus",
+      path: "/registrar-prospectus",
+      component: <Prospectus />,
+    },
+    {
+      title: "Course Offering",
+      path: "/course/:programCode",
+      component: <CourseOffering />,
+    },
+    {
+      title: "Manage Prospectus",
+      path: "/manage-prospectus/:programCode/:yearLevel",
+      component: <ManageProspectus />,
+    },
   ];
   return (
     <>
@@ -55,6 +121,30 @@ function App() {
             path={link.path}
             element={<LayoutHome>{link.component}</LayoutHome>}
           />
+        ))}
+
+        {registrarLinks?.map((link) => (
+          <Route
+            key={link.title}
+            element={<ProtectedRoute allowedRoles={[UserRoles[2]]} />}
+          >
+            <Route
+              path={link.path}
+              element={<LayoutDashboard>{link.component}</LayoutDashboard>}
+            />
+          </Route>
+        ))}
+
+        {campusAdminLinks.map((link) => (
+          <Route
+            key={link.title}
+            element={<ProtectedRoute allowedRoles={[UserRoles[3]]} />}
+          >
+            <Route
+              path={link.path}
+              element={<LayoutDashboard>{link.component}</LayoutDashboard>}
+            />
+          </Route>
         ))}
 
         <Route

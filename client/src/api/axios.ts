@@ -8,15 +8,15 @@ interface CustomAxiosRequestConfig extends AxiosRequestConfig {
 
 const api: AxiosInstance = axios.create({
   baseURL: "http://localhost:3001",
-  headers: {
-    "Content-Type": "application/json",
-  },
+  // headers: {
+  //   "Content-Type": "application/json",
+  // },
   withCredentials: true,
 });
 
 api.interceptors.request.use(
   (config) => {
-    const token: string | undefined = Cookie.get("token");
+    const token: string | undefined = Cookie.get("accessToken");
     if (token && config.headers) {
       config.headers.Authorization = `Bearer ${token}`;
     }

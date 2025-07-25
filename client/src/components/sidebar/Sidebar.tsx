@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState, type JSX } from "react";
 import { Link } from "react-router-dom";
 import { IoSettingsSharp } from "react-icons/io5";
 import { FaUsers } from "react-icons/fa";
@@ -9,6 +9,19 @@ import { TbReportAnalytics } from "react-icons/tb";
 import { BiLogOut } from "react-icons/bi";
 import { FiChevronDown, FiChevronRight } from "react-icons/fi";
 import Logo from "../../assets/images/optischedlogo-Photoroom.png";
+import { useAppSelector } from "../../hooks/redux";
+import { UserRoles } from "../../constants/constants";
+import { FaRegListAlt } from "react-icons/fa";
+
+type LinkItem = {
+  title: string;
+  path: string;
+  src: JSX.Element;
+  sublinks?: {
+    title: string;
+    path: string;
+  }[];
+};
 
 export type SidebarProps = {
   sidebar: boolean;
@@ -16,29 +29,121 @@ export type SidebarProps = {
 };
 
 const Sidebar = ({ sidebar, handleBurger }: SidebarProps) => {
+  const user = useAppSelector((state) => state.auth.user);
+  const [links, setLinks] = useState<LinkItem[]>([]);
+
   const [isUserManagementOpen, setIsUserManagementOpen] = useState(false);
 
-  const sidebarLinks = [
-    { title: "Dashboard", path: "/admin-dashboard", src: <MdSpaceDashboard /> },
-    { title: "View Schedules", path: "/schedules", src: <AiOutlineCalendar /> },
-    {
-      title: "User Management",
-      path: "/users",
-      src: <FaUsers />,
-      sublinks: [
-        { title: "Faculty", path: "/users/faculty" },
-        { title: "Campus Administrator", path: "/users/campus-administrator" },
-        { title: "ESU Registrar", path: "/users/esu-registrar" },
-      ],
-    },
-    {
-      title: "View Teaching Load",
-      path: "/teaching-load",
-      src: <GiTeacher />,
-    },
-    { title: "Reports", path: "/report", src: <TbReportAnalytics /> },
-    { title: "Settings", path: "/settings", src: <IoSettingsSharp /> },
-  ];
+  useEffect(() => {
+    const adminLinks = [
+      {
+        title: "Dashboard",
+        path: "/admin-dashboard",
+        src: <MdSpaceDashboard />,
+      },
+      {
+        title: "View Schedules",
+        path: "/schedules",
+        src: <AiOutlineCalendar />,
+      },
+      {
+        title: "User Management",
+        path: "/users",
+        src: <FaUsers />,
+        sublinks: [
+          { title: "Faculty", path: "/users/faculty" },
+          {
+            title: "Campus Administrator",
+            path: "/users/campus-administrator",
+          },
+          { title: "ESU Registrar", path: "/users/esu-registrar" },
+        ],
+      },
+      {
+        title: "View Teaching Load",
+        path: "/teaching-load",
+        src: <GiTeacher />,
+      },
+      { title: "Reports", path: "/report", src: <TbReportAnalytics /> },
+      { title: "Settings", path: "/settings", src: <IoSettingsSharp /> },
+    ];
+
+    const registrarLinks = [
+      {
+        title: "Dashboard",
+        path: "/registrar-dashboard",
+        src: <MdSpaceDashboard />,
+      },
+      {
+        title: "Subjects",
+        path: "/subjects",
+        src: <FaRegListAlt />,
+      },
+      {
+        title: "View Schedules",
+        path: "/registrar-schedules",
+        src: <AiOutlineCalendar />,
+      },
+      {
+        title: "Prospectus Management",
+        path: "/registrar-prospectus",
+        src: <TbReportAnalytics />,
+      },
+    ];
+
+    const departmentHeadLinks = [
+      {
+        title: "Dashboard",
+        path: "/department-head-dashboard",
+        src: <MdSpaceDashboard />,
+      },
+      {
+        title: "Schedule Management",
+        path: "/department-head-schedules",
+        src: <AiOutlineCalendar />,
+      },
+      {
+        title: "Faculty Profile",
+        path: "/department-head-faculty",
+        src: <GiTeacher />,
+      },
+      {
+        title: "View Teaching Load",
+        path: "/department-head-teaching-load",
+        src: <TbReportAnalytics />,
+      },
+    ];
+
+    const facultyLinks = [
+      {
+        title: "Dashboard",
+        path: "/faculty-dashboard",
+        src: <MdSpaceDashboard />,
+      },
+      {
+        title: "View Schedules",
+        path: "/faculty-schedules",
+        src: <AiOutlineCalendar />,
+      },
+      {
+        title: "View Teaching Load",
+        path: "/faculty-teaching-load",
+        src: <TbReportAnalytics />,
+      },
+    ];
+
+    if (user) {
+      if (user.role === UserRoles[0]) {
+        setLinks(facultyLinks);
+      } else if (user.role === UserRoles[1]) {
+        setLinks(departmentHeadLinks);
+      } else if (user.role === UserRoles[2]) {
+        setLinks(registrarLinks);
+      } else {
+        setLinks(adminLinks);
+      }
+    }
+  }, [user]);
 
   const toggleUserManagement = () => {
     setIsUserManagementOpen(!isUserManagementOpen);
@@ -58,7 +163,7 @@ const Sidebar = ({ sidebar, handleBurger }: SidebarProps) => {
       )}
       <aside
         id="logo-sidebar"
-        className={`fixed top-0 left-0 z-40 w-64 bg-rose-800 h-screen rounded-br-lg transition-transform transform ${
+        className={`fixed top-0 left-0 z-40 w-64 bg-primary h-screen rounded-br-lg transition-transform transform ${
           sidebar ? "translate-x-0" : "-translate-x-full"
         } md:translate-x-0 md:relative md:transform-none`}
         aria-label="Sidebar"
@@ -69,7 +174,7 @@ const Sidebar = ({ sidebar, handleBurger }: SidebarProps) => {
               <img src={Logo} className="h-14 me-3 text-center" alt="Logo" />
             </div>
             <ul className="space-y-2 font-medium">
-              {sidebarLinks.map((menu, index) => (
+              {links.map((menu, index) => (
                 <li key={index}>
                   {menu.sublinks ? (
                     <div>

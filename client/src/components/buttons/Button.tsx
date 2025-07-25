@@ -4,6 +4,7 @@ type ButtonProps = {
   label: string;
   type?: "button" | "submit" | "reset";
   onClick?: React.MouseEventHandler<HTMLButtonElement>;
+  icon?: React.ReactNode;
   variant?: "primary" | "secondary" | "danger";
   disabled?: boolean;
   isLoading?: boolean;
@@ -14,6 +15,7 @@ const Button: React.FC<ButtonProps> = ({
   label,
   type = "button",
   onClick,
+  icon,
   variant = "primary",
   disabled = false,
   isLoading = false,
@@ -38,6 +40,7 @@ const Button: React.FC<ButtonProps> = ({
           : "cursor-pointer"
       } ${className}`}
     >
+      {icon}
       {isLoading && (
         <svg
           aria-hidden="true"

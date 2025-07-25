@@ -18,6 +18,7 @@ const Subjects = () => {
   };
 
   useEffect(() => {
+    dispatch(fetchSubjects());
     if (searchTerm) {
       dispatch(searchSubject(searchTerm));
     } else {

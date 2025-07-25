@@ -135,7 +135,7 @@ const Login: React.FC<LoginProps> = ({
                       </button>
                     </div>
                     <Button
-                      label="Login to your account"
+                      label="Login"
                       type="submit"
                       className="w-full"
                       onClick={handleSubmit}
