@@ -44,7 +44,7 @@ const Login: React.FC<LoginProps> = ({
       if (response.user.role === UserRoles[0]) {
         path = "/faculty-dashboard";
       } else if (response.user.role === UserRoles[1]) {
-        path = "/department-head-dashboard";
+        path = "/program-head-dashboard";
       } else if (response.user.role === UserRoles[2]) {
         path = "/registrar-dashboard";
       } else {

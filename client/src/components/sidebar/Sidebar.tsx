@@ -94,12 +94,12 @@ const Sidebar = ({ sidebar, handleBurger }: SidebarProps) => {
     const departmentHeadLinks = [
       {
         title: "Dashboard",
-        path: "/department-head-dashboard",
+        path: "/program-head-dashboard",
         src: <MdSpaceDashboard />,
       },
       {
         title: "Schedule Management",
-        path: "/department-head-schedules",
+        path: "/schedule-management",
         src: <AiOutlineCalendar />,
       },
       {

@@ -50,7 +50,7 @@ const Subjects: FC<SubjectsProps> = ({ subjects }) => {
           </tr>
         </thead>
         <tbody className="bg-white">
-          {subjects.map((sched, idx) => (
+          {subjects?.map((sched, idx) => (
             <tr
               key={idx}
               className="hover:bg-gray-100 transition-colors duration-150 text-gray-600"

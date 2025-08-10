@@ -27,6 +27,9 @@ import Subjects from "./pages/Registrar/Subjects/Subjects";
 import CourseOffering from "./pages/Registrar/CourseEffering/CourseOffering";
 import ManageProspectus from "./pages/Registrar/ProspectusManagement/ManageProspectus";
 
+import ProgramHeadDashboard from './pages/DepartmentHead/Dashboard/Dashboard'
+import ScheduleManagement from "./pages/DepartmentHead/ScheduleManagement/ScheduleManagement";
+
 function App() {
   const sharedLinks: ArrayLink[] = [
     {
@@ -111,6 +114,19 @@ function App() {
       component: <ManageProspectus />,
     },
   ];
+
+  const programHeadLinks: ArrayLink[] = [
+    {
+      title: "Dashboard",
+      path: "/program-head-dashboard",
+      component: <ProgramHeadDashboard />
+    },
+    {
+      title: "Schedule Management",
+      path: "/schedule-management",
+      component: <ScheduleManagement />
+    }
+  ]
   return (
     <>
       <ToastContainer />
@@ -146,6 +162,18 @@ function App() {
             />
           </Route>
         ))}
+
+        {
+          programHeadLinks.map((link) => (
+            <Route key={link.title}
+            element={<ProtectedRoute allowedRoles={[UserRoles[1]]}/>}
+            >
+              <Route path={link.path}
+              element={<LayoutDashboard >{link.component}</LayoutDashboard>}
+              />
+            </Route>
+          ))
+        }
 
         <Route
           path="/admin-dashboard"
