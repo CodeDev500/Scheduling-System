@@ -8,6 +8,8 @@ async function main() {
 
   // Clear existing data (optional - remove if you want to keep existing data)
   await prisma.notifications.deleteMany();
+  await prisma.userSubject.deleteMany();
+  await prisma.subject.deleteMany();
   await prisma.units_Loads.deleteMany();
   await prisma.roomSchedules.deleteMany();
   await prisma.courseOffering.deleteMany();
@@ -144,6 +146,374 @@ async function main() {
         status: "VERIFIED",
       },
     }),
+
+    // Department Head - BSCRIM
+    prisma.user.create({
+      data: {
+        image: "dept-head-crim.png",
+        firstname: "Dr. Carlos",
+        lastname: "Villanueva",
+        middleInitial: "R",
+        email: "crim.head@university.edu",
+        designation: "Department Head",
+        department: "BSCRIM",
+        password: "depthead123",
+        role: "DEPARTMENT_HEAD",
+        status: "VERIFIED",
+      },
+    }),
+
+    // Department Head - BSSW
+    prisma.user.create({
+      data: {
+        image: "dept-head-sw.png",
+        firstname: "Dr. Maria",
+        lastname: "Gonzales",
+        middleInitial: "T",
+        email: "sw.head@university.edu",
+        designation: "Department Head",
+        department: "BSSW",
+        password: "depthead123",
+        role: "DEPARTMENT_HEAD",
+        status: "VERIFIED",
+      },
+    }),
+
+    // Department Head - BSED
+    prisma.user.create({
+      data: {
+        image: "dept-head-ed.png",
+        firstname: "Dr. Elena",
+        lastname: "Morales",
+        middleInitial: "D",
+        email: "ed.head@university.edu",
+        designation: "Department Head",
+        department: "BSED",
+        password: "depthead123",
+        role: "DEPARTMENT_HEAD",
+        status: "VERIFIED",
+      },
+    }),
+
+    // Faculty - BSCRIM
+    prisma.user.create({
+      data: {
+        image: "faculty-crim1.png",
+        firstname: "Prof. Mark",
+        lastname: "Rodriguez",
+        middleInitial: "S",
+        email: "mark.rodriguez@university.edu",
+        designation: "Assistant Professor",
+        department: "BSCRIM",
+        password: "faculty123",
+        role: "FACULTY",
+        status: "VERIFIED",
+      },
+    }),
+
+    prisma.user.create({
+      data: {
+        image: "faculty-crim2.png",
+        firstname: "Prof. Patricia",
+        lastname: "Santos",
+        middleInitial: "L",
+        email: "patricia.santos@university.edu",
+        designation: "Instructor I",
+        department: "BSCRIM",
+        password: "faculty123",
+        role: "FACULTY",
+        status: "VERIFIED",
+      },
+    }),
+
+    // Faculty - BSSW
+    prisma.user.create({
+      data: {
+        image: "faculty-sw1.png",
+        firstname: "Prof. James",
+        lastname: "Tan",
+        middleInitial: "K",
+        email: "james.tan@university.edu",
+        designation: "Associate Professor",
+        department: "BSSW",
+        password: "faculty123",
+        role: "FACULTY",
+        status: "VERIFIED",
+      },
+    }),
+
+    prisma.user.create({
+      data: {
+        image: "faculty-sw2.png",
+        firstname: "Prof. Grace",
+        lastname: "Lim",
+        middleInitial: "M",
+        email: "grace.lim@university.edu",
+        designation: "Instructor III",
+        department: "BSSW",
+        password: "faculty123",
+        role: "FACULTY",
+        status: "VERIFIED",
+      },
+    }),
+
+    // Faculty - BSED
+    prisma.user.create({
+      data: {
+        image: "faculty-ed1.png",
+        firstname: "Prof. Anna",
+        lastname: "Cruz",
+        middleInitial: "M",
+        email: "anna.cruz@university.edu",
+        designation: "Assistant Professor",
+        department: "BSED",
+        password: "faculty123",
+        role: "FACULTY",
+        status: "VERIFIED",
+      },
+    }),
+
+    // Additional Registrar
+    prisma.user.create({
+      data: {
+        image: "registrar2.png",
+        firstname: "Ms. Carmen",
+        lastname: "Torres",
+        middleInitial: "V",
+        email: "assistant.registrar@university.edu",
+        designation: "Assistant Registrar",
+        department: "Registrar Office",
+        password: "registrar123",
+        role: "REGISTRAR",
+        status: "VERIFIED",
+      },
+    }),
+  ]);
+
+  // 7. Create Subjects
+  console.log("📖 Creating subjects...");
+  const subjects = await Promise.all([
+    // Computer Science Subjects
+    prisma.subject.create({
+      data: {
+        subjectCode: "CS101",
+        subjectDescription: "Introduction to Computing",
+      },
+    }),
+
+    prisma.subject.create({
+      data: {
+        subjectCode: "CS102",
+        subjectDescription: "Computer Programming 1",
+      },
+    }),
+
+    prisma.subject.create({
+      data: {
+        subjectCode: "CS201",
+        subjectDescription: "Data Structures and Algorithms",
+      },
+    }),
+
+    prisma.subject.create({
+      data: {
+        subjectCode: "CS202",
+        subjectDescription: "Object-Oriented Programming",
+      },
+    }),
+
+    prisma.subject.create({
+      data: {
+        subjectCode: "CS301",
+        subjectDescription: "Database Management Systems",
+      },
+    }),
+
+    prisma.subject.create({
+      data: {
+        subjectCode: "CS302",
+        subjectDescription: "Software Engineering",
+      },
+    }),
+
+    // Information Technology Subjects
+    prisma.subject.create({
+      data: {
+        subjectCode: "IT101",
+        subjectDescription: "Introduction to Information Technology",
+      },
+    }),
+
+    prisma.subject.create({
+      data: {
+        subjectCode: "IT201",
+        subjectDescription: "Web Development",
+      },
+    }),
+
+    prisma.subject.create({
+      data: {
+        subjectCode: "IT202",
+        subjectDescription: "Network Administration",
+      },
+    }),
+
+    prisma.subject.create({
+      data: {
+        subjectCode: "IT301",
+        subjectDescription: "Systems Analysis and Design",
+      },
+    }),
+
+    // General Education Subjects
+    prisma.subject.create({
+      data: {
+        subjectCode: "GE101",
+        subjectDescription: "Mathematics in the Modern World",
+      },
+    }),
+
+    prisma.subject.create({
+      data: {
+        subjectCode: "GE102",
+        subjectDescription: "Purposive Communication",
+      },
+    }),
+
+    prisma.subject.create({
+      data: {
+        subjectCode: "GE201",
+        subjectDescription: "Ethics",
+      },
+    }),
+
+    prisma.subject.create({
+      data: {
+        subjectCode: "PE101",
+        subjectDescription: "Physical Education 1",
+      },
+    }),
+
+    prisma.subject.create({
+      data: {
+        subjectCode: "NSTP101",
+        subjectDescription: "National Service Training Program 1",
+      },
+    }),
+  ]);
+
+  // 8. Create Faculty-Subject Assignments
+  console.log("👨‍🏫 Assigning subjects to faculty...");
+  const userSubjectAssignments = await Promise.all([
+    // Prof. Miguel Garcia (CS Faculty) - CS subjects
+    prisma.userSubject.create({
+      data: {
+        userId: users[4].id, // Prof. Miguel Garcia
+        subjectId: subjects[0].id, // CS101
+      },
+    }),
+
+    prisma.userSubject.create({
+      data: {
+        userId: users[4].id, // Prof. Miguel Garcia
+        subjectId: subjects[1].id, // CS102
+      },
+    }),
+
+    prisma.userSubject.create({
+      data: {
+        userId: users[4].id, // Prof. Miguel Garcia
+        subjectId: subjects[2].id, // CS201
+      },
+    }),
+
+    // Prof. Roberto Dela Cruz (CS Faculty) - CS subjects
+    prisma.userSubject.create({
+      data: {
+        userId: users[6].id, // Prof. Roberto Dela Cruz
+        subjectId: subjects[3].id, // CS202
+      },
+    }),
+
+    prisma.userSubject.create({
+      data: {
+        userId: users[6].id, // Prof. Roberto Dela Cruz
+        subjectId: subjects[4].id, // CS301
+      },
+    }),
+
+    prisma.userSubject.create({
+      data: {
+        userId: users[6].id, // Prof. Roberto Dela Cruz
+        subjectId: subjects[5].id, // CS302
+      },
+    }),
+
+    // Prof. Sarah Mendoza (IT Faculty) - IT subjects
+    prisma.userSubject.create({
+      data: {
+        userId: users[5].id, // Prof. Sarah Mendoza
+        subjectId: subjects[6].id, // IT101
+      },
+    }),
+
+    prisma.userSubject.create({
+      data: {
+        userId: users[5].id, // Prof. Sarah Mendoza
+        subjectId: subjects[7].id, // IT201
+      },
+    }),
+
+    prisma.userSubject.create({
+      data: {
+        userId: users[5].id, // Prof. Sarah Mendoza
+        subjectId: subjects[8].id, // IT202
+      },
+    }),
+
+    // Prof. Lisa Fernandez (IT Faculty) - IT and GE subjects
+    prisma.userSubject.create({
+      data: {
+        userId: users[7].id, // Prof. Lisa Fernandez
+        subjectId: subjects[9].id, // IT301
+      },
+    }),
+
+    prisma.userSubject.create({
+      data: {
+        userId: users[7].id, // Prof. Lisa Fernandez
+        subjectId: subjects[10].id, // GE101
+      },
+    }),
+
+    prisma.userSubject.create({
+      data: {
+        userId: users[7].id, // Prof. Lisa Fernandez
+        subjectId: subjects[11].id, // GE102
+      },
+    }),
+
+    // Additional assignments for variety
+    prisma.userSubject.create({
+      data: {
+        userId: users[4].id, // Prof. Miguel Garcia
+        subjectId: subjects[12].id, // GE201
+      },
+    }),
+
+    prisma.userSubject.create({
+      data: {
+        userId: users[5].id, // Prof. Sarah Mendoza
+        subjectId: subjects[13].id, // PE101
+      },
+    }),
+
+    prisma.userSubject.create({
+      data: {
+        userId: users[6].id, // Prof. Roberto Dela Cruz
+        subjectId: subjects[14].id, // NSTP101
+      },
+    }),
   ]);
 
   // 2. Create Academic Programs
@@ -198,8 +568,8 @@ async function main() {
         curriculumYear: "2024-2025",
         programCode: "BSCS",
         programName: "Bachelor of Science in Computer Science",
-        courseCode: "CS101",
-        courseName: "Introduction to Computing",
+        subjectCode: "CS101",
+        subjectDescription: "Introduction to Computing",
         lec: 2,
         lab: 1,
         units: 3,
@@ -214,8 +584,8 @@ async function main() {
         curriculumYear: "2024-2025",
         programCode: "BSCS",
         programName: "Bachelor of Science in Computer Science",
-        courseCode: "CS102",
-        courseName: "Computer Programming 1",
+        subjectCode: "CS102",
+        subjectDescription: "Computer Programming 1",
         lec: 2,
         lab: 1,
         units: 3,
@@ -230,8 +600,8 @@ async function main() {
         curriculumYear: "2024-2025",
         programCode: "BSCS",
         programName: "Bachelor of Science in Computer Science",
-        courseCode: "MATH101",
-        courseName: "College Algebra",
+        subjectCode: "MATH101",
+        subjectDescription: "College Algebra",
         lec: 3,
         lab: 0,
         units: 3,
@@ -246,8 +616,8 @@ async function main() {
         curriculumYear: "2024-2025",
         programCode: "BSCS",
         programName: "Bachelor of Science in Computer Science",
-        courseCode: "CS103",
-        courseName: "Computer Programming 2",
+        subjectCode: "CS103",
+        subjectDescription: "Computer Programming 2",
         lec: 2,
         lab: 1,
         units: 3,
@@ -262,8 +632,8 @@ async function main() {
         curriculumYear: "2024-2025",
         programCode: "BSCS",
         programName: "Bachelor of Science in Computer Science",
-        courseCode: "CS201",
-        courseName: "Data Structures and Algorithms",
+        subjectCode: "CS201",
+        subjectDescription: "Data Structures and Algorithms",
         lec: 2,
         lab: 1,
         units: 3,
@@ -279,8 +649,8 @@ async function main() {
         curriculumYear: "2024-2025",
         programCode: "BSIT",
         programName: "Bachelor of Science in Information Technology",
-        courseCode: "IT101",
-        courseName: "Introduction to Information Technology",
+        subjectCode: "IT101",
+        subjectDescription: "Introduction to Information Technology",
         lec: 2,
         lab: 1,
         units: 3,
@@ -295,8 +665,8 @@ async function main() {
         curriculumYear: "2024-2025",
         programCode: "BSIT",
         programName: "Bachelor of Science in Information Technology",
-        courseCode: "IT102",
-        courseName: "Computer Programming Fundamentals",
+        subjectCode: "IT102",
+        subjectDescription: "Computer Programming Fundamentals",
         lec: 2,
         lab: 1,
         units: 3,
@@ -311,8 +681,8 @@ async function main() {
         curriculumYear: "2024-2025",
         programCode: "BSIT",
         programName: "Bachelor of Science in Information Technology",
-        courseCode: "IT201",
-        courseName: "Web Development",
+        subjectCode: "IT201",
+        subjectDescription: "Web Development",
         lec: 2,
         lab: 1,
         units: 3,
@@ -382,7 +752,6 @@ async function main() {
         room: "CS-101",
         offeringId: courseOfferings[0].id,
         instructorId: users[4].id, // Prof. Miguel Garcia
-        isActive: true,
         isLoaded: 1,
       },
     }),
@@ -395,7 +764,6 @@ async function main() {
         room: "CS-102",
         offeringId: courseOfferings[1].id,
         instructorId: users[6].id, // Prof. Roberto Dela Cruz
-        isActive: true,
         isLoaded: 1,
       },
     }),
@@ -409,7 +777,6 @@ async function main() {
         room: "IT-201",
         offeringId: courseOfferings[3].id,
         instructorId: users[5].id, // Prof. Sarah Mendoza
-        isActive: true,
         isLoaded: 1,
       },
     }),
@@ -423,7 +790,6 @@ async function main() {
         room: "LAB-301",
         offeringId: courseOfferings[2].id,
         instructorId: users[7].id, // Prof. Lisa Fernandez
-        isActive: true,
         isLoaded: 1,
       },
     }),
@@ -461,7 +827,7 @@ async function main() {
     }),
   ]);
 
-  // 8. Create Notifications
+  // 9. Create Notifications
   console.log("🔔 Creating notifications...");
   const notifications = await Promise.all([
     prisma.notifications.create({

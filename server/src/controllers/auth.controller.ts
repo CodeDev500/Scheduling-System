@@ -10,6 +10,24 @@ import { sendOTPController } from "./otp.controller";
 
 export const register = async (req: Request, res: Response) => {
   try {
+    // Clean up field names by trimming spaces and handle specialization parsing
+    const cleanedBody: any = {};
+    for (const [key, value] of Object.entries(req.body)) {
+      const cleanKey = key.trim();
+      if (cleanKey === 'specialization' && typeof value === 'string') {
+        try {
+          cleanedBody[cleanKey] = JSON.parse(value as string);
+        } catch (error) {
+          console.error('Failed to parse specialization:', error);
+          cleanedBody[cleanKey] = value;
+        }
+      } else {
+        cleanedBody[cleanKey] = value;
+      }
+    }
+    
+    req.body = cleanedBody;
+
     const parseResult = registerUserSchema.safeParse(req.body);
 
     if (!parseResult.success) {

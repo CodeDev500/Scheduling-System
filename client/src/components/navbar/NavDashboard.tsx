@@ -1,9 +1,11 @@
-import { useState } from "react";
+import React, { useState } from "react";
 import { useLocation } from "react-router-dom";
 import { FaBars } from "react-icons/fa";
 import { IoMdNotificationsOutline } from "react-icons/io";
 import userIcon from "../../assets/images/user (1).png";
 import NavProfile from "../NavProfile";
+import { useAppSelector } from "../../hooks/redux";
+import api from "../../api/axios";
 
 interface NavDashboardProps {
   handleBurger: () => void;
@@ -12,8 +14,11 @@ interface NavDashboardProps {
 
 const NavDashboard: React.FC<NavDashboardProps> = ({ handleBurger }) => {
   const location = useLocation();
+  const userData = useAppSelector((state) => state.auth.user);
   const [unread, setUnread] = useState(2);
   const [showProfile, setShowProfile] = useState(false);
+  
+  const profilePic = userData?.image ? `${api.defaults.baseURL}/uploads/${userData.image}` : userIcon;
 
   const pageTitles: { [key: string]: string } = {
     "/dashboard": "Dashboard",
@@ -50,11 +55,11 @@ const NavDashboard: React.FC<NavDashboardProps> = ({ handleBurger }) => {
           </div>
           <div className="flex items-center sm:gap-3 gap-2">
             <div className="flex flex-col">
-              <span className="font-bold">John</span>
-              <span className="text-[12px] text-gray-500">Admin</span>
+              <span className="font-bold">{userData?.firstname} {userData?.lastname}</span>
+              <span className="text-[12px] text-gray-500 capitalize">{userData?.role?.toLowerCase().replace('_', ' ')}</span>
             </div>
             <img
-              src={userIcon}
+              src={profilePic}
               alt="User"
               onClick={() => setShowProfile(!showProfile)}
               className="h-10 w-10 rounded-full cursor-pointer bg-gray-100"
@@ -62,7 +67,7 @@ const NavDashboard: React.FC<NavDashboardProps> = ({ handleBurger }) => {
             {showProfile && (
               <div
                 // onMouseLeave={handleProfile}
-                className="absolute top-12 right-5 text-sm"
+                className="absolute top-12 right-5 text-sm z-50"
               >
                 <NavProfile />
               </div>

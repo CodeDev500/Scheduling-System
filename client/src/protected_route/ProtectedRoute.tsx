@@ -29,6 +29,8 @@ const ProtectedRoute = ({ allowedRoles }: Props) => {
     return <h1>Loading...</h1>;
   }
 
+  console.log(userData)
+
   return <Outlet />;
 };
 

@@ -4,6 +4,17 @@ import { Request, Response } from "express";
 export const addSubject = async (req: Request, res: Response) => {
   try {
     const data = req.body;
+    
+    // Handle tags field - parse JSON string if it exists
+    if (data.tags && typeof data.tags === 'string') {
+      try {
+        data.tags = JSON.parse(data.tags);
+      } catch (error) {
+        console.error('Error parsing tags JSON:', error);
+        data.tags = [];
+      }
+    }
+    
     const subject = await SubjectSlice.createSubject(data);
     res.status(200).json(subject);
   } catch (error: any) {
@@ -34,6 +45,16 @@ export const updateSubject = async (req: Request, res: Response) => {
   const { id } = req.params;
   const data = req.body;
   try {
+    // Handle tags field - parse JSON string if it exists
+    if (data.tags && typeof data.tags === 'string') {
+      try {
+        data.tags = JSON.parse(data.tags);
+      } catch (error) {
+        console.error('Error parsing tags JSON:', error);
+        data.tags = [];
+      }
+    }
+    
     const subject = await SubjectSlice.updateSubjectData(parseInt(id), data);
     res.status(200).json(subject);
   } catch (error: any) {

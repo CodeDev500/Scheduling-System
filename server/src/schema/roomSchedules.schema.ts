@@ -8,7 +8,6 @@ export const roomSchedulesSchema = z.object({
   room: z.string(),
   offeringId: z.number().int().nullable().optional(),
   instructorId: z.number().int().nullable().optional(),
-  isActive: z.boolean(),
   isLoaded: z.number().int(),
   createdAt: z.date().optional(),
   updatedAt: z.date().optional(),

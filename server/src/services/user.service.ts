@@ -1,5 +1,5 @@
 import { db } from "../utils/db.server";
-import { User } from "@prisma/client";
+import { User, UserRoles } from "@prisma/client";
 import { statusList, UserStatus } from "../constants/constants";
 import { UserRegisterInput } from "../schema/user.schema";
 
@@ -14,6 +14,7 @@ export const listUsers = async (): Promise<User[]> => {
       email: true,
       designation: true,
       department: true,
+      specialization: true,
       role: true,
       status: true,
       password: true,
@@ -26,6 +27,22 @@ export const listUsers = async (): Promise<User[]> => {
 export const getUserById = async (id: number): Promise<User | null> => {
   return db.user.findUnique({
     where: { id },
+    select: {
+      id: true,
+      image: true,
+      firstname: true,
+      lastname: true,
+      middleInitial: true,
+      email: true,
+      designation: true,
+      department: true,
+      specialization: true,
+      role: true,
+      status: true,
+      password: true,
+      createdAt: true,
+      updatedAt: true,
+    },
   });
 };
 
@@ -36,6 +53,22 @@ export const getUserByEmail = async (email: string): Promise<User | null> => {
       status: {
         in: [statusList.VERIFIED, statusList.APPROVED],
       },
+    },
+    select: {
+      id: true,
+      image: true,
+      firstname: true,
+      lastname: true,
+      middleInitial: true,
+      email: true,
+      designation: true,
+      department: true,
+      specialization: true,
+      role: true,
+      status: true,
+      password: true,
+      createdAt: true,
+      updatedAt: true,
     },
   });
 };
@@ -51,6 +84,7 @@ export const createUser = async (
     email,
     designation,
     department,
+    specialization,
     password,
     role,
     status,
@@ -65,6 +99,7 @@ export const createUser = async (
       email,
       designation,
       department,
+      specialization: specialization as any, // Type assertion for JSON field
       password,
       role,
       status,
@@ -78,21 +113,25 @@ export const createUser = async (
       email: true,
       designation: true,
       department: true,
+      specialization: true,
       role: true,
       status: true,
       password: true,
       createdAt: true,
       updatedAt: true,
     },
-  });
+  }) as Promise<UserRegisterInput>;
 };
 export const updateUser = async (
   id: number,
-  data: UserRegisterInput
+  data: Partial<UserRegisterInput>
 ): Promise<UserRegisterInput> => {
   return db.user.update({
     where: { id },
-    data,
+    data: {
+      ...data,
+      specialization: data.specialization as any, // Type assertion for JSON field
+    },
     select: {
       id: true,
       image: true,
@@ -102,13 +141,14 @@ export const updateUser = async (
       email: true,
       designation: true,
       department: true,
+      specialization: true,
       role: true,
       status: true,
       password: true,
       createdAt: true,
       updatedAt: true,
     },
-  });
+  }) as Promise<UserRegisterInput>;
 };
 
 export const updatePassword = async (email: string, password: string) => {
@@ -134,6 +174,7 @@ export const updateStatus = async (
       email: true,
       designation: true,
       department: true,
+      specialization: true,
       role: true,
       status: true,
       password: true,
@@ -163,5 +204,62 @@ export const deleteUserByEmail = async (
 
   return db.user.delete({
     where: { id: existingUser.id },
+  });
+};
+
+export const getFacultyByDepartment = async (department: string): Promise<User[]> => {
+  return db.user.findMany({
+    where: {
+      department,
+      role: 'FACULTY',
+      status: {
+        in: [statusList.VERIFIED, statusList.APPROVED],
+      },
+    },
+    select: {
+      id: true,
+      image: true,
+      firstname: true,
+      lastname: true,
+      middleInitial: true,
+      email: true,
+      designation: true,
+      department: true,
+      specialization: true,
+      role: true,
+      status: true,
+      password: true,
+      createdAt: true,
+      updatedAt: true,
+    },
+  });
+};
+
+export const getInstructors = async (): Promise<User[]> => {
+  return db.user.findMany({
+    where: {
+      role: {
+        in: [UserRoles.FACULTY, UserRoles.DEPARTMENT_HEAD, UserRoles.CAMPUS_ADMIN],
+      },
+      status: {
+        in: [statusList.APPROVED],
+      },
+    },
+    select: {
+      id: true,
+      image: true,
+      firstname: true,
+      lastname: true,
+      middleInitial: true,
+      email: true,
+      designation: true,
+      department: true,
+      specialization: true,
+      role: true,
+      status: true,
+      password: true,
+      createdAt: true,
+      updatedAt: true,
+    },
   });
 };

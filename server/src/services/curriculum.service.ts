@@ -24,7 +24,7 @@ export const createCurriculumCourse = async (data: {
       timeEnds: string;
       room?: string;
       instructorId?: number; // Ideally id of instructor (User)
-      isActive?: boolean;
+
       isLoaded?: number;
     }[];
   }[];
@@ -57,7 +57,7 @@ export const createCurriculumCourse = async (data: {
                   timeEnds: schedule.timeEnds,
                   room: schedule.room,
                   instructorId: schedule.instructorId,
-                  isActive: schedule.isActive ?? true,
+
                   isLoaded: schedule.isLoaded ?? 0,
                 })) ?? [],
             },
@@ -75,19 +75,34 @@ export const createCurriculumCourse = async (data: {
 };
 
 export const listCurriculumCourses = async () => {
-  return await db.curriculumCourse.findMany({
-    include: {
-      courseOfferings: {
-        include: {
-          roomSchedules: {
-            include: {
-              instructor: true,
-            },
-          },
-        },
-      },
+  const curriculumCourses = await db.curriculumCourse.findMany({});
+  
+  // Get all unique subject codes from curriculum courses, filtering out null values
+  const subjectCodes = [...new Set(curriculumCourses.map(course => course.subjectCode).filter((code): code is string => code !== null))];
+  
+  // Fetch subjects with tags for these subject codes
+  const subjects = await db.subject.findMany({
+    where: {
+      subjectCode: {
+        in: subjectCodes
+      }
     },
+    select: {
+      subjectCode: true,
+      tags: true
+    }
   });
+  
+  // Create a map for quick lookup of tags by subject code
+  const subjectTagsMap = new Map(
+    subjects.map(subject => [subject.subjectCode, subject.tags])
+  );
+  
+  // Add tags to curriculum courses
+  return curriculumCourses.map(course => ({
+    ...course,
+    tags: course.subjectCode ? subjectTagsMap.get(course.subjectCode) || null : null
+  }));
 };
 
 export const getCurriculumCourseById = async (id: number) => {
@@ -178,6 +193,8 @@ export const getCurriculumCoursesByProgramandLevel = async (
       lab: course.lab ?? 0,
       units: course.units ?? 0,
       hours: course.hours ?? 0,
+      // Note: tags are no longer available since subject relationship was removed
+      // Subject information is now stored directly in curriculum_courses table
       offerings: course.courseOfferings,
     });
   }

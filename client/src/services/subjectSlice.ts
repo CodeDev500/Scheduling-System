@@ -14,7 +14,14 @@ export const fetchSubjects = createAsyncThunk(
   async (_, { rejectWithValue }) => {
     try {
       const response = await axios.get("/subject");
-      return response.data;
+      // Parse tags from JSON strings to arrays
+      const subjects = response.data.map((subject: any) => ({
+        ...subject,
+        tags: subject.tags ? 
+          (typeof subject.tags === 'string' ? JSON.parse(subject.tags) : subject.tags) 
+          : []
+      }));
+      return subjects;
     } catch (error: unknown) {
       if (isAxiosError(error)) {
         if (error.response?.data?.errors) {
@@ -94,7 +101,14 @@ export const searchSubject = createAsyncThunk<
 >("subject/searchSubject", async (query: string, { rejectWithValue }) => {
   try {
     const response = await axios.get(`/subject/search/${query}`);
-    return response.data;
+    // Parse tags from JSON strings to arrays
+    const subjects = response.data.map((subject: any) => ({
+      ...subject,
+      tags: subject.tags ? 
+        (typeof subject.tags === 'string' ? JSON.parse(subject.tags) : subject.tags) 
+        : []
+    }));
+    return subjects;
   } catch (error: unknown) {
     if (isAxiosError(error)) {
       if (error.response?.data?.errors) {

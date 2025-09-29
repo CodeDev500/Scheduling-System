@@ -20,6 +20,10 @@ export const registerUserSchema = z
       .trim()
       .min(1, { message: "Designation is required" }),
     department: z.string().trim().min(1, { message: "Department is required" }),
+    specialization: z
+      .array(z.string().trim())
+      .optional()
+      .nullable(),
     password: z
       .string()
       .trim()
@@ -50,5 +54,8 @@ export type Register = z.infer<typeof registerUserSchema>;
 export type Login = z.infer<typeof loginSchema>;
 export type UserRegisterInput = Omit<
   User,
-  "id" | "confirmPassword" | "createdAt" | "updatedAt"
->;
+  "id" | "createdAt" | "updatedAt"
+> & {
+  specialization?: string[] | null;
+  confirmPassword?: string;
+};

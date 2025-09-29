@@ -67,7 +67,7 @@ const Navbar = () => {
                 <span className="absolute left-0 bottom-0 w-0 h-0.5 bg-white transition-all duration-300 group-hover:w-full"></span>
               </Link>
             </li>
-            <li>
+            {/* <li>
               <Link
                 to={"/about"}
                 className={`relative w-fit h-10 p-2 text-white focus:outline-none group ${
@@ -88,7 +88,7 @@ const Navbar = () => {
                 Contact Us
                 <span className="absolute left-0 bottom-0 w-0 h-0.5 bg-white transition-all duration-300 group-hover:w-full"></span>
               </Link>
-            </li>
+            </li> */}
           </ul>
         </div>
 

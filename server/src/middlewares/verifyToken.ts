@@ -10,11 +10,11 @@ declare global {
   }
 }
 
-export const verifyToken = async (
+export const verifyToken = (
   req: Request,
   res: Response,
   next: NextFunction
-) => {
+): void => {
   try {
     const authHeader = req.headers["authorization"];
 
@@ -30,12 +30,13 @@ export const verifyToken = async (
         return;
       }
 
-      req.user = decoded as JwtPayload; // Now TypeScript will not complain
+      req.user = decoded as JwtPayload;
       next();
     });
   } catch (error: any) {
     res.status(401).json({
       message: "Unauthorized",
     });
+    return;
   }
 };

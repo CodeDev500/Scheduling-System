@@ -11,7 +11,7 @@ interface VerifyOTPProps {
   closeModal: () => void;
 }
 
-const VerifyOTP: React.FC<VerifyOTPProps> = ({ email, closeOTP }) => {
+const VerifyOTP: React.FC<VerifyOTPProps> = ({ email, closeOTP, closeModal }) => {
   const toast = toastUtils();
   const [otp, setOtp] = useState<string[]>(new Array(4).fill(""));
   const [countDown, setCountDown] = useState<number>(0);
@@ -58,9 +58,21 @@ const VerifyOTP: React.FC<VerifyOTPProps> = ({ email, closeOTP }) => {
     }
   };
 
-  const handleResend = () => {
-    setCountDown(60);
-    setOtp(new Array(4).fill(""));
+  const handleResend = async () => {
+    try {
+      setLoading(true);
+      const response = await api.post("/auth/resend-otp", { email });
+      if (response.status === 200) {
+        setCountDown(60);
+        setOtp(new Array(4).fill(""));
+        toast.success("OTP resent successfully!");
+      }
+    } catch (error: any) {
+      toast.error(error?.response?.data?.message || "Failed to resend OTP");
+      console.error("Resend OTP failed:", error);
+    } finally {
+      setLoading(false);
+    }
   };
 
   useEffect(() => {
@@ -73,7 +85,7 @@ const VerifyOTP: React.FC<VerifyOTPProps> = ({ email, closeOTP }) => {
   const disableSubmit = otp.includes("") || otp.length < 4;
 
   return (
-    <div className="fixed inset-0 z-50 px-5 flex items-center justify-center w-full h-full bg-black/40 font-normal">
+    <div className="fixed inset-0 z-[60] px-5 flex items-center justify-center w-full h-full bg-black/40 font-normal">
       {loading && <div className="absolute">Loading...</div>}
 
       <form className="otp-Form" onSubmit={handleSubmit}>

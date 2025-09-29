@@ -8,6 +8,7 @@ type YearLevel = {
 
 type YearLevelsTableProps = {
   programCode: string;
+  basePath?: string;
 };
 
 const yearLevels: YearLevel[] = [
@@ -17,7 +18,7 @@ const yearLevels: YearLevel[] = [
   { id: 4, name: "4th Year" },
 ];
 
-const YearLevelsTable: FC<YearLevelsTableProps> = ({ programCode }) => {
+const YearLevelsTable: FC<YearLevelsTableProps> = ({ programCode, basePath = "/manage-prospectus" }) => {
   const navigate = useNavigate();
   return (
     <div className="mt-6 overflow-x-auto">
@@ -39,7 +40,7 @@ const YearLevelsTable: FC<YearLevelsTableProps> = ({ programCode }) => {
               key={year.id}
               onClick={() =>
                 navigate(
-                  `/manage-prospectus/${programCode}/${encodeURIComponent(
+                  `${basePath}/${programCode}/${encodeURIComponent(
                     year.name
                   )}`
                 )

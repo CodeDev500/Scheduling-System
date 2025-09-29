@@ -1,16 +1,16 @@
 import axios from "../api/axios";
 import { isAxiosError } from "axios";
 import { createSlice, createAsyncThunk } from "@reduxjs/toolkit";
-import type { CurriculumCourse, SubjectData } from "../types/types";
+import type { CurriculumCourse } from "../types/types";
 
 interface CurriculumState {
-  curriculums: SubjectData[];
+  curriculums: CurriculumCourse[];
   isLoading: boolean;
   error: string | null;
 }
 
 const initialState: CurriculumState = {
-  curriculums: [],
+  curriculums: [] as CurriculumCourse[],
   isLoading: false,
   error: null,
 };
@@ -19,14 +19,26 @@ export const fetchCurriculums = createAsyncThunk(
   "curriculum/getCurriculums",
   async (_, { rejectWithValue }) => {
     try {
+      console.log("Attempting to fetch curriculums...");
       const response = await axios.get("/curriculum");
+      console.log("curriculums response:", response.data);
       return response.data;
     } catch (error: unknown) {
+      console.error("Error fetching curriculums:", error);
       if (isAxiosError(error)) {
+        console.error("Axios error details:", {
+          status: error.response?.status,
+          statusText: error.response?.statusText,
+          data: error.response?.data,
+          headers: error.response?.headers
+        });
+        if (error.response?.status === 401) {
+          return rejectWithValue("Authentication required. Please log in.");
+        }
         if (error.response?.data?.errors) {
           return rejectWithValue(error.response.data.errors);
         }
-        return rejectWithValue(error.response?.data?.message);
+        return rejectWithValue(error.response?.data?.message || "Failed to fetch curriculums");
       }
       return rejectWithValue("Error fetching curriculums");
     }
@@ -108,6 +120,34 @@ export const fetchCurriculumByProgramAndYear = createAsyncThunk(
   }
 );
 
+export const fetchCurriculumCoursesWithFilters = createAsyncThunk(
+  "curriculum/fetchCurriculumCoursesWithFilters",
+  async ({ programCode, yearLevel = "all", semester = "all" }: { programCode: string; yearLevel?: string; semester?: string }, { rejectWithValue }) => {
+    try {
+      const params = new URLSearchParams();
+      if (semester !== "all") {
+        params.append("semester", semester);
+      }
+      
+      const queryString = params.toString();
+      const url = `/curriculum/search/${programCode}/${yearLevel}${queryString ? `?${queryString}` : ""}`;
+      console.log(programCode, yearLevel, semester)
+      
+      const response = await axios.get(url);
+      console.log(response.data)
+      return response.data;
+    } catch (error: unknown) {
+      if (isAxiosError(error)) {
+        if (error.response?.data?.errors) {
+          return rejectWithValue(error.response.data.errors);
+        }
+        return rejectWithValue(error.response?.data?.message);
+      }
+      return rejectWithValue("Error fetching curriculum courses with filters");
+    }
+  }
+);
+
 export const CurriculumSlice = createSlice({
   name: "curriculum",
   initialState,
@@ -135,6 +175,18 @@ export const CurriculumSlice = createSlice({
         state.curriculums = action.payload;
       })
       .addCase(fetchCurriculumByProgramAndYear.rejected, (state, action) => {
+        state.isLoading = false;
+        state.error = action.payload as string;
+      })
+      .addCase(fetchCurriculumCoursesWithFilters.pending, (state) => {
+        state.isLoading = true;
+        state.error = null;
+      })
+      .addCase(fetchCurriculumCoursesWithFilters.fulfilled, (state, action) => {
+        state.isLoading = false;
+        state.curriculums = action.payload;
+      })
+      .addCase(fetchCurriculumCoursesWithFilters.rejected, (state, action) => {
         state.isLoading = false;
         state.error = action.payload as string;
       });

@@ -150,6 +150,12 @@ const ManageProspectus = () => {
     });
   };
 
+  const checkDuplicateSubject = (semester: Semester, subjectCode: string, currentSubjectId: number): boolean => {
+    return subjects[semester].some(
+      (subject) => subject.code === subjectCode && subject.id !== currentSubjectId
+    );
+  };
+
   const handleChange = (
     semester: Semester,
     id: number,
@@ -158,17 +164,25 @@ const ManageProspectus = () => {
   ) => {
     setSubjects((prev) => ({
       ...prev,
-      [semester]: prev[semester].map((subject) =>
-        subject.id === id
-          ? {
-              ...subject,
-              [field]:
-                field === "lec" || field === "lab" || field === "units"
-                  ? Number(value)
-                  : value,
-            }
-          : subject
-      ),
+      [semester]: prev[semester].map((subject) => {
+        if (subject.id === id) {
+          const updatedSubject = {
+            ...subject,
+            [field]:
+              field === "lec" || field === "lab" || field === "units"
+                ? Number(value)
+                : value,
+          };
+          
+          // Auto-calculate units when lec or lab changes
+          if (field === "lec" || field === "lab") {
+            updatedSubject.units = updatedSubject.lec + updatedSubject.lab;
+          }
+          
+          return updatedSubject;
+        }
+        return subject;
+      }),
     }));
   };
 
@@ -271,6 +285,8 @@ const ManageProspectus = () => {
       </div>
     );
   }
+
+  console.log(subjects);
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-gray-50 to-gray-100 p-6">
@@ -406,6 +422,10 @@ const ManageProspectus = () => {
                                       <div
                                         key={subj.id}
                                         onClick={() => {
+                                          if (checkDuplicateSubject(semester, subj.subjectCode, subject.id)) {
+                                            toast.error(`Subject ${subj.subjectCode} already exists in ${semester}`);
+                                            return;
+                                          }
                                           setSubjects((prev) => ({
                                             ...prev,
                                             [semester]: prev[semester].map(
@@ -417,7 +437,7 @@ const ManageProspectus = () => {
                                                       name: subj.subjectDescription,
                                                       lec: subj.lec,
                                                       lab: subj.lab,
-                                                      units: subj.units,
+                                                      units: subj.lec + subj.lab,
                                                     }
                                                   : s
                                             ),
@@ -483,6 +503,10 @@ const ManageProspectus = () => {
                                       <div
                                         key={subj.id}
                                         onClick={() => {
+                                          if (checkDuplicateSubject(semester, subj.subjectCode, subject.id)) {
+                                            toast.error(`Subject ${subj.subjectCode} already exists in ${semester}`);
+                                            return;
+                                          }
                                           setSubjects((prev) => ({
                                             ...prev,
                                             [semester]: prev[semester].map(
@@ -494,7 +518,7 @@ const ManageProspectus = () => {
                                                       name: subj.subjectDescription,
                                                       lec: subj.lec,
                                                       lab: subj.lab,
-                                                      units: subj.units,
+                                                      units: subj.lec + subj.lab,
                                                     }
                                                   : s
                                             ),

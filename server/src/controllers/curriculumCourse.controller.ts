@@ -177,7 +177,7 @@ export const searchSubjectsBySemester = async (req: Request, res: Response) => {
       yearLevel,
     };
     
-    if (semester) {
+    if (semester && semester !== 'all') {
       whereClause.period = semester;
     }
     
@@ -200,18 +200,88 @@ export const searchSubjectsBySemester = async (req: Request, res: Response) => {
     
     const subjects = await db.curriculumCourse.findMany({
       where: whereClause,
-      select: {
-        id: true,
-        subjectCode: true,
-        subjectDescription: true,
-        lec: true,
-        lab: true,
-        units: true,
-        period: true,
-      }
+      include: {
+        courseOfferings: {
+          include: {
+            roomSchedules: {
+              include: {
+                instructor: {
+                  select: {
+                    id: true,
+                    firstname: true,
+                    lastname: true,
+                    email: true,
+                  },
+                },
+              },
+            },
+          },
+        },
+      },
     });
     
-    res.status(200).json(subjects);
+    // Transform the data to match frontend expectations
+    const transformedSubjects = subjects.map((subject) => {
+      // Flatten all schedules from all course offerings
+      const allSchedules = subject.courseOfferings.flatMap((offering) =>
+        offering.roomSchedules.map((schedule) => ({
+          id: schedule.id,
+          day: schedule.day,
+          timeStarts: schedule.timeStarts,
+          timeEnds: schedule.timeEnds,
+          room: schedule.room,
+          isLoaded: schedule.isLoaded,
+          offeringId: schedule.offeringId,
+          sectionName: offering.sectionName,
+          instructor: schedule.instructor
+            ? {
+                id: schedule.instructor.id,
+                name: `${schedule.instructor.firstname} ${schedule.instructor.lastname}`,
+                email: schedule.instructor.email,
+              }
+            : null,
+        }))
+      );
+
+      return {
+        id: subject.id,
+        subjectCode: subject.subjectCode,
+        subjectDescription: subject.subjectDescription,
+        lec: subject.lec,
+        lab: subject.lab,
+        units: subject.units,
+        yearLevel: subject.yearLevel,
+        semester: subject.period,
+        prerequisites: [], // Add if available in schema
+        schedules: allSchedules, // Add flattened schedules array
+        courseOfferings: subject.courseOfferings.map((offering) => ({
+          id: offering.id,
+          courseType: offering.courseType,
+          description: offering.description,
+          sectionName: offering.sectionName,
+          yearLevel: offering.yearLevel,
+          roomSchedules: offering.roomSchedules.map((schedule) => ({
+            id: schedule.id,
+            day: schedule.day,
+            timeStarts: schedule.timeStarts,
+            timeEnds: schedule.timeEnds,
+            room: schedule.room,
+            isLoaded: schedule.isLoaded,
+            offeringId: schedule.offeringId,
+            sectionName: offering.sectionName,
+            instructor: schedule.instructor
+              ? {
+                  id: schedule.instructor.id,
+                  name: `${schedule.instructor.firstname} ${schedule.instructor.lastname}`,
+                  email: schedule.instructor.email,
+                }
+              : null,
+          })),
+        })),
+      };
+    });
+    
+    res.status(200).json(transformedSubjects);
   } catch (error) {
     console.error('Error searching subjects by semester:', error);
     res.status(500).json({ message: 'Internal server error' });

@@ -14,6 +14,7 @@ export const fetchAcademicPrograms = createAsyncThunk(
   async (_, { rejectWithValue }) => {
     try {
       const response = await axios.get("/program");
+      console.log("academic programs", response.data)
       return response.data;
     } catch (error: unknown) {
       if (isAxiosError(error)) {

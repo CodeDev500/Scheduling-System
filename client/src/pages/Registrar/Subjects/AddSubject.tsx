@@ -3,6 +3,8 @@ import { useAppDispatch } from "../../../hooks/redux";
 import { createSubject } from "../../../services/subjectSlice";
 import { useToast } from "../../../hooks/useToast";
 import { type SubjectTypes } from "../../../types/types";
+import MultiSelectField from "../../../components/input_field/MultiSelectField";
+import { specializationOptions } from "../../../constants/constants";
 
 interface AddSubjectProps {
   onClose: () => void;
@@ -18,33 +20,60 @@ const AddSubject: React.FC<AddSubjectProps> = ({ onClose }) => {
     lec: 0,
     lab: 0,
     units: 0,
+    tags: [],
   });
+  
   const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const { name, value } = e.target;
+    setFormData((prev) => {
+      const updatedData = {
+        ...prev,
+        [name]:
+          name === "subjectCode" || name === "subjectDescription"
+            ? value
+            : parseInt(value) || 0,
+      };
+      
+      // Auto-calculate total units when lec or lab changes
+      if (name === "lec" || name === "lab") {
+        const lecUnits = name === "lec" ? (parseInt(value) || 0) : prev.lec;
+        const labUnits = name === "lab" ? (parseInt(value) || 0) : prev.lab;
+        updatedData.units = lecUnits + labUnits;
+      }
+      
+      return updatedData;
+    });
+  };
+
+  const handleMultiSelectChange = (name: string, value: string[]) => {
     setFormData((prev) => ({
       ...prev,
-      [name]:
-        name === "subjectCode" || name === "subjectDescription"
-          ? value
-          : parseInt(value),
+      [name]: value,
     }));
   };
 
   const handleSubmit = () => {
-    dispatch(createSubject(formData))
+    // Prepare form data for submission
+    const submitData = {
+      ...formData,
+      tags: formData.tags && formData.tags.length > 0 ? formData.tags : undefined,
+    };
+
+    dispatch(createSubject(submitData))
       .unwrap()
       .then(() => {
         toast.success("Subject added successfully");
         onClose();
       })
-      .catch(() => {
-        toast.error("Failed to add subject");
+      .catch((error) => {
+        const errorMessage = typeof error === 'string' ? error : 'Failed to add subject';
+        toast.error(errorMessage);
       });
   };
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40">
-      <div className="bg-white rounded-xl p-6 w-[90%] max-w-md shadow-xl space-y-4">
+      <div className="bg-white rounded-xl p-6 w-[90%] max-w-lg shadow-xl space-y-4">
         <h2 className="text-xl font-semibold text-gray-800">Add New Subject</h2>
 
         <div className="grid gap-3">
@@ -95,11 +124,24 @@ const AddSubject: React.FC<AddSubjectProps> = ({ onClose }) => {
                 type="number"
                 name="units"
                 value={formData.units}
-                onChange={handleChange}
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                readOnly
+                className="w-full px-3 py-2 border border-gray-300 rounded-lg bg-gray-100 text-gray-700 cursor-not-allowed"
               />
             </div>
           </div>
+          
+          <MultiSelectField
+            label="Tags"
+            id="tags"
+            name="tags"
+            value={formData.tags || []}
+            onChange={handleMultiSelectChange}
+            placeholder="Select tags for this subject..."
+            options={specializationOptions.map((spec) => ({
+              value: spec,
+              label: spec,
+            }))}
+          />
         </div>
 
         <div className="flex justify-end gap-3 pt-2">

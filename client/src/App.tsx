@@ -2,7 +2,7 @@ import "./App.css";
 import type { ArrayLink } from "./types/types";
 import { UserRoles } from "./constants/constants";
 import { Routes, Route } from "react-router-dom";
-import { ToastContainer } from "react-toastify";
+import { ToastProvider } from "./hooks/useToast";
 
 import ProtectedRoute from "./protected_route/ProtectedRoute";
 
@@ -19,6 +19,11 @@ import ViewSchedules from "./pages/CampusAdmin/ViewSchedules/ViewSchedules";
 import TeachingLoad from "./pages/CampusAdmin/TeachingLoad/TeachingLoad";
 import ManageUser from "./pages/CampusAdmin/ManageUser/ManageUser";
 import FacultyProfile from "./pages/CampusAdmin/FacultyProfile/FacultyProfile";
+import RoomManagement from "./pages/CampusAdmin/RoomManagement/RoomManagement";
+import Settings from "./pages/CampusAdmin/Settings/Settings";
+import ScheduleGeneration from "./pages/CampusAdmin/ScheduleGeneration/ScheduleGeneration";
+import TestComponent from "./pages/CampusAdmin/ScheduleGeneration/TestComponent";
+
 
 import RegistrarDashboard from "./pages/Registrar/Dashboard/Dashboard";
 import Prospectus from "./pages/Registrar/ProspectusManagement/Prospectus";
@@ -29,6 +34,21 @@ import ManageProspectus from "./pages/Registrar/ProspectusManagement/ManageProsp
 
 import ProgramHeadDashboard from './pages/DepartmentHead/Dashboard/Dashboard'
 import ScheduleManagement from "./pages/DepartmentHead/ScheduleManagement/ScheduleManagement";
+import AddSchedule from "./pages/DepartmentHead/ScheduleManagement/AddSchedule";
+import ViewProspectus from "./pages/DepartmentHead/ScheduleManagement/ViewProspectus";
+import ViewProspectusSemesters from "./pages/DepartmentHead/ScheduleManagement/ViewProspectusSemesters";
+import ViewProspectusScheduling from "./pages/DepartmentHead/ScheduleManagement/ViewProspectusScheduling";
+import DeptCourseOffering from "./pages/DepartmentHead/ScheduleManagement/CourseOffering";
+import DeptCourseScheduling from "./pages/DepartmentHead/ScheduleManagement/CourseScheduling";
+import DeptFacultyVLLoading from "./pages/DepartmentHead/ScheduleManagement/FacultyVLLoading";
+import DepartmentHeadTeachingLoad from "./pages/DepartmentHead/TeachingLoad/TeachingLoad";
+import DepartmentHeadFacultyProfile from "./pages/DepartmentHead/FacultyProfile/FacultyProfile";
+
+import FacultyDashboard from "./pages/Faculty/Dashboard/FacultyDashboard";
+import FacultyViewSchedules from "./pages/Faculty/ViewSchedules/ViewSchedules";
+import FacultyViewTeachingLoad from "./pages/Faculty/ViewTeachingLoad/ViewTeachingLoad";
+import { FacultyPreferences } from "./components/FacultyPreferences";
+import { FacultyPreferencesProvider } from "./contexts/FacultyPreferencesContext";
 
 function App() {
   const sharedLinks: ArrayLink[] = [
@@ -63,12 +83,23 @@ function App() {
     {
       title: "View Schedules",
       path: "/view-schedules",
-      component: <Schedules />,
+      component: <ViewSchedules />,
     },
     {
-      title: "Prospectus",
-      path: "/prospectus",
-      component: <Prospectus />,
+      title: "Schedule Generation",
+      path: "/schedule-generation",
+      component: <ScheduleGeneration />,
+    },
+
+    {
+      title: "Faculty/VL Profile",
+      path: "/faculty-profile",
+      component: <FacultyProfile />,
+    },
+    {
+      title: "Manage User",
+      path: "/manage-user",
+      component: <ManageUser />,
     },
     {
       title: "View Teaching Load",
@@ -76,9 +107,14 @@ function App() {
       component: <TeachingLoad />,
     },
     {
-      title: "Manage User",
-      path: "/manage-user",
-      component: <ManageUser />,
+      title: "Room Management",
+      path: "/room-management",
+      component: <RoomManagement />,
+    },
+    {
+      title: "Settings",
+      path: "/settings",
+      component: <Settings />,
     },
   ];
 
@@ -113,6 +149,7 @@ function App() {
       path: "/manage-prospectus/:programCode/:yearLevel",
       component: <ManageProspectus />,
     },
+
   ];
 
   const programHeadLinks: ArrayLink[] = [
@@ -125,12 +162,82 @@ function App() {
       title: "Schedule Management",
       path: "/schedule-management",
       component: <ScheduleManagement />
+    },
+    {
+      title: "Add Schedule",
+      path: "/schedule-management/add",
+      component: <AddSchedule />
+    },
+    {
+      title: "View Prospectus",
+      path: "/schedule-management/view-prospectus",
+      component: <ViewProspectus />
+    },
+    {
+      title: "View Prospectus Semesters",
+      path: "/schedule-management/view-prospectus/:programCode/:yearLevel",
+      component: <ViewProspectusSemesters />
+    },
+    {
+      title: "View Prospectus Scheduling",
+      path: "/schedule-management/view-prospectus-scheduling",
+      component: <ViewProspectusScheduling />
+    },
+    {
+      title: "Course Offering",
+      path: "/schedule-management/course-offering",
+      component: <DeptCourseOffering />
+    },
+    {
+      title: "Course Scheduling",
+      path: "/schedule-management/course-scheduling",
+      component: <DeptCourseScheduling />
+    },
+    {
+      title: "Faculty/VL Loading",
+      path: "/schedule-management/faculty-vl-loading",
+      component: <DeptFacultyVLLoading />
+    },
+    {
+      title: "Faculty Profile",
+      path: "/department-head-faculty",
+      component: <DepartmentHeadFacultyProfile />
+    },
+    {
+      title: "View Teaching Load",
+      path: "/department-head-teaching-load",
+      component: <DepartmentHeadTeachingLoad />
     }
-  ]
+   ];
+
+  const facultyLinks: ArrayLink[] = [
+    {
+      title: "Faculty Dashboard",
+      path: "/faculty-dashboard",
+      component: <FacultyDashboard />
+    },
+    {
+      title: "View Schedules",
+      path: "/faculty-schedules",
+      component: <FacultyViewSchedules />
+    },
+    {
+      title: "View Teaching Load",
+      path: "/faculty-teaching-load",
+      component: <FacultyViewTeachingLoad />
+    },
+    {
+      title: "Teaching Preferences",
+      path: "/faculty-preferences",
+      component: <FacultyPreferences />
+    }
+  ];
+
   return (
     <>
-      <ToastContainer />
-      <Routes>
+      <ToastProvider>
+        <FacultyPreferencesProvider>
+          <Routes>
         {sharedLinks.map((link) => (
           <Route
             key={link.title}
@@ -163,17 +270,29 @@ function App() {
           </Route>
         ))}
 
-        {
-          programHeadLinks.map((link) => (
-            <Route key={link.title}
-            element={<ProtectedRoute allowedRoles={[UserRoles[1]]}/>}
-            >
-              <Route path={link.path}
-              element={<LayoutDashboard >{link.component}</LayoutDashboard>}
-              />
-            </Route>
-          ))
-        }
+        {programHeadLinks.map((link) => (
+          <Route
+            key={link.title}
+            element={<ProtectedRoute allowedRoles={[UserRoles[1]]} />}
+          >
+            <Route
+              path={link.path}
+              element={<LayoutDashboard>{link.component}</LayoutDashboard>}
+            />
+          </Route>
+        ))}
+
+        {facultyLinks.map((link) => (
+          <Route
+            key={link.title}
+            element={<ProtectedRoute allowedRoles={[UserRoles[0]]} />}
+          >
+            <Route
+              path={link.path}
+              element={<LayoutDashboard>{link.component}</LayoutDashboard>}
+            />
+          </Route>
+        ))}
 
         <Route
           path="/admin-dashboard"
@@ -185,6 +304,8 @@ function App() {
         />
         <Route path="/*" element={<PageNotFound />} />
       </Routes>
+      </FacultyPreferencesProvider>
+      </ToastProvider>
     </>
   );
 }

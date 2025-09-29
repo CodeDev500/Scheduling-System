@@ -11,8 +11,18 @@ import { refreshToken } from "./middlewares/refreshToken";
 import authRoutes from "./routes/auth.router";
 import userRoutes from "./routes/user.router";
 import subjectRoutes from "./routes/subjects.router";
+import userSubjectRoutes from "./routes/userSubject.router";
 import academicProgramRoutes from "./routes/academicProgram.router";
 import curriculumRoutes from "./routes/curriculumCourse.router";
+import schedulesRoutes from "./routes/schedules.router";
+import roomRoutes from "./routes/room.router";
+import totalUnitsRoutes from "./routes/totalUnitsRoutes";
+import facultySubjectAssignmentRoutes from "./routes/facultySubjectAssignment.router";
+import facultySubjectRoutes from "./routes/facultySubjectRoutes";
+import scheduleGenerationRoutes from "./routes/scheduleGeneration.router";
+import specializationRoutes from "./routes/specialization.router";
+import programPriorityRoutes from "./routes/programPriority.router";
+import { facultyRecommendationRouter } from "./routes/facultyRecommendation.router";
 
 dotenv.config();
 const PORT: number = process.env.PORT ? parseInt(process.env.PORT) : 3000;
@@ -53,8 +63,18 @@ app.use("/protected", verifyToken, async (req: Request, res: Response) => {
 app.use(verifyToken);
 app.use("/user", userRoutes);
 app.use("/subject", subjectRoutes);
+app.use("/user-subject", userSubjectRoutes);
 app.use("/program", academicProgramRoutes);
 app.use("/curriculum", curriculumRoutes);
+app.use("/schedules", schedulesRoutes);
+app.use("/rooms", roomRoutes);
+app.use("/total-units", totalUnitsRoutes);
+app.use("/faculty-assignments", facultySubjectAssignmentRoutes);
+app.use("/faculty-subjects", facultySubjectRoutes);
+app.use("/schedule-generation", scheduleGenerationRoutes);
+app.use("/specializations", specializationRoutes);
+app.use("/program-priorities", programPriorityRoutes);
+app.use("/faculty-recommendations", facultyRecommendationRouter);
 
 app.listen(PORT, () => {
   console.log(`Server running on port ${PORT}`);

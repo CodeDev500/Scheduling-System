@@ -4,6 +4,8 @@ import type { SubjectTypes } from "../../../types/types";
 import { useAppDispatch } from "../../../hooks/redux";
 import { updateSubject } from "../../../services/subjectSlice";
 import { useToast } from "../../../hooks/useToast";
+import MultiSelectField from "../../../components/input_field/MultiSelectField";
+import { specializationOptions } from "../../../constants/constants";
 
 interface UpdateSubjectProps {
   subject: SubjectTypes | null;
@@ -20,41 +22,83 @@ const UpdateSubject: FC<UpdateSubjectProps> = ({ subject, onClose }) => {
     lec: 0,
     lab: 0,
     units: 0,
+    tags: [] as string[],
   });
 
   useEffect(() => {
     if (subject) {
+      let parsedTags: string[] = [];
+      
+      // Handle tags field - parse if it's a string, otherwise use as array
+      if (subject.tags) {
+        if (typeof subject.tags === 'string') {
+          try {
+            parsedTags = JSON.parse(subject.tags);
+          } catch (error) {
+            console.error('Error parsing tags JSON:', error);
+            parsedTags = [];
+          }
+        } else if (Array.isArray(subject.tags)) {
+          parsedTags = subject.tags;
+        }
+      }
+
+      const lecUnits = subject.lec ?? 0;
+      const labUnits = subject.lab ?? 0;
       setFormData({
         subjectCode: subject.subjectCode ?? "",
         subjectDescription: subject.subjectDescription ?? "",
-        lec: subject.lec ?? 0,
-        lab: subject.lab ?? 0,
-        units: subject.units ?? 0,
+        lec: lecUnits,
+        lab: labUnits,
+        units: lecUnits + labUnits, // Auto-calculate total units
+        tags: parsedTags,
       });
     }
   }, [subject]);
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const { name, value } = e.target;
+    setFormData((prev) => {
+      const updatedData = {
+        ...prev,
+        [name]:
+          name === "subjectCode" || name === "subjectDescription"
+            ? value
+            : parseInt(value) || 0,
+      };
+      
+      // Auto-calculate total units when lec or lab changes
+      if (name === "lec" || name === "lab") {
+        const lecUnits = name === "lec" ? (parseInt(value) || 0) : prev.lec;
+        const labUnits = name === "lab" ? (parseInt(value) || 0) : prev.lab;
+        updatedData.units = lecUnits + labUnits;
+      }
+      
+      return updatedData;
+    });
+  };
+
+  const handleMultiSelectChange = (name: string, value: string[]) => {
     setFormData((prev) => ({
       ...prev,
-      [name]:
-        name === "subjectCode" || name === "subjectDescription"
-          ? value
-          : parseInt(value),
+      [name]: value,
     }));
   };
 
   const handleUpdate = () => {
     if (subject?.id == null) return;
 
+    // Prepare form data for submission
+    const submitData = {
+      ...formData,
+      id: subject.id,
+      tags: formData.tags && formData.tags.length > 0 ? formData.tags : undefined,
+    };
+
     dispatch(
       updateSubject({
         id: subject.id,
-        data: {
-          ...formData,
-          id: subject.id,
-        },
+        data: submitData,
       })
     )
       .unwrap()
@@ -62,8 +106,9 @@ const UpdateSubject: FC<UpdateSubjectProps> = ({ subject, onClose }) => {
         toast.success("Subject updated successfully");
         onClose();
       })
-      .catch(() => {
-        toast.error("Failed to update subject");
+      .catch((error) => {
+        const errorMessage = typeof error === 'string' ? error : 'Failed to update subject';
+        toast.error(errorMessage);
       });
   };
 
@@ -138,11 +183,24 @@ const UpdateSubject: FC<UpdateSubjectProps> = ({ subject, onClose }) => {
                 type="number"
                 name="units"
                 value={formData.units}
-                onChange={handleChange}
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg text-center focus:outline-none focus:ring-2 focus:ring-blue-500"
+                readOnly
+                className="w-full px-3 py-2 border border-gray-300 rounded-lg text-center bg-gray-100 text-gray-700 cursor-not-allowed"
               />
             </div>
           </div>
+          
+          <MultiSelectField
+            label="Tags"
+            id="tags"
+            name="tags"
+            value={formData.tags || []}
+            onChange={handleMultiSelectChange}
+            placeholder="Select tags for this subject..."
+            options={specializationOptions.map((spec) => ({
+              value: spec,
+              label: spec,
+            }))}
+          />
         </div>
 
         <div className="mt-6 flex justify-end gap-3">

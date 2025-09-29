@@ -71,12 +71,12 @@ export const fetchUser = createAsyncThunk<User, void, { rejectValue: string }>(
 );
 
 export const register = createAsyncThunk<
-  User,
+  { user?: User; message: string },
   FormData, // 🔄 changed from Partial<User> to FormData
   { rejectValue: Record<string, string[]> }
 >("/auth/register", async (data, { rejectWithValue }) => {
   try {
-    const response = await axios.post<User>("/auth/register", data, {
+    const response = await axios.post<{ user?: User; message: string }>("/auth/register", data, {
       headers: {
         "Content-Type": "multipart/form-data", // ✅ important for file upload
       },
@@ -154,7 +154,7 @@ const authSlice = createSlice({
       })
       .addCase(register.fulfilled, (state, action) => {
         state.loading = false;
-        state.user = action.payload;
+        state.user = action.payload.user || null;
         state.registerError = null;
       })
       .addCase(register.rejected, (state, action) => {

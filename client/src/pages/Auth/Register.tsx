@@ -1,11 +1,13 @@
 import React, { useEffect, useState } from "react";
 import InputField from "../../components/input_field/InputField";
 import SelectField from "../../components/input_field/SelectField";
+import MultiSelectField from "../../components/input_field/MultiSelectField";
 import Button from "../../components/buttons/Button";
 import {
   designationList,
   UserStatuses,
   program,
+  specializationOptions,
 } from "../../constants/constants";
 import { register, clearRegisterError } from "../../services/authSlice";
 import { useAppDispatch, useAppSelector } from "../../hooks/redux";
@@ -37,6 +39,7 @@ const Register: React.FC<RegisterProps> = ({
     email: "",
     designation: "",
     department: "",
+    specialization: [] as string[],
     password: "",
     confirmPassword: "",
     role: "",
@@ -67,6 +70,13 @@ const Register: React.FC<RegisterProps> = ({
     });
   };
 
+  const handleMultiSelectChange = (name: string, value: string[]) => {
+    setForm((prevForm) => ({
+      ...prevForm,
+      [name]: value,
+    }));
+  };
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
 
@@ -75,7 +85,16 @@ const Register: React.FC<RegisterProps> = ({
     for (const key in form) {
       const value = form[key as keyof typeof form];
       if (value !== null) {
-        formData.append(key, value);
+        if (key === 'specialization' && Array.isArray(value)) {
+          // Handle array fields by converting to JSON string
+          formData.append(key, JSON.stringify(value));
+        } else {
+          if (value instanceof File) {
+            formData.append(key, value);
+          } else if (typeof value === 'string') {
+            formData.append(key, value);
+          }
+        }
       }
     }
 
@@ -225,6 +244,20 @@ const Register: React.FC<RegisterProps> = ({
                     options={program?.map((program) => ({
                       value: program.programCode,
                       label: program.programName,
+                    }))}
+                  />
+
+                  <MultiSelectField
+                    label="Specialization"
+                    id="specialization"
+                    name="specialization"
+                    value={form.specialization}
+                    onChange={handleMultiSelectChange}
+                    error={error?.specialization?.[0] || ""}
+                    placeholder="Select your areas of specialization..."
+                    options={specializationOptions.map((spec) => ({
+                      value: spec,
+                      label: spec,
                     }))}
                   />
 
