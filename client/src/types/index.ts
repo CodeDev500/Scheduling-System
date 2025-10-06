@@ -1,4 +1,3 @@
-// Re-export all types from schedule-types
 export * from './schedule-types';
 
 // Define types inline as a fallback
@@ -52,6 +51,8 @@ export interface GenerationStep {
   description: string;
   status: 'pending' | 'running' | 'completed' | 'error';
   progress: number;
+  message?: string;
+  duration?: number;
   startTime?: Date;
   endTime?: Date;
   error?: string;

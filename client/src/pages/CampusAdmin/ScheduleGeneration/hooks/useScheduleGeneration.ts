@@ -2,7 +2,7 @@ import { useState, useRef } from 'react';
 import { toast } from 'sonner';
 import type { GeneratedSchedule } from '../../../../types';
 import type { ScheduleItem, GenerationStep, OptimizationConstraints } from '../../../../types';
-import { generateMockScheduleData, detectConflicts, createSchedule } from '../utils/scheduleUtils';
+import { detectConflicts, createSchedule } from '../utils/scheduleUtils';
 import { ScheduleGenerationService } from '../services/scheduleGenerationService';
 import { useAppSelector } from '../../../../hooks/redux';
 
@@ -71,7 +71,20 @@ export const useScheduleGeneration = (instructors: any[] = []) => {
     // Define all available programs, year levels, and semesters for auto-generation
     const programs = ['BSCS', 'BSIT', 'BSIS', 'BSED', 'BSCRIM', 'BSSW'];
     const yearLevels = ['1st Year', '2nd Year', '3rd Year', '4th Year'];
-    const semesters = ['1st Semester', '2nd Semester'];
+    // Include Summer term in auto-generation
+    const semesters = ['1st Semester', '2nd Semester', 'Summer'];
+
+    // Helper: normalize period field to consistently match strings or numeric codes
+    const normalizePeriod = (period: any): string => {
+      if (typeof period === 'number') {
+        return period === 1 ? '1st Semester' : period === 2 ? '2nd Semester' : period === 3 ? 'Summer' : String(period);
+      }
+      const s = String(period).trim().toLowerCase();
+      if (s.includes('summer')) return 'Summer';
+      if (s.includes('1') || s.includes('first')) return '1st Semester';
+      if (s.includes('2') || s.includes('second')) return '2nd Semester';
+      return period;
+    };
     
     setIsGenerating(true);
     setGenerationProgress(0);
@@ -124,7 +137,7 @@ export const useScheduleGeneration = (instructors: any[] = []) => {
             const hasData = curriculumData.some(course => 
               course.programCode === program && 
               course.yearLevel === yearLevel && 
-              course.period === semester
+              normalizePeriod(course.period) === semester
             );
             if (hasData) {
               totalCombinations++;
@@ -143,7 +156,7 @@ export const useScheduleGeneration = (instructors: any[] = []) => {
             const hasData = curriculumData.some(course => 
               course.programCode === program && 
               course.yearLevel === yearLevel && 
-              course.period === semester
+              normalizePeriod(course.period) === semester
             );
             
             if (hasData) {
@@ -183,22 +196,12 @@ export const useScheduleGeneration = (instructors: any[] = []) => {
         }
       }
       
-      console.log('Generated all schedule items:', allScheduleItems);
-      console.log('Total schedule items generated:', allScheduleItems.length);
-      
       // Apply conflict detection to all schedule items
       const { enhancedItems, conflicts } = detectConflicts(allScheduleItems);
-      console.log('Enhanced items after conflict detection:', enhancedItems);
-      console.log('Enhanced items count:', enhancedItems.length);
-      console.log('Detected conflicts:', conflicts);
-      console.log('Conflicts count:', conflicts.length);
-      
       // Create new schedule
       const newSchedule = createSchedule(enhancedItems, conflicts, generatedSchedules.length);
 
-      console.log('Created new schedule:', newSchedule);
-      console.log('New schedule subjects count:', newSchedule.subjects?.length || 0);
-      console.log('Current generatedSchedules before update:', generatedSchedules);
+
       
       setGeneratedSchedules(prev => {
         const updated = [...prev, newSchedule];
@@ -207,20 +210,10 @@ export const useScheduleGeneration = (instructors: any[] = []) => {
       });
       
       setSelectedSchedule(newSchedule);
-      console.log('Set selectedSchedule to:', newSchedule);
-
       setIsGenerating(false);
       setGenerationProgress(100);
       setCurrentStep('Schedule generated successfully!');
-      
-      // Scroll to results section after generation
-      setTimeout(() => {
-        console.log('Attempting to scroll to results...');
-        resultsRef.current?.scrollIntoView({ 
-          behavior: 'smooth', 
-          block: 'start' 
-        });
-      }, 500);
+    
       
       if (conflicts.length > 0) {
         toast.warning(`Schedule generated with ${conflicts.length} conflicts detected`);

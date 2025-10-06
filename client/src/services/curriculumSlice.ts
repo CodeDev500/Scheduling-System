@@ -19,9 +19,7 @@ export const fetchCurriculums = createAsyncThunk(
   "curriculum/getCurriculums",
   async (_, { rejectWithValue }) => {
     try {
-      console.log("Attempting to fetch curriculums...");
       const response = await axios.get("/curriculum");
-      console.log("curriculums response:", response.data);
       return response.data;
     } catch (error: unknown) {
       console.error("Error fetching curriculums:", error);

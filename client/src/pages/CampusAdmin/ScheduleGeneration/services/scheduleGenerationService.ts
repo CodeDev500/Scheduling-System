@@ -1,5 +1,6 @@
 import api from '@/api/axios';
 import type { Subject, Faculty, Room, GeneratedSchedule, ScheduleItem } from '../../../../types';
+// Day utilities not required here; constrain patterns internally to MW, TTh, and S.
 
 export interface CurriculumCourse {
   id: number;
@@ -36,41 +37,60 @@ export interface UsedTimeSlot {
   facultyId: string;
   roomId: string;
   subjectId: string;
+  programCode?: string;
+  yearLevel?: string | number;
+}
+
+// Local course input interface aligned with requirements
+interface CourseInput {
+  id: string | number;
+  code?: string; // e.g., "CS101"
+  subjectCode?: string;
+  name?: string;
+  subjectName?: string;
+  subjectDescription?: string;
+  lec?: number; // lecture hours
+  lab?: number; // lab hours
+  units: number; // total units (hours per week)
+  hours?: number; // optional total hours
+  yearLevel?: number | string;
+  semester?: string | number;
+  period?: string | number; // sometimes used instead of semester
+  programCode?: string; // used by existing flow
+  tags?: string[] | string; // may come as CSV or array
 }
 
 export class ScheduleGenerationService {
   // Global state tracking to prevent conflicts
   private static usedTimeSlots: UsedTimeSlot[] = [];
   private static globalTimeSlotIndex: number = 0;
-  // Enhanced faculty matching algorithm that compares course tags with faculty specializations
+  // Tracks how many courses have been successfully scheduled to alternate AM/PM distribution
+  private static scheduledCourseCount: number = 0;
+
+  // Enhanced faculty matching algorithm (unchanged)
   static calculateFacultyMatchScore(courseTags: string[], facultySpecializations: string[]): number {
     if (!courseTags || courseTags.length === 0 || !facultySpecializations || facultySpecializations.length === 0) {
       return 0;
     }
 
-    // Normalize strings for comparison (lowercase, remove extra spaces)
     const normalizedCourseTags = courseTags.map(tag => tag.toLowerCase().trim());
     const normalizedSpecializations = facultySpecializations.map(spec => spec.toLowerCase().trim());
 
     let matchScore = 0;
     let totalPossibleMatches = normalizedCourseTags.length;
 
-    // Direct matches (exact match)
     for (const courseTag of normalizedCourseTags) {
       if (normalizedSpecializations.includes(courseTag)) {
-        matchScore += 10; // High score for exact matches
+        matchScore += 10;
       }
     }
 
-    // Partial matches (contains keywords)
     for (const courseTag of normalizedCourseTags) {
       for (const specialization of normalizedSpecializations) {
-        // Check if course tag is contained in specialization or vice versa
         if (courseTag.includes(specialization) || specialization.includes(courseTag)) {
-          matchScore += 5; // Medium score for partial matches
+          matchScore += 5;
         }
         
-        // Check for keyword matches (split by common separators)
         const courseKeywords = courseTag.split(/[\s\-_&]+/);
         const specKeywords = specialization.split(/[\s\-_&]+/);
         
@@ -78,18 +98,16 @@ export class ScheduleGenerationService {
           if (courseKeyword.length > 2 && specKeywords.some(specKeyword => 
             specKeyword.includes(courseKeyword) || courseKeyword.includes(specKeyword)
           )) {
-            matchScore += 2; // Lower score for keyword matches
+            matchScore += 2;
           }
         }
       }
     }
 
-    // Normalize score to percentage (0-100)
-    const maxPossibleScore = totalPossibleMatches * 10; // Maximum if all are exact matches
+    const maxPossibleScore = Math.max(1, totalPossibleMatches * 10);
     return Math.min(100, (matchScore / maxPossibleScore) * 100);
   }
 
-  // Parse JSON string tags/specializations safely
   static parseJsonArray(jsonString: string | string[]): string[] {
     if (Array.isArray(jsonString)) {
       return jsonString;
@@ -99,7 +117,6 @@ export class ScheduleGenerationService {
       return [];
     }
 
-    // Handle comma-separated strings (common format for specializations)
     if (jsonString.includes(',') && !jsonString.trim().startsWith('[')) {
       return jsonString.split(',').map(item => item.trim()).filter(item => item.length > 0);
     }
@@ -108,18 +125,14 @@ export class ScheduleGenerationService {
       const parsed = JSON.parse(jsonString);
       return Array.isArray(parsed) ? parsed : [parsed.toString()];
     } catch (error) {
-      console.warn('Failed to parse JSON array, treating as single string:', jsonString, error);
-      // If JSON parsing fails, treat as a single string value
       return [jsonString.trim()];
     }
   }
 
-  // Find best faculty matches for a course
   static findBestFacultyMatches(course: any, instructors: any[], maxMatches: number = 3): any[] {
     const courseTags = this.parseJsonArray(course.tags);
     
     const facultyWithScores = instructors.map(instructor => {
-      // Handle both Redux faculty structure (FacultyWithSubjects) and API instructor structure
       const specialization = instructor.specialization || instructor.designation || '';
       const facultySpecializations = this.parseJsonArray(specialization);
       const matchScore = this.calculateFacultyMatchScore(courseTags, facultySpecializations);
@@ -136,16 +149,30 @@ export class ScheduleGenerationService {
       };
     });
 
-    // Sort by match score (highest first) and return top matches
-    return facultyWithScores
-      .sort((a, b) => b.matchScore - a.matchScore)
-      .slice(0, maxMatches);
+    const sortedFaculty = facultyWithScores.sort((a, b) => {
+      if (b.matchScore !== a.matchScore) {
+        return b.matchScore - a.matchScore;
+      }
+      const aLoad = a.currentLoad || 0;
+      const bLoad = b.currentLoad || 0;
+      return aLoad - bLoad;
+    });
+    
+    const goodMatches = sortedFaculty.filter(f => f.matchScore > 0);
+    
+    if (goodMatches.length >= maxMatches) {
+      return goodMatches.slice(0, maxMatches);
+    }
+    
+    const fallbackFaculty = sortedFaculty.filter(f => f.matchScore === 0).slice(0, maxMatches - goodMatches.length);
+    
+    return [...goodMatches, ...fallbackFaculty];
   }
 
-  // Fetch curriculum courses for a specific program and year level
   static async getCurriculumCourses(programCode: string, yearLevel: string): Promise<ProgramCourses> {
     try {
       const response = await api.get(`/curriculum/program/${programCode}/${yearLevel}`);
+      console.log('Curriculum courses response:', response.data);
       return response.data;
     } catch (error) {
       console.error('Error fetching curriculum courses:', error);
@@ -153,7 +180,6 @@ export class ScheduleGenerationService {
     }
   }
 
-  // Fetch faculty recommendations for a specific program
   static async getFacultyRecommendations(programCode: string, yearLevel: string, department?: string): Promise<any> {
     try {
       const params = department ? `?department=${department}` : '';
@@ -165,7 +191,6 @@ export class ScheduleGenerationService {
     }
   }
 
-  // Fetch all instructors
   static async getInstructors(): Promise<Faculty[]> {
     try {
       const response = await api.get('/user/instructor');
@@ -186,7 +211,6 @@ export class ScheduleGenerationService {
     }
   }
 
-  // Fetch rooms (if available)
   static async getRooms(): Promise<Room[]> {
     try {
       const response = await api.get('/rooms');
@@ -204,323 +228,189 @@ export class ScheduleGenerationService {
       return [];
     }
   }
-  
 
-  // Enhanced method to generate schedule data using curriculum from Redux store
+  // Enhanced conflict detection
+  private static timeRangesOverlap(
+    start1: string,
+    end1: string,
+    start2: string,
+    end2: string
+  ): boolean {
+    const start1Minutes = this.timeToMinutes(start1);
+    const end1Minutes = this.timeToMinutes(end1);
+    const start2Minutes = this.timeToMinutes(start2);
+    const end2Minutes = this.timeToMinutes(end2);
+    return start1Minutes < end2Minutes && start2Minutes < end1Minutes;
+  }
+
+  private static markTimeSlotAsUsed(
+    day: string,
+    startTime: string,
+    endTime: string,
+    facultyId: string,
+    roomId: string,
+    subjectId: string,
+    programCode?: string,
+    yearLevel?: string | number
+  ): void {
+    this.usedTimeSlots.push({
+      day,
+      startTime,
+      endTime,
+      facultyId,
+      roomId,
+      subjectId,
+      programCode,
+      yearLevel
+    });
+  }
+
+  // Overloaded main generation method (unchanged interface)
   static async generateScheduleDataFromCurriculum(
-    curriculumData: any[], 
-    instructors: any[], 
-    programCode: string, 
-    yearLevel: string, 
+    courses: CourseInput[],
+    instructors: any[],
+    rooms: Room[]
+  ): Promise<ScheduleItem[]>;
+  static async generateScheduleDataFromCurriculum(
+    curriculumData: any[],
+    instructors: any[],
+    programCode: string,
+    yearLevel: string,
     semester: string,
     department?: string
+  ): Promise<ScheduleItem[]>;
+  static async generateScheduleDataFromCurriculum(
+    arg0: any[],
+    instructors: any[],
+    arg2: any,
+    yearLevel?: string,
+    semester?: string,
+    department?: string
   ): Promise<ScheduleItem[]> {
-    // Reset global state for new schedule generation
-    this.usedTimeSlots = [];
-    this.globalTimeSlotIndex = 0;
-    try {
-      console.log('🚀 Starting schedule generation with curriculum data:', curriculumData);
-      console.log('📊 Input summary:', {
-        totalCurriculum: curriculumData.length,
-        instructors: instructors.length,
-        programCode,
-        yearLevel,
-        semester
-      });
-      
-      // Log all unique field values to understand the data structure
-      if (curriculumData.length > 0) {
-        const sampleItem = curriculumData[0];
-        console.log('Sample curriculum item keys:', Object.keys(sampleItem));
-        console.log('Sample programCode field:', sampleItem.programCode);
-        console.log('Sample yearLevel field:', sampleItem.yearLevel);
-        console.log('Sample period field:', sampleItem.period);
-        
-        // Log all unique values for key fields
-        const uniqueProgramCodes = [...new Set(curriculumData.map(c => c.programCode))];
-        const uniqueYearLevels = [...new Set(curriculumData.map(c => c.yearLevel))];
-        const uniquePeriods = [...new Set(curriculumData.map(c => c.period))];
-        
-        console.log('Unique programCodes in data:', uniqueProgramCodes);
-        console.log('Unique yearLevels in data:', uniqueYearLevels);
-        console.log('Unique periods in data:', uniquePeriods);
-      }
-      
-      console.log('Generating schedule from curriculum data:', { curriculumData, instructors, programCode, yearLevel, semester });
-      console.log('Using faculty data:', instructors);
-      
-      // Filter curriculum data for the specific program, year level, and semester
-      // Handle both 'period' and 'semester' fields for compatibility
-      const filteredCourses = curriculumData.filter(course => {
-        const programMatch = course.programCode === programCode;
-        const yearMatch = course.yearLevel === yearLevel;
-        const semesterMatch = course.period === semester || course.semester === semester;
-        
-        const matches = programMatch && yearMatch && semesterMatch;
-        
-        if (!matches) {
-          console.log(`🔍 Course ${course.subjectCode || course.code} filtered out:`, {
-            programMatch,
-            yearMatch,
-            semesterMatch,
-            courseProgram: course.programCode,
-            courseYearLevel: course.yearLevel,
-            courseSemester: course.semester || course.period
-          });
-        }
-        
-        return matches;
-      });
+    this.globalTimeSlotIndex = Math.floor(Math.random() * 10);
+    this.scheduledCourseCount = 0;
+    this.usedTimeSlots = []; // clear used slots for fresh run
 
-      console.log('📋 Filtered courses for schedule generation:', filteredCourses.length, 'courses');
-      console.log('📝 Courses to process:', filteredCourses.map(c => ({
-        id: c.id,
-        code: c.subjectCode || c.code,
-        name: c.subjectDescription || c.name,
-        units: c.units
-      })));
+    try {
+      const isNewApi = Array.isArray(arg2);
+      const courses: CourseInput[] = isNewApi ? (arg0 as CourseInput[]) : (arg0 as CourseInput[]);
+
+      const filteredCourses = isNewApi
+        ? courses
+        : (courses as any[]).filter(course => {
+            const programMatch = course.programCode === arg2;
+            const yearMatch = course.yearLevel === yearLevel;
+            const semesterMatch = course.period === semester || course.semester === semester;
+            return programMatch && yearMatch && semesterMatch;
+          });
 
       if (filteredCourses.length === 0) {
-        console.warn('⚠️ No courses found for the specified criteria');
+        console.warn('⚠️ No courses found');
         return [];
       }
 
-      const rooms = await this.getRooms();
+      const rooms: Room[] = isNewApi ? (arg2 as Room[]) : await this.getRooms();
+      if (rooms.length === 0) {
+        throw new Error('No rooms available for scheduling');
+      }
+
       const scheduleItems: ScheduleItem[] = [];
 
-      // Initialize conflict tracking
-      const facultySchedule: { [facultyId: string]: { [day: string]: { [timeSlot: string]: boolean } } } = {};
-      const roomSchedule: { [roomId: string]: { [day: string]: { [timeSlot: string]: boolean } } } = {};
-      const facultyWorkload: { [facultyId: string]: number } = {};
-
-      // Initialize faculty workload tracking
-      instructors.forEach(instructor => {
-        const facultyId = instructor.id?.toString() || instructor.facultyId?.toString();
-        if (facultyId) {
-          facultyWorkload[facultyId] = 0;
-          facultySchedule[facultyId] = {};
-        }
-      });
-
-      // Helper function to check if faculty is available at a given time
-      const isFacultyAvailable = (facultyId: string, day: string, startTime: string, endTime: string): boolean => {
-        if (!facultySchedule[facultyId] || !facultySchedule[facultyId][day]) {
-          return true;
-        }
-        
-        const timeSlotKey = `${startTime}-${endTime}`;
-        return !facultySchedule[facultyId][day][timeSlotKey];
-      };
-
-      // Helper function to check if room is available at a given time
-      const isRoomAvailable = (roomId: string, day: string, startTime: string, endTime: string): boolean => {
-        if (!roomSchedule[roomId] || !roomSchedule[roomId][day]) {
-          return true;
-        }
-        
-        const timeSlotKey = `${startTime}-${endTime}`;
-        return !roomSchedule[roomId][day][timeSlotKey];
-      };
-
-      // Helper function to mark faculty as busy
-      const markFacultyBusy = (facultyId: string, day: string, startTime: string, endTime: string) => {
-        if (!facultySchedule[facultyId]) facultySchedule[facultyId] = {};
-        if (!facultySchedule[facultyId][day]) facultySchedule[facultyId][day] = {};
-        
-        const timeSlotKey = `${startTime}-${endTime}`;
-        facultySchedule[facultyId][day][timeSlotKey] = true;
-        facultyWorkload[facultyId] = (facultyWorkload[facultyId] || 0) + 1;
-      };
-
-      // Helper function to mark room as busy
-      const markRoomBusy = (roomId: string, day: string, startTime: string, endTime: string) => {
-        if (!roomSchedule[roomId]) roomSchedule[roomId] = {};
-        if (!roomSchedule[roomId][day]) roomSchedule[roomId][day] = {};
-        
-        const timeSlotKey = `${startTime}-${endTime}`;
-        roomSchedule[roomId][day][timeSlotKey] = true;
-      };
-
-      // Helper function to find best available faculty for a course
-      const findBestAvailableFaculty = (course: any, timeSlot: any): any => {
-        // Get faculty matches based on specialization
-        const facultyMatches = this.findBestFacultyMatches(course, instructors, instructors.length);
-        
-        // Sort by workload (ascending) and then by match score (descending)
-        const sortedFaculty = facultyMatches.sort((a, b) => {
-          const aWorkload = facultyWorkload[a.id?.toString()] || 0;
-          const bWorkload = facultyWorkload[b.id?.toString()] || 0;
-          
-          // First priority: lower workload
-          if (aWorkload !== bWorkload) {
-            return aWorkload - bWorkload;
-          }
-          
-          // Second priority: higher match score
-          return (b.matchScore || 0) - (a.matchScore || 0);
-        });
-
-        // Find the first available faculty
-        for (const faculty of sortedFaculty) {
-          const facultyId = faculty.id?.toString();
-          if (facultyId && isFacultyAvailable(facultyId, timeSlot.day, timeSlot.startTime, timeSlot.endTime)) {
-            return faculty;
-          }
-        }
-
-        // If no specialized faculty is available, try any available faculty
-        for (const instructor of instructors) {
-          const facultyId = instructor.id?.toString();
-          if (facultyId && isFacultyAvailable(facultyId, timeSlot.day, timeSlot.startTime, timeSlot.endTime)) {
-            return instructor;
-          }
-        }
-
-        // Last resort: return faculty with lowest workload (even if conflicted)
-        const leastBusyFaculty = instructors.reduce((min, current) => {
-          const currentWorkload = facultyWorkload[current.id?.toString()] || 0;
-          const minWorkload = facultyWorkload[min.id?.toString()] || 0;
-          return currentWorkload < minWorkload ? current : min;
-        });
-
-        return leastBusyFaculty;
-      };
-
-      // Helper function to find available room
-      const findAvailableRoom = (timeSlot: any): any => {
-        // Try to find an available room
-        for (const room of rooms) {
-          const roomId = room.id?.toString();
-          if (roomId && isRoomAvailable(roomId, timeSlot.day, timeSlot.startTime, timeSlot.endTime)) {
-            return room;
-          }
-        }
-        
-        // If no room is available, return a random room (conflict will be noted)
-        return rooms[Math.floor(Math.random() * rooms.length)];
-      };
-
-      // Generate schedule items for each course
       for (let courseIndex = 0; courseIndex < filteredCourses.length; courseIndex++) {
-        const course = filteredCourses[courseIndex];
+        const course = filteredCourses[courseIndex] as CourseInput;
         console.log(`\n--- 📚 Processing course ${courseIndex + 1}/${filteredCourses.length}: ${course.subjectCode || course.code} ---`);
-        console.log('📖 Course details:', {
-          id: course.id,
-          code: course.subjectCode || course.code,
-          name: course.subjectDescription || course.name,
-          units: course.units,
-          lec: course.lec,
-          lab: course.lab,
-          programCode: course.programCode,
-          yearLevel: course.yearLevel,
-          semester: course.semester || course.period
-        });
-        
-        // Skip courses with 0 units early in the process
+
         if (course.units === 0) {
-          console.log(`⚠️ SKIPPED: Course ${course.subjectCode || course.code} has 0 units`);
+          console.log(`⚠️ SKIPPED: Course has 0 units`);
           continue;
         }
-        
-        // Yield control to the event loop every few iterations to prevent UI blocking
+
         if (courseIndex % 5 === 0) {
           await new Promise(resolve => setTimeout(resolve, 0));
         }
-        
-        // Parse course tags
-        const courseTags = this.parseJsonArray(course.tags);
-        console.log('🏷️ Course tags:', courseTags);
 
-        console.log(`🔍 Finding conflict-free schedule for ${course.subjectCode || course.code}...`);
-        
-        // Try to find a conflict-free schedule for this course
-        const conflictFreeResult = this.findConflictFreeSchedule(course, instructors, rooms, 20);
-        
+        console.log(`🔍 Finding conflict-free schedule...`);
+        const conflictFreeResult = this.findConflictFreeSchedule(course, instructors, rooms, 150);
+
         if (!conflictFreeResult) {
-          console.log(`❌ SKIPPED: Failed to find conflict-free schedule for ${course.subjectCode || course.code} after 20 attempts`);
-          console.log(`📊 Current schedule state:`, {
-            usedTimeSlots: this.usedTimeSlots.length,
-            globalTimeSlotIndex: this.globalTimeSlotIndex
-          });
+          console.log(`❌ SKIPPED: Failed to find conflict-free schedule after attempts`);
           continue;
         }
 
         const { timeSlots, faculty: subjectFaculty, room: assignedRoom } = conflictFreeResult;
-        
-        // Increment globalTimeSlotIndex based on the number of time slots used by this course
-        // This ensures the next course starts from a different time slot
-        this.globalTimeSlotIndex += timeSlots.length;
-        
-        // Validate that we have valid faculty and room assignments
-        if (!subjectFaculty || !assignedRoom) {
-          console.log(`❌ SKIPPED: Invalid assignments for ${course.subjectCode || course.code}:`, {
-            hasFaculty: !!subjectFaculty,
-            hasRoom: !!assignedRoom,
-            faculty: subjectFaculty,
-            room: assignedRoom
-          });
-          continue;
-        }
-        
-        console.log(`✅ SUCCESS: Scheduled ${course.subjectCode || course.code}:`, {
-          faculty: `${subjectFaculty.firstname} ${subjectFaculty.lastname}`,
-          room: assignedRoom.name,
-          timeSlots: timeSlots.length,
-          days: timeSlots.map(ts => `${ts.day} ${ts.startTime}-${ts.endTime}`).join(', ')
-        });
 
-        // Skip courses with no time slots
-        if (timeSlots.length === 0) {
-          console.log(`❌ SKIPPED: No time slots generated for ${course.subjectCode || course.code}`);
+        if (!subjectFaculty || !assignedRoom || timeSlots.length === 0) {
+          console.log(`❌ SKIPPED: Invalid assignments`);
           continue;
         }
 
-        // Group time slots by type (Lecture vs Laboratory)
-        const lecHours = course.lec || 0;
-        const labHours = course.lab || 0;
-        const lectureSlots = timeSlots.filter((_, index) => index < lecHours);
-        const labSlots = timeSlots.filter((_, index) => index >= lecHours);
+        // compute total scheduled minutes for sanity check
+        const totalScheduledMinutes = timeSlots.reduce((sum, t) => sum + (t.duration || (this.timeToMinutes(t.endTime) - this.timeToMinutes(t.startTime))), 0);
+        const expectedMinutes = (course.units || 3) * 60;
+        if (totalScheduledMinutes < expectedMinutes) {
+          console.warn(`⚠️ WARNING: Scheduled minutes (${totalScheduledMinutes}) < expected (${expectedMinutes}) for ${course.subjectCode || course.code}`);
+        }
+
+        console.log(`✅ SUCCESS: Scheduled ${course.subjectCode || course.code}`);
 
         const facultyId = subjectFaculty?.id?.toString() || 'unassigned';
         const roomId = assignedRoom?.id?.toString() || 'unassigned';
 
-        // COMBINED APPROACH: Create single schedule item per subject combining lecture and lab
-        const allSlots = [...lectureSlots, ...labSlots];
-        const combinedDays = this.combineDays(allSlots.map(slot => slot.day));
-        
-        // Determine the type based on what components exist
-        let subjectType = 'Lecture';
-        if (lecHours > 0 && labHours > 0) {
-          subjectType = 'Lecture/Laboratory';
-        } else if (labHours > 0 && lecHours === 0) {
-          subjectType = 'Laboratory';
-        }
-
-        // Create time range that covers all sessions
-        const startTimes = allSlots.map(slot => slot.startTime);
-        const endTimes = allSlots.map(slot => slot.endTime);
-        const earliestStart = startTimes.reduce((earliest, current) => 
+        // Instead of collapsing multiple separated sessions into a single continuous start/end,
+        // we keep earliestStart/latestEnd only if sessions are contiguous (no big gaps).
+        const startTimes = timeSlots.map(slot => slot.startTime);
+        const endTimes = timeSlots.map(slot => slot.endTime);
+        const earliestStart = startTimes.reduce((earliest, current) =>
           this.compareTime(current, earliest) < 0 ? current : earliest
         );
-        const latestEnd = endTimes.reduce((latest, current) => 
+        const latestEnd = endTimes.reduce((latest, current) =>
           this.compareTime(current, latest) > 0 ? current : latest
         );
 
-        // Convert semester to proper string format for filtering
+        // detect if there is any gap > 30 minutes between sessions (e.g., lunch)
+        const sortedSlots = timeSlots.slice().sort((a, b) => this.compareTime(a.startTime, b.startTime));
+        let contiguous = true;
+        for (let i = 1; i < sortedSlots.length; i++) {
+          const prevEnd = sortedSlots[i - 1].endTime;
+          const nextStart = sortedSlots[i].startTime;
+          if (this.timeToMinutes(nextStart) - this.timeToMinutes(prevEnd) > 30) {
+            contiguous = false;
+            break;
+          }
+        }
+
+        // produce a clear day/time representation:
+        // if contiguous -> show combined day string and earliestStart/latestEnd
+        // otherwise -> create day string with semicolon-separated sessions (keeps accurate representation)
+        let dayString = this.combineDays(timeSlots.map(slot => slot.day)); // fallback (keeps abbreviations)
+        let displayStart = earliestStart;
+        let displayEnd = latestEnd;
+
+        if (!contiguous) {
+          // build a descriptive day/time string like "F 09:00-11:30; F 13:00-15:00"
+          dayString = timeSlots.map(ts => `${this.abbrevDay(ts.day)} ${ts.startTime}-${ts.endTime}`).join('; ');
+          // set displayStart/displayEnd to the first session only (to avoid appearing as continuous 9-15)
+          displayStart = sortedSlots[0].startTime;
+          displayEnd = sortedSlots[0].endTime;
+        } else {
+          // keep dayString as combined abbreviations
+          dayString = this.combineDays(timeSlots.map(slot => slot.day));
+        }
+
         let semesterValue = course.semester || course.period;
         if (typeof semesterValue === 'number') {
           if (semesterValue === 1) semesterValue = '1st Semester';
           else if (semesterValue === 2) semesterValue = '2nd Semester';
           else if (semesterValue === 3) semesterValue = 'Summer';
-        } else if (typeof semesterValue === 'string') {
-          // Handle various string formats
-          if (semesterValue.toLowerCase().includes('summer')) {
-            semesterValue = 'Summer';
-          } else if (semesterValue === '1' || semesterValue.toLowerCase().includes('1st') || semesterValue.toLowerCase().includes('first')) {
-            semesterValue = '1st Semester';
-          } else if (semesterValue === '2' || semesterValue.toLowerCase().includes('2nd') || semesterValue.toLowerCase().includes('second')) {
-            semesterValue = '2nd Semester';
-          }
+        }
+
+        const lecHours = course.lec || 0;
+        const labHours = course.lab || 0;
+        let subjectType = 'Lecture';
+        if (lecHours > 0 && labHours > 0) {
+          subjectType = 'Lecture/Laboratory';
+        } else if (labHours > 0 && lecHours === 0) {
+          subjectType = 'Laboratory';
         }
 
         const scheduleItem: ScheduleItem = {
@@ -529,447 +419,497 @@ export class ScheduleGenerationService {
           subjectCode: course.subjectCode || course.code,
           subjectName: course.subjectDescription || course.name || course.subjectName,
           facultyId: facultyId,
-          facultyName: subjectFaculty?.firstname 
+          facultyName: subjectFaculty?.firstname
             ? `${subjectFaculty.firstname} ${subjectFaculty.lastname || ''}`.trim()
-            : subjectFaculty?.name || subjectFaculty?.fullName || 'Unassigned',
+            : 'Unassigned',
           roomId: roomId,
           roomName: assignedRoom?.name || 'TBA',
-          day: combinedDays,
-          startTime: earliestStart,
-          endTime: latestEnd,
+          day: dayString,
+          startTime: displayStart,
+          endTime: displayEnd,
           units: course.units || 3,
-          yearLevel: parseInt(course.yearLevel) || 1,
+          yearLevel: course.yearLevel || "1st Year",
           semester: semesterValue || '1st Semester',
-          type: subjectType as 'Lecture' | 'Laboratory'
+          type: subjectType as 'Lec' | 'Lab' | 'Lec/Lab'
         };
 
-        // Mark all time slots as used
-        allSlots.forEach(timeSlot => {
+        // Mark each precise timeslot as used (so conflicts are detected per-block)
+        timeSlots.forEach(timeSlot => {
           this.markTimeSlotAsUsed(
             timeSlot.day,
             timeSlot.startTime,
             timeSlot.endTime,
             facultyId,
             roomId,
-            course.id.toString()
+            course.id.toString(),
+            (course as any).programCode || (course as any).program,
+            (course as any).yearLevel
           );
         });
 
         scheduleItems.push(scheduleItem);
-        console.log(`Created combined schedule item for ${course.subjectCode}:`, scheduleItem);
+        this.scheduledCourseCount++;
       }
 
-      // Log final faculty workload distribution
-      console.log('Final faculty workload distribution:');
-      Object.entries(facultyWorkload).forEach(([facultyId, workload]) => {
-        const faculty = instructors.find(i => i.id?.toString() === facultyId);
-        console.log(`${faculty?.firstname || 'Unknown'}: ${workload} assignments`);
-      });
-
-      console.log(`Generated ${scheduleItems.length} total schedule items`);
-      console.log('Final schedule items being returned:', scheduleItems);
+      console.log(`✅ Generated ${scheduleItems.length} total schedule items`);
       return scheduleItems;
     } catch (error) {
-      console.error('Error generating schedule data from curriculum:', error);
+      console.error('Error generating schedule:', error);
       throw new Error('Failed to generate schedule data from curriculum');
     }
   }
 
-  // Generate time slots for a course based on lecture and lab hours
-  private static generateTimeSlots(lecHours: number, labHours: number, totalUnits: number = 3, startingTimeSlotIndex: number = 0, dayPatternIndex: number = 0) {
-    const timeSlots = [];
-    
-    console.log(`Generating time slots - lecHours: ${lecHours}, labHours: ${labHours}, totalUnits: ${totalUnits}, startingTimeSlotIndex: ${startingTimeSlotIndex}, dayPatternIndex: ${dayPatternIndex}`);
-    
-    // Ensure total hours don't exceed total units
-    const actualTotalHours = Math.min(lecHours + labHours, totalUnits);
-    
-    // If lecHours + labHours exceeds totalUnits, adjust proportionally
-    let adjustedLecHours = lecHours;
-    let adjustedLabHours = labHours;
-    
-    if (lecHours + labHours > totalUnits) {
-      const ratio = totalUnits / (lecHours + labHours);
-      adjustedLecHours = Math.round(lecHours * ratio);
-      adjustedLabHours = Math.round(labHours * ratio);
+  // Helper that returns day abbreviation used for the descriptive day/time string above
+  private static abbrevDay(day: string) {
+    const map: Record<string, string> = {
+      'Monday': 'M',
+      'Tuesday': 'T',
+      'Wednesday': 'W',
+      'Thursday': 'Th',
+      'Friday': 'F',
+      'Saturday': 'S',
+      'Sunday': 'Su'
+    };
+    return map[day] || day;
+  }
+
+  /**
+   * generateTimeSlots — rewritten to:
+   *  - compute per-session durations that sum exactly to total units * 60 (in 30-min increments)
+   *  - prefer single continuous placement for single-day patterns (so we don't split across lunch and then display 9:00-15:00)
+   *  - systematically try day × startTime combinations to fill sessionsNeeded (with attempt cap)
+   */
+  static generateTimeSlots(
+    lecHours: number,
+    labHours: number,
+    totalUnits: number = 3,
+    startingTimeSlotIndex: number = 0,
+    dayPatternIndex: number = 0,
+    options?: { sessionDurationMinutesOverride?: number; sessionsPerWeekOverride?: number }
+  ) {
+    if (totalUnits === 0) return [];
+
+    const timeSlots: any[] = [];
+    const totalWeeklyMinutes = totalUnits * 60;
+
+    // Decide sessionsNeeded
+    let sessionsNeeded: number;
+    if (options?.sessionsPerWeekOverride) {
+      sessionsNeeded = options.sessionsPerWeekOverride;
+    } else {
+      if (totalWeeklyMinutes === 420) { // 7 units
+        sessionsNeeded = 2;
+      } else if (totalWeeklyMinutes <= 120) {
+        sessionsNeeded = 1;
+      } else if (totalWeeklyMinutes === 180) {
+        sessionsNeeded = 2;
+      } else {
+        sessionsNeeded = Math.ceil(totalWeeklyMinutes / 120);
+      }
     }
-    
-    console.log(`Adjusted hours - lecHours: ${adjustedLecHours}, labHours: ${adjustedLabHours}`);
-    
-    // Get day patterns for the course
+
+    // compute per-session durations in 30-minute increments that sum exactly to totalWeeklyMinutes
+    const perSessionBase = Math.floor((totalWeeklyMinutes / sessionsNeeded) / 30) * 30;
+    let remainder = totalWeeklyMinutes - perSessionBase * sessionsNeeded;
+    const sessionDurations: number[] = [];
+    for (let i = 0; i < sessionsNeeded; i++) {
+      let dur = perSessionBase;
+      if (remainder >= 30) {
+        dur += 30;
+        remainder -= 30;
+      }
+      sessionDurations.push(dur);
+    }
+    if (remainder > 0) sessionDurations[sessionDurations.length - 1] += remainder;
+
+    // Day patterns and selection
     const dayPatterns = this.getDayPatternForUnits(totalUnits);
     const selectedDayPattern = dayPatterns[dayPatternIndex % dayPatterns.length];
-    
-    console.log(`Selected day pattern:`, selectedDayPattern);
-    
-    // Define available time slots - EXCLUDE 12:00 PM (lunch break)
-    const timeSlotOptions = [
-      { startTime: '08:00', endTime: '09:00', duration: 60 }, // 1 hour
-      { startTime: '09:00', endTime: '10:00', duration: 60 }, // 1 hour
-      { startTime: '10:00', endTime: '11:00', duration: 60 }, // 1 hour
-      { startTime: '11:00', endTime: '12:00', duration: 60 }, // 1 hour
-      // 12:00-1:00PM is lunch break - EXCLUDED
-      { startTime: '13:00', endTime: '14:00', duration: 60 }, // 1 hour
-      { startTime: '14:00', endTime: '15:00', duration: 60 }, // 1 hour
-      { startTime: '15:00', endTime: '16:00', duration: 60 }, // 1 hour
-      { startTime: '16:00', endTime: '17:00', duration: 60 }, // 1 hour
-      { startTime: '17:00', endTime: '18:00', duration: 60 }  // 1 hour
-    ];
 
-    let slotIndex = 0;
-    let timeSlotIndex = startingTimeSlotIndex;
+    // Candidate start times (30-min increments)
+    const baseTimeSlotOptions = this.getTimeSlotOptions(30); // all possible 30-min starts (validated)
+    if (baseTimeSlotOptions.length === 0) return [];
 
-    // DYNAMIC DURATION CALCULATION based on units and optimal distribution
-    // Strategy: Distribute total weekly hours across optimal number of days
-    // - 0 units: Skip scheduling (no time slots needed)
-    // - 1-2 units: 1-2 sessions per week (1 hour each)
-    // - 3 units: 2 sessions per week (1.5 hours each) OR 3 sessions per week (1 hour each)
-    // - 4+ units: Distribute across multiple days with reasonable session lengths
-    
-    const totalWeeklyHours = totalUnits; // 1 unit = 1 hour per week
-    let optimalSessionsPerWeek: number;
-    let sessionDurationMinutes: number;
-    
-    if (totalWeeklyHours === 0) {
-      // 0 units: No scheduling needed, return empty time slots
-      console.log(`Skipping subject with 0 units - no time slots needed`);
-      return [];
-    } else if (totalWeeklyHours <= 2) {
-      // 1-2 units: Simple 1 hour sessions
-      optimalSessionsPerWeek = totalWeeklyHours;
-      sessionDurationMinutes = 60;
-    } else if (totalWeeklyHours === 3) {
-      // 3 units: 2 sessions of 1.5 hours each (more efficient than 3 x 1 hour)
-      optimalSessionsPerWeek = 2;
-      sessionDurationMinutes = 90;
-    } else {
-      // 4+ units: Distribute across multiple days, max 2 hours per session
-      const maxSessionDuration = 120; // 2 hours max per session
-      sessionDurationMinutes = Math.min(maxSessionDuration, totalWeeklyHours * 60 / 2);
-      optimalSessionsPerWeek = Math.ceil((totalWeeklyHours * 60) / sessionDurationMinutes);
-    }
-    
-    console.log(`Dynamic scheduling: ${totalWeeklyHours} units → ${optimalSessionsPerWeek} sessions of ${sessionDurationMinutes} minutes each`);
-    
-    // Adjust session duration for time slot compatibility
-    const sessionHours = sessionDurationMinutes / 60;
-    const endTimeOffset = sessionDurationMinutes;
-    
-    console.log(`Dynamic scheduling: ${totalWeeklyHours} units → ${optimalSessionsPerWeek} sessions of ${sessionDurationMinutes} minutes each`);
-    
-    // UPDATED APPROACH: Create sessions based on dynamic calculation instead of separate lec/lab
-    const sessionGroups = [];
-    
-    // For subjects with both lecture and lab components, combine them intelligently
-    if (adjustedLecHours > 0 && adjustedLabHours > 0) {
-      // Combined lecture/lab sessions
-      const baseTimeOption = timeSlotOptions[timeSlotIndex % timeSlotOptions.length];
-      const sessionEndTime = this.addMinutes(baseTimeOption.startTime, sessionDurationMinutes);
-      
-      if (this.isValidTimeSlot(baseTimeOption.startTime, sessionEndTime)) {
-        sessionGroups.push({
-          type: 'Lecture/Laboratory',
-          startTime: baseTimeOption.startTime,
-          endTime: sessionEndTime,
-          duration: sessionDurationMinutes,
-          sessionsNeeded: optimalSessionsPerWeek
-        });
-      }
-    } else if (adjustedLecHours > 0) {
-      // Lecture-only sessions
-      const lectureTimeOption = timeSlotOptions[timeSlotIndex % timeSlotOptions.length];
-      const lectureEndTime = this.addMinutes(lectureTimeOption.startTime, sessionDurationMinutes);
-      
-      if (this.isValidTimeSlot(lectureTimeOption.startTime, lectureEndTime)) {
-        sessionGroups.push({
-          type: 'Lecture',
-          startTime: lectureTimeOption.startTime,
-          endTime: lectureEndTime,
-          duration: sessionDurationMinutes,
-          sessionsNeeded: optimalSessionsPerWeek
-        });
-      }
-    } else if (adjustedLabHours > 0) {
-      // Lab-only sessions
-      const labTimeOption = timeSlotOptions[timeSlotIndex % timeSlotOptions.length];
-      const labEndTime = this.addMinutes(labTimeOption.startTime, sessionDurationMinutes);
-      
-      if (this.isValidTimeSlot(labTimeOption.startTime, labEndTime)) {
-        sessionGroups.push({
-          type: 'Laboratory',
-          startTime: labTimeOption.startTime,
-          endTime: labEndTime,
-          duration: sessionDurationMinutes,
-          sessionsNeeded: optimalSessionsPerWeek
-        });
-      }
-    }
-    
-    // Generate time slots ensuring consistency across days for each session type
-    for (const sessionGroup of sessionGroups) {
-      let sessionsCreated = 0;
-      let dayIndex = 0;
-      
-      while (sessionsCreated < sessionGroup.sessionsNeeded && dayIndex < selectedDayPattern.length * 2) {
-        const day = selectedDayPattern[dayIndex % selectedDayPattern.length];
-        
-        if (!day) {
-          console.error(`Day is undefined for session ${sessionsCreated}, dayIndex=${dayIndex}, selectedDayPattern:`, selectedDayPattern);
-          dayIndex++;
-          continue;
-        }
-        
-        console.log(`Creating ${sessionGroup.type} session ${sessionsCreated + 1}: day=${day}, time=${sessionGroup.startTime}-${sessionGroup.endTime}`);
-        
+    // If pattern is single-day and sessionsNeeded > 1, try to fit the FULL weekly minutes as a single continuous block
+    // inside morning or inside afternoon (this avoids splitting around lunch and displaying e.g., 9:00-15:00)
+    const isSingleDayPattern = selectedDayPattern.length === 1;
+    if (isSingleDayPattern && sessionsNeeded > 1) {
+      const day = selectedDayPattern[0];
+
+      // look for a start time such that start + totalWeeklyMinutes fits entirely inside morning OR inside afternoon
+      for (const option of baseTimeSlotOptions) {
+        const start = option.startTime;
+        const end = this.addMinutes(start, totalWeeklyMinutes);
+        if (!this.isValidTimeSlot(start, end)) continue;
+
+        // ensure requested day/time doesn't collide with lunch by isValidTimeSlot already
         timeSlots.push({
-          id: `${sessionGroup.type.toLowerCase()}-slot-${slotIndex}`,
-          day: day as "Monday" | "Tuesday" | "Wednesday" | "Thursday" | "Friday" | "Saturday" | "Sunday",
-          startTime: sessionGroup.startTime,
-          endTime: sessionGroup.endTime,
-          duration: sessionGroup.duration,
-          type: sessionGroup.type
+          id: `singleblock-${day}-${start}`,
+          day,
+          startTime: start,
+          endTime: end,
+          duration: totalWeeklyMinutes,
+          type: (lecHours > 0 && labHours > 0) ? 'Lec/Lab' : (lecHours > 0 ? 'Lecture' : 'Lab')
         });
-        
-        slotIndex++;
-        sessionsCreated++;
-        dayIndex++;
+        return timeSlots; // perfect single continuous block found
+      }
+      // if no single-block fits, fall back to splitting across days or back-to-back same-day sessions (below)
+    }
+
+    // Otherwise try systematic placement of each session (distribute across selectedDayPattern)
+    const maxAttempts = baseTimeSlotOptions.length * selectedDayPattern.length * sessionsNeeded * 4;
+    let attempts = 0;
+    const usedStartsForThisCourse: { day: string; startTime: string; endTime: string }[] = [];
+    let createdSessions = 0;
+    let searchIndexOffset = startingTimeSlotIndex % baseTimeSlotOptions.length;
+
+    while (createdSessions < sessionsNeeded && attempts < maxAttempts) {
+      attempts++;
+
+      // pick day in round-robin across pattern days
+      const day = selectedDayPattern[createdSessions % selectedDayPattern.length] || selectedDayPattern[0];
+
+      // choose a candidate start index (rotates to give AM/PM balance)
+      const candidateStartIndex = (searchIndexOffset + createdSessions + attempts) % baseTimeSlotOptions.length;
+      const candidateStart = baseTimeSlotOptions[candidateStartIndex].startTime;
+      const duration = sessionDurations[createdSessions];
+      const candidateEnd = this.addMinutes(candidateStart, duration);
+
+      if (!this.isValidTimeSlot(candidateStart, candidateEnd)) {
+        continue;
+      }
+
+      // ensure no local overlap with already chosen sessions for this course
+      const overlapsLocal = usedStartsForThisCourse.some(s =>
+        s.day === day && this.timeRangesOverlap(s.startTime, s.endTime, candidateStart, candidateEnd)
+      );
+      if (overlapsLocal) {
+        continue;
+      }
+
+      // Good candidate -> add
+      const slot = {
+        id: `slot-${createdSessions}-${day}-${candidateStart}`,
+        day,
+        startTime: candidateStart,
+        endTime: candidateEnd,
+        duration,
+        type: (lecHours > 0 && labHours > 0) ? 'Lec/Lab' : (lecHours > 0 ? 'Lecture' : 'Lab')
+      };
+
+      timeSlots.push(slot);
+      usedStartsForThisCourse.push({ day, startTime: candidateStart, endTime: candidateEnd });
+      createdSessions++;
+    }
+
+    // If not all sessions created, do exhaustive fallback trying all days x starts
+    if (createdSessions < sessionsNeeded) {
+      for (let s = createdSessions; s < sessionsNeeded; s++) {
+        let filled = false;
+        for (let dayIdx = 0; dayIdx < selectedDayPattern.length && !filled; dayIdx++) {
+          const d = selectedDayPattern[dayIdx];
+          for (let startIdx = 0; startIdx < baseTimeSlotOptions.length && !filled; startIdx++) {
+            const candidateStart = baseTimeSlotOptions[(startIdx + startingTimeSlotIndex) % baseTimeSlotOptions.length].startTime;
+            const duration = sessionDurations[s];
+            const candidateEnd = this.addMinutes(candidateStart, duration);
+            if (!this.isValidTimeSlot(candidateStart, candidateEnd)) continue;
+            const overlapsLocal = usedStartsForThisCourse.some(st =>
+              st.day === d && this.timeRangesOverlap(st.startTime, st.endTime, candidateStart, candidateEnd)
+            );
+            if (overlapsLocal) continue;
+            const slot = {
+              id: `slot-fallback-${s}-${d}-${candidateStart}`,
+              day: d,
+              startTime: candidateStart,
+              endTime: candidateEnd,
+              duration,
+              type: (lecHours > 0 && labHours > 0) ? 'Lec/Lab' : (lecHours > 0 ? 'Lecture' : 'Lab')
+            };
+            timeSlots.push(slot);
+            usedStartsForThisCourse.push({ day: d, startTime: candidateStart, endTime: candidateEnd });
+            filled = true;
+            break;
+          }
+        }
       }
     }
 
-    console.log(`Generated ${timeSlots.length} time slots for ${totalUnits} units:`, timeSlots);
+    // Final sanity: ensure total scheduled minutes equal expected; try best-effort adjust last session by 30s if necessary
+    const scheduledMinutes = timeSlots.reduce((sum, t) => sum + (t.duration || (this.timeToMinutes(t.endTime) - this.timeToMinutes(t.startTime))), 0);
+    if (scheduledMinutes !== totalWeeklyMinutes) {
+      const diff = totalWeeklyMinutes - scheduledMinutes;
+      if (Math.abs(diff) >= 30 && timeSlots.length > 0) {
+        // try to expand/shrink last session by multiples of 30
+        const last = timeSlots[timeSlots.length - 1];
+        let newDur = (last.duration || (this.timeToMinutes(last.endTime) - this.timeToMinutes(last.startTime))) + diff;
+        newDur = Math.max(30, Math.round(newDur / 30) * 30);
+        const newEnd = this.addMinutes(last.startTime, newDur);
+        if (this.isValidTimeSlot(last.startTime, newEnd)) {
+          last.duration = newDur;
+          last.endTime = newEnd;
+        } else {
+          console.warn(`⚠️ Unable to exactly match required minutes (${totalWeeklyMinutes}) for course — scheduled ${scheduledMinutes}`);
+        }
+      } else if (scheduledMinutes !== totalWeeklyMinutes) {
+        console.warn(`⚠️ TimeSlots sum mismatch: scheduled ${scheduledMinutes} / expected ${totalWeeklyMinutes}`);
+      }
+    }
+
     return timeSlots;
   }
 
-  // Helper method to check if a time slot conflicts with existing assignments
-  private static hasTimeSlotConflict(
-    day: string, 
-    startTime: string, 
-    endTime: string, 
-    facultyId: string, 
-    roomId: string
-  ): boolean {
-    return this.usedTimeSlots.some(slot => 
-      slot.day === day &&
-      slot.startTime === startTime &&
-      slot.endTime === endTime &&
-      (slot.facultyId === facultyId || slot.roomId === roomId)
-    );
-  }
-
-  // Helper method to mark a time slot as used
-  private static markTimeSlotAsUsed(
-    day: string, 
-    startTime: string, 
-    endTime: string, 
-    facultyId: string, 
-    roomId: string, 
-    subjectId: string
-  ): void {
-    this.usedTimeSlots.push({
-      day,
-      startTime,
-      endTime,
-      facultyId,
-      roomId,
-      subjectId
-    });
-  }
-
-  // Method to find conflict-free schedule for a course
-  private static findConflictFreeSchedule(
+  // Improved conflict-free scheduling
+  static findConflictFreeSchedule(
     course: any,
     instructors: any[],
     rooms: any[],
-    maxRetries: number = 25
+    maxRetries: number = 100
   ): { timeSlots: any[], faculty: any, room: any } | null {
     const lecHours = course.lec || 0;
     const labHours = course.lab || 0;
     const totalUnits = course.units || 3;
-    
-    console.log(`🔍 Finding schedule for ${course.subjectCode || course.code} (${totalUnits} units, ${lecHours}L/${labHours}Lab)`);
-    
-    // Get available day patterns for this course
+
     const dayPatterns = this.getDayPatternForUnits(totalUnits);
-    console.log(`📅 Available day patterns: ${dayPatterns.length}`);
-    
-    // Calculate the number of available time slots to better distribute courses
-    // EXCLUDE 12:00 PM (lunch break) from available scheduling times
-    const timeSlotOptions = [
-      { startTime: '08:00', endTime: '09:00', duration: 60 },
-      { startTime: '09:00', endTime: '10:00', duration: 60 },
-      { startTime: '10:00', endTime: '11:00', duration: 60 },
-      { startTime: '11:00', endTime: '12:00', duration: 60 },
-      // 12:00-1:00 PM is lunch break - EXCLUDED
-      { startTime: '13:00', endTime: '14:00', duration: 60 },
-      { startTime: '14:00', endTime: '15:00', duration: 60 },
-      { startTime: '15:00', endTime: '16:00', duration: 60 },
-      { startTime: '16:00', endTime: '17:00', duration: 60 },
-      { startTime: '17:00', endTime: '18:00', duration: 60 }
-    ];
-    
-    // Find qualified faculty for this course
-    const courseTags = this.parseJsonArray(course.tags);
-    const qualifiedFaculty = this.findBestFacultyMatches(course, instructors, 5); // Increased from 3 to 5
-    console.log(`👨‍🏫 Qualified faculty: ${qualifiedFaculty.length}`);
-    
-    if (qualifiedFaculty.length === 0) {
-      console.log(`⚠️ No qualified faculty found for ${course.subjectCode || course.code}`);
-      // Fallback: use any available instructor
-      if (instructors.length > 0) {
-        qualifiedFaculty.push(instructors[0]);
-        console.log(`🔄 Using fallback faculty: ${instructors[0].firstname} ${instructors[0].lastname}`);
-      }
+    const totalWeeklyHours = totalUnits;
+
+    // Build candidate distributions
+    const distributionCandidates: { duration: number; sessions: number }[] = [];
+    if (totalWeeklyHours === 7) {
+      distributionCandidates.push({ duration: 210, sessions: 2 });
+      distributionCandidates.push({ duration: 60, sessions: 7 });
+    } else if (totalWeeklyHours <= 2) {
+      distributionCandidates.push({ duration: 120, sessions: 1 });
+    } else if (totalWeeklyHours === 3) {
+      distributionCandidates.push({ duration: 90, sessions: 2 });
+    } else {
+      const baseDuration = 120;
+      const sessions = Math.ceil((totalWeeklyHours * 60) / baseDuration);
+      distributionCandidates.push({ duration: baseDuration, sessions });
     }
-    
-    // Try different combinations of time slots, day patterns, faculty, and rooms
-    // Start from the current globalTimeSlotIndex to ensure better distribution
-    for (let timeSlotAttempt = 0; timeSlotAttempt < maxRetries; timeSlotAttempt++) {
-      for (let dayPatternIndex = 0; dayPatternIndex < dayPatterns.length; dayPatternIndex++) {
-        // Calculate starting time slot index with better distribution
-        // Use modulo to wrap around available time slots
-        const startingTimeSlotIndex = (this.globalTimeSlotIndex + timeSlotAttempt) % timeSlotOptions.length;
-        
-        // Generate time slots with current parameters
-        const timeSlots = this.generateTimeSlots(
-          lecHours, 
-          labHours, 
-          totalUnits, 
-          startingTimeSlotIndex,
-          dayPatternIndex
-        );
-        
-        if (timeSlots.length === 0) continue;
-        
-        // Try each qualified faculty
-        for (const faculty of qualifiedFaculty) {
-          const facultyId = faculty.id?.toString() || 'unassigned';
-          
-          // Try each available room
-          for (const room of rooms) {
+
+    const qualifiedFaculty = this.findBestFacultyMatches(course, instructors, instructors.length);
+    const roomsShuffled = [...rooms].sort(() => Math.random() - 0.5);
+    const facultyShuffled = [...qualifiedFaculty].sort(() => Math.random() - 0.5);
+
+    if (qualifiedFaculty.length === 0 && instructors.length > 0) {
+      qualifiedFaculty.push(...instructors);
+    }
+
+    // Strategy: try combinations
+    for (const candidate of distributionCandidates) {
+      const timeSlotOptions = this.getTimeSlotOptions(candidate.duration);
+      const balancedOrder = this.getBalancedStartOrder(timeSlotOptions);
+
+      for (let timeSlotAttempt = 0; timeSlotAttempt < maxRetries; timeSlotAttempt++) {
+        for (let dayPatternIndex = 0; dayPatternIndex < dayPatterns.length; dayPatternIndex++) {
+          if (totalWeeklyHours === 7 && candidate.duration === 210 && dayPatterns[dayPatternIndex].length < 2) {
+            continue;
+          }
+
+          const startingTimeSlotIndex = balancedOrder[(this.globalTimeSlotIndex + timeSlotAttempt) % balancedOrder.length];
+
+          const timeSlots = this.generateTimeSlots(
+            lecHours,
+            labHours,
+            totalUnits,
+            startingTimeSlotIndex,
+            dayPatternIndex,
+            { sessionDurationMinutesOverride: candidate.duration, sessionsPerWeekOverride: candidate.sessions }
+          );
+
+          if (timeSlots.length === 0) continue;
+
+          // Prevent overlapping within same program/year
+          let programYearOk = true;
+          const courseProgram = (course as any).programCode || (course as any).program;
+          const courseYear = (course as any).yearLevel;
+          for (const timeSlot of timeSlots) {
+            const overlapWithinProgramYear = this.usedTimeSlots.some(slot =>
+              slot.day === timeSlot.day &&
+              slot.programCode === courseProgram &&
+              String(slot.yearLevel) === String(courseYear) &&
+              this.timeRangesOverlap(slot.startTime, slot.endTime, timeSlot.startTime, timeSlot.endTime)
+            );
+            if (overlapWithinProgramYear) {
+              programYearOk = false;
+              break;
+            }
+          }
+          if (!programYearOk) continue;
+
+          // Try rooms first
+          for (const room of roomsShuffled) {
             const roomId = room.id?.toString() || 'unassigned';
-            
-            // Check if this combination has any conflicts
-            let hasConflict = false;
+
+            let roomAvailable = true;
             for (const timeSlot of timeSlots) {
-              if (this.hasTimeSlotConflict(
-                timeSlot.day, 
-                timeSlot.startTime, 
-                timeSlot.endTime, 
-                facultyId, 
-                roomId
-              )) {
-                hasConflict = true;
+              const roomConflict = this.usedTimeSlots.some(slot =>
+                slot.day === timeSlot.day &&
+                slot.roomId === roomId &&
+                this.timeRangesOverlap(slot.startTime, slot.endTime, timeSlot.startTime, timeSlot.endTime)
+              );
+              if (roomConflict) {
+                roomAvailable = false;
                 break;
               }
             }
-            
-            // If no conflicts found, return this combination
-            if (!hasConflict) {
-              console.log(`✅ Found conflict-free schedule for ${course.subjectCode || course.code} on attempt ${timeSlotAttempt + 1}/${maxRetries}`);
-              console.log(`📍 Schedule details: ${faculty.firstname} ${faculty.lastname} in ${room.name} at ${timeSlots[0]?.startTime}`);
+            if (!roomAvailable) continue;
+
+            // Try faculties
+            for (const faculty of facultyShuffled) {
+              const facultyId = faculty.id?.toString() || 'unassigned';
+
+              let facultyAvailable = true;
+              for (const timeSlot of timeSlots) {
+                const facultyConflict = this.usedTimeSlots.some(slot =>
+                  slot.day === timeSlot.day &&
+                  slot.facultyId === facultyId &&
+                  this.timeRangesOverlap(slot.startTime, slot.endTime, timeSlot.startTime, timeSlot.endTime)
+                );
+                if (facultyConflict) {
+                  facultyAvailable = false;
+                  break;
+                }
+              }
+              if (!facultyAvailable) continue;
+
+              // Avoid repeating exact Time+Day+Room for same subject or same faculty
+              const repeatsPreviousCombo = timeSlots.some(ts =>
+                this.usedTimeSlots.some(slot =>
+                  slot.day === ts.day &&
+                  slot.startTime === ts.startTime &&
+                  slot.endTime === ts.endTime &&
+                  slot.roomId === roomId &&
+                  (slot.subjectId === String(course.id) || slot.facultyId === facultyId)
+                )
+              );
+              if (repeatsPreviousCombo) continue;
+
+              // Success
+              console.log(`✅ Found conflict-free schedule for ${course.subjectCode || course.code}:`);
+              console.log(`   Faculty: ${faculty.firstname} ${faculty.lastname} (ID: ${facultyId})`);
+              console.log(`   Room: ${room.name} (ID: ${roomId})`);
+              console.log(`   Time: ${timeSlots.map(t => `${t.day} ${t.startTime}-${t.endTime}`).join('; ')}`);
+              console.log(`   Attempt: ${timeSlotAttempt + 1}/${maxRetries}`);
+
+              this.globalTimeSlotIndex = (this.globalTimeSlotIndex + 1) % balancedOrder.length;
               return { timeSlots, faculty, room };
             }
           }
         }
       }
     }
-    
-    // No conflict-free combination found - try with relaxed constraints
+
     console.warn(`⚠️ No conflict-free schedule found for ${course.subjectCode || course.code} after ${maxRetries} attempts`);
-    console.log(`🔄 Attempting fallback scheduling with relaxed constraints...`);
-    
-    // Fallback: Try to assign any available faculty and room, even with some conflicts
-    if (qualifiedFaculty.length > 0 && rooms.length > 0) {
-      const fallbackTimeSlots = this.generateTimeSlots(lecHours, labHours, totalUnits, 0, 0);
-      if (fallbackTimeSlots.length > 0) {
-        console.log(`🆘 Using fallback schedule for ${course.subjectCode || course.code}`);
-        return { 
-          timeSlots: fallbackTimeSlots, 
-          faculty: qualifiedFaculty[0], 
-          room: rooms[0] 
-        };
-      }
-    }
-    
-    console.error(`❌ Complete failure to schedule ${course.subjectCode || course.code}`);
+    console.log(`   Tried ${dayPatterns.length} day patterns x multiple time slots x ${rooms.length} rooms x ${qualifiedFaculty.length} faculty`);
     return null;
   }
 
-  // Helper method to validate time slots don't conflict with lunch break or exceed 8PM
-  private static isValidTimeSlot(startTime: string, endTime: string): boolean {
+  static isValidTimeSlot(startTime: string, endTime: string): boolean {
     const start = this.timeToMinutes(startTime);
     const end = this.timeToMinutes(endTime);
+    const dayStart = this.timeToMinutes('07:00');
     const lunchStart = this.timeToMinutes('12:00');
     const lunchEnd = this.timeToMinutes('13:00');
-    const dayEnd = this.timeToMinutes('20:00');
-    
-    // Check if slot conflicts with lunch break or goes past 8PM
-    return end <= dayEnd && !(start < lunchEnd && end > lunchStart);
+    const morningEnd = this.timeToMinutes('12:00');
+    const afternoonStart = this.timeToMinutes('13:00');
+    const afternoonEnd = this.timeToMinutes('20:00');
+
+    const inMorning = start >= dayStart && end <= morningEnd;
+    const inAfternoon = start >= afternoonStart && end <= afternoonEnd;
+    const crossesLunch = start < lunchEnd && end > lunchStart;
+
+    return (inMorning || inAfternoon) && !crossesLunch && end > start;
   }
 
-  // Helper method to convert time string to minutes
-  private static timeToMinutes(timeString: string): number {
+  static getTimeSlotOptions(sessionDurationMinutes: number = 60) {
+    const options: { startTime: string; endTime: string; duration: number }[] = [];
+    let hour = 7;
+    let minute = 0;
+    while (hour < 20) {
+      const start = `${String(hour).padStart(2, '0')}:${String(minute).padStart(2, '0')}`;
+      const end = this.addMinutes(start, sessionDurationMinutes);
+      if (this.isValidTimeSlot(start, end)) {
+        options.push({ startTime: start, endTime: end, duration: sessionDurationMinutes });
+      }
+      minute += 30;
+      if (minute >= 60) {
+        minute = 0;
+        hour += 1;
+      }
+    }
+    return options;
+  }
+
+  static getBalancedStartOrder(timeSlotOptions: { startTime: string }[]) {
+    const amIndices: number[] = [];
+    const pmIndices: number[] = [];
+    for (let i = 0; i < timeSlotOptions.length; i++) {
+      const hour = parseInt(timeSlotOptions[i].startTime.split(':')[0], 10);
+      if (hour < 12) amIndices.push(i);
+      else if (hour >= 13) pmIndices.push(i);
+    }
+
+    const startWithPm = this.globalTimeSlotIndex % 2 === 1;
+    const first = startWithPm ? pmIndices : amIndices;
+    const second = startWithPm ? amIndices : pmIndices;
+
+    const interleaved: number[] = [];
+    const maxLen = Math.max(first.length, second.length);
+    for (let i = 0; i < maxLen; i++) {
+      if (i < first.length) interleaved.push(first[i]);
+      if (i < second.length) interleaved.push(second[i]);
+    }
+    return interleaved.length > 0 ? interleaved : [...amIndices, ...pmIndices];
+  }
+
+  static timeToMinutes(timeString: string): number {
     const [hours, minutes] = timeString.split(':').map(Number);
     return hours * 60 + minutes;
   }
 
-  // Helper method to get day patterns based on optimal session distribution
-  private static getDayPatternForUnits(units: number): string[][] {
-    // Updated day patterns to match dynamic scheduling approach
-    // Focus on optimal distribution rather than strict unit-to-day mapping
-    
-    if (units <= 2) {
-      // 1-2 units: Simple single or double day patterns
-      return [
-        ['Monday'], ['Tuesday'], ['Wednesday'], ['Thursday'], ['Friday'],
-        ['Monday', 'Wednesday'], ['Tuesday', 'Thursday'], ['Monday', 'Friday']
+  static getDayPatternForUnits(units: number): string[][] {
+    let basePatterns: string[][];
+    if (units === 7) {
+      basePatterns = [
+        ['Monday', 'Wednesday'],
+        ['Tuesday', 'Thursday'],
+        ['Friday', 'Saturday'],
+        ['Friday'],
+        ['Saturday']
       ];
     } else if (units === 3) {
-      // 3 units: Prefer 2-day patterns (1.5 hours each) over 3-day patterns (1 hour each)
-      return [
-        ['Monday', 'Wednesday'], ['Tuesday', 'Thursday'], ['Monday', 'Friday'], 
-        ['Wednesday', 'Friday'], ['Tuesday', 'Friday'],
-        ['Monday', 'Wednesday', 'Friday'] // Fallback 3-day option
+      basePatterns = [
+        ['Monday', 'Wednesday'],
+        ['Tuesday', 'Thursday']
       ];
-    } else if (units === 4) {
-      // 4 units: Distribute across 2-3 days optimally
-      return [
-        ['Monday', 'Wednesday'], ['Tuesday', 'Thursday'], 
-        ['Monday', 'Wednesday', 'Friday'], ['Tuesday', 'Thursday', 'Friday']
-      ];
-    } else if (units === 5) {
-      // 5 units: Distribute across 3-4 days
-      return [
-        ['Monday', 'Wednesday', 'Friday'], ['Tuesday', 'Thursday', 'Friday'],
-        ['Monday', 'Tuesday', 'Thursday'], ['Monday', 'Tuesday', 'Wednesday', 'Thursday']
+    } else if (units <= 2) {
+      basePatterns = [
+        ['Monday', 'Wednesday'],
+        ['Tuesday', 'Thursday'],
+        ['Friday'],
+        ['Saturday']
       ];
     } else {
-      // 6+ units: Use maximum distribution
-      return [
-        ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday'],
-        ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday']
+      basePatterns = [
+        ['Monday', 'Wednesday'],
+        ['Tuesday', 'Thursday'],
+        ['Friday'],
+        ['Saturday']
       ];
     }
+
+    const rotate = this.scheduledCourseCount % basePatterns.length;
+    const ordered = [...basePatterns.slice(rotate), ...basePatterns.slice(0, rotate)];
+    return ordered;
   }
 
-  // Helper method to combine days into abbreviated format (e.g., "MW", "TTh", "MWF")
-  private static combineDays(days: string[]): string {
-    console.log('combineDays input:', days);
-    
-    if (!days || days.length === 0) {
-      console.warn('combineDays received empty or undefined days array');
-      return '';
-    }
-    
-    // Filter out undefined, null, and empty string values
+  static combineDays(days: string[]): string {
+    if (!days || days.length === 0) return '';
+
     const validDays = days.filter(day => day && day.trim() !== '');
-    console.log('Valid days after filtering:', validDays);
-    
-    if (validDays.length === 0) {
-      console.warn('No valid days found after filtering');
-      return '';
-    }
-    
+    if (validDays.length === 0) return '';
+
     const dayAbbreviations: { [key: string]: string } = {
       'Monday': 'M',
       'Tuesday': 'T',
@@ -980,39 +920,28 @@ export class ScheduleGenerationService {
       'Sunday': 'Su'
     };
 
-    // Remove duplicates and sort by day order
     const uniqueDays = [...new Set(validDays)];
     const dayOrder = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'];
-    
-    const sortedDays = uniqueDays.sort((a, b) => {
-      return dayOrder.indexOf(a) - dayOrder.indexOf(b);
-    });
-
-    // Convert to abbreviations and join
-    const result = sortedDays.map(day => dayAbbreviations[day] || day).join('');
-    console.log('combineDays result:', result);
-    return result;
+    const sortedDays = uniqueDays.sort((a, b) => dayOrder.indexOf(a) - dayOrder.indexOf(b));
+    return sortedDays.map(day => dayAbbreviations[day] || day).join('');
   }
 
-  // Helper method to add minutes to a time string
-  private static addMinutes(timeString: string, minutes: number): string {
+  static addMinutes(timeString: string, minutes: number): string {
     const [hourStr, minuteStr] = timeString.split(':');
     const totalMinutes = parseInt(hourStr) * 60 + parseInt(minuteStr) + minutes;
     const newHour = Math.floor(totalMinutes / 60);
     const newMinute = totalMinutes % 60;
-    
+
     return `${newHour.toString().padStart(2, '0')}:${newMinute.toString().padStart(2, '0')}`;
   }
 
-  // Helper method to compare two time strings
-  private static compareTime(time1: string, time2: string): number {
+  static compareTime(time1: string, time2: string): number {
     const [hour1, minute1] = time1.split(':').map(Number);
     const [hour2, minute2] = time2.split(':').map(Number);
-    
+
     const totalMinutes1 = hour1 * 60 + minute1;
     const totalMinutes2 = hour2 * 60 + minute2;
-    
+
     return totalMinutes1 - totalMinutes2;
   }
-
 }

@@ -11,27 +11,16 @@ import {
   BookOpen,
   GraduationCap,
   MapPin,
-  Star,
   Award,
-  Eye,
-  ChevronRight,
   User,
   Target,
-  X,
   AlertTriangle,
-  CheckCircle,
-  AlertCircle,
   Info,
   Table,
   Search,
-  Filter,
-  Download,
-  RefreshCw,
-  Settings,
   GripVertical,
   Save
 } from 'lucide-react';
-import { toast } from 'sonner';
 import {
   DndContext,
   closestCenter,
@@ -50,16 +39,14 @@ import {
   useSortable,
 } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
+import { useToast } from '@/hooks/useToast';
 
 // Import extracted components
 import { ScheduleHeader } from './components/ScheduleHeader';
 import { GenerationProgress } from './components/GenerationProgress';
-import { ScheduleGridView } from './components/ScheduleGridView';
-import { ScheduleTableView } from './components/ScheduleTableView';
 
 // Import hooks
 import { useScheduleGeneration } from './hooks/useScheduleGeneration';
-import { useScheduleEditing } from './hooks/useScheduleEditing';
 
 // Import Redux hooks and slice
 import { useAppDispatch, useAppSelector } from '../../../hooks/redux';
@@ -72,17 +59,19 @@ import { fetchProgramPriorities, saveProgramPriorities } from '../../../services
 import type { GeneratedSchedule, ScheduleItem, FacultyRecommendation, Subject } from '../../../types';
 import type { AcademicProgram } from '../../../types/types';
 
-// Import day utilities
-import { getDayDisplayText, parseDaysCombination, formatDaysCombination } from './utils/dayUtils';
-import { convertTo12Hour, formatTimeRange as formatTimeRangeUtil } from './utils/timeUtils';
+import { formatTimeRange as formatTimeRangeUtil } from './utils/timeUtils';
 import api from '@/api/axios';
-import { ScheduleGenerationService } from './services/scheduleGenerationService';
-
 // Define Schedule type for the sample data
 interface Schedule {
   id: string;
   subject: string;
+  subjectCode?: string;
+  subjectName?: string;
+  units?: number;
+  startTime?: string;
+  endTime?: string;
   faculty: string;
+  facultyName: string;
   room: string;
   time: string;
   day: string;
@@ -94,6 +83,8 @@ interface Schedule {
   credits?: number;
   type?: string;
   students?: string;
+  recommendations?: FacultyRecommendation[];
+  roomName?: string;
 }
 
 // Utility function to format time range using timeUtils
@@ -111,27 +102,17 @@ const ScheduleGeneration: React.FC = () => {
   const { academicPrograms, isLoading: programsLoading, error: programsError } = useAppSelector((state) => state.academicProgram);
   const { programPriorities: savedProgramPriorities, isLoading: prioritiesLoading, error: prioritiesError } = useAppSelector((state) => state.programPriority);
 
-
-
-  // Additional state for UI
+  const toast = useToast();
   const [showFacultyRecommendations, setShowFacultyRecommendations] = useState(false);
   const [selectedSubject, setSelectedSubject] = useState<Subject | null>(null);
-  const [showScheduleDetail, setShowScheduleDetail] = useState(false);
-  const [selectedScheduleItem, setSelectedScheduleItem] = useState<ScheduleItem | null>(null);
-  const [activeTab, setActiveTab] = useState('generation');
   const [schedules, setSchedules] = useState<Schedule[]>([]);
   const [searchTerm, setSearchTerm] = useState("");
   const [filterSemester, setFilterSemester] = useState("all");
   const [filterProgram, setFilterProgram] = useState("all");
-
   const [programs, setPrograms] = useState<any[]>([]);
   const [programPriorities, setProgramPriorities] = useState<string[]>([]);
   const [showPrioritySettings, setShowPrioritySettings] = useState(false);
   const [instructors, setInstructors] = useState<any[]>([]);
-  const [rooms, setRooms] = useState<any[]>([]);
-  const [loading, setLoading] = useState(false);
-  const { curriculums, isLoading: curriculumsLoading, error: curriculumsError } = useAppSelector((state) => state.curriculum);
-
   useEffect(() => {
     const getInstructors = async () => {
       try {
@@ -160,15 +141,10 @@ const ScheduleGeneration: React.FC = () => {
         priority: index + 1,
         department: selectedDepartment || undefined
       }));
+      await dispatch(saveProgramPriorities(prioritiesData)).unwrap();
 
-      console.log('Priorities data to save:', prioritiesData);
-      
-      const result = await dispatch(saveProgramPriorities(prioritiesData)).unwrap();
-      console.log('Save result:', result);
-      
       toast.success('Program priorities saved successfully!');
     } catch (error) {
-      console.error('Error saving program priorities:', error);
       toast.error('Failed to save program priorities. Please try again.');
     }
   };
@@ -176,45 +152,23 @@ const ScheduleGeneration: React.FC = () => {
   // Use extracted hooks
   const {
     selectedDepartment,
-    setSelectedDepartment,
     selectedProgram,
-    setSelectedProgram,
     selectedYearLevel,
-    setSelectedYearLevel,
     selectedSemester,
-    setSelectedSemester,
-    targetStudents,
-    setTargetStudents,
     isGenerating,
     generatedSchedules,
-    setGeneratedSchedules,
     selectedSchedule,
-    setSelectedSchedule,
-    showScheduleDetails,
-    setShowScheduleDetails,
     generationProgress,
-    completedSteps,
-    estimatedTime,
     currentStep,
     handleGenerateSchedule
   } = useScheduleGeneration(instructors);
 
   useEffect(() => {
-    console.log("curriculums", curriculums)
-    console.log("generatedSchedules updated:", generatedSchedules);
-    console.log("generatedSchedules length:", generatedSchedules.length);
     // Fetch academic programs and program priorities when component mounts
     dispatch(fetchAcademicPrograms());
     dispatch(fetchProgramPriorities());
     dispatch(fetchCurriculums());
-    
-    // Note: Using separate API call for instructors instead of Redux faculty data
-    // This provides all instructors for schedule assignment purposes
   }, [dispatch]);
-
-  const {
-
-  } = useScheduleEditing(selectedSchedule, setSelectedSchedule, setGeneratedSchedules);
 
   // Update program priorities when academic programs are loaded
   useEffect(() => {
@@ -237,19 +191,37 @@ const ScheduleGeneration: React.FC = () => {
     }
   }, [academicPrograms, savedProgramPriorities]);
 
+  useEffect(() => {  
+    const fetchLatestSavedSchedule = async () => {
+    try {
+      // Use the unfiltered endpoint that returns all subject_schedules rows
+      const response = await api.get('/schedule-generation/items');
+      // Server returns the raw array of subject_schedules, not wrapped in { data }
+      setSchedules(response.data?.data || []);
+    } catch (error: any) {
+      if (error?.response?.status !== 404) {
+        console.error('Error fetching all subject schedules:', error);
+      }
+    }
+  };
+    // Fetch and display all subject_schedules rows directly (no filters, no wrapping)
+    fetchLatestSavedSchedule();
+  }, []);
+
+  
+  // When generating a new schedule, clear current display first
   useEffect(() => {
-    // Convert generatedSchedules data to table format - preserve all original data
-    console.log("Processing generatedSchedules for display:", generatedSchedules);
-    console.log("generatedSchedules length in processing useEffect:", generatedSchedules.length);
-    
+    if (isGenerating) {
+      setSchedules([]);
+    }
+  }, [isGenerating]);
+  
+
+  useEffect(() => {
     if (generatedSchedules && generatedSchedules.length > 0) {
       const scheduleItems: Schedule[] = [];
       
       generatedSchedules.forEach((schedule, scheduleIndex) => {
-        console.log(`Processing schedule ${scheduleIndex}:`, schedule);
-        console.log(`Schedule ${scheduleIndex} subjects:`, schedule.subjects);
-        console.log(`Schedule ${scheduleIndex} subjects length:`, schedule.subjects?.length || 0);
-        
         if (schedule.subjects && Array.isArray(schedule.subjects)) {
           // Preserve all original data from the generated schedule
           schedule.subjects.forEach((item: any) => {
@@ -284,7 +256,7 @@ const ScheduleGeneration: React.FC = () => {
               
               // Academic information - preserve all fields
               semester: item.semester || 'Unknown Semester',
-              academicYear: '2024-2025',
+              academicYear: '2025-2026',
               program: item.program || item.programCode || 'Unknown Program',
               yearLevel: item.yearLevel || 'Unknown Year Level',
               credits: item.subject?.credits || item.units || 3,
@@ -302,8 +274,6 @@ const ScheduleGeneration: React.FC = () => {
           });
         }
       });
-
-      console.log('Final schedule items with all preserved data:', scheduleItems);
       setSchedules(scheduleItems);
     } else {
       // Clear schedules if no generated schedules
@@ -311,124 +281,62 @@ const ScheduleGeneration: React.FC = () => {
     }
   }, [generatedSchedules, selectedSemester, selectedProgram, selectedYearLevel]);
 
-   // Fetch rooms from API
-  const fetchRooms = async () => {
-    try {
-      const response = await api.get('/rooms');
-      setRooms(response.data.data || []);
-    } catch (error) {
-      console.error('Error fetching rooms:', error);
-      toast.error('Failed to fetch rooms');
-    } finally {
-      setLoading(false);
-    }
-  };
 
-  useEffect(() => {
-    fetchRooms();
-  }, []);
-  console.log(schedules)
+const filteredSchedules = useMemo(() => {
+  // Step 1: Filter schedules based on search term, semester, and program
+  let filtered = schedules?.filter((schedule) => {
+    const searchMatch =
+      !searchTerm ||
+      (schedule.facultyName &&
+        schedule.facultyName.toLowerCase().includes(searchTerm.toLowerCase()));
 
-  // Filter schedules based on search term, semester, and program
-  const filteredSchedules = useMemo(() => {
-    if (!schedules || schedules.length === 0) {
-      console.log('No schedules to filter');
-      return [];
-    }
+    const semesterMatch =
+      !filterSemester ||
+      filterSemester === "all" ||
+      schedule.semester === filterSemester;
 
-    console.log('Filtering schedules with:', { searchTerm, filterSemester, filterProgram });
-    console.log('Total schedules before filtering:', schedules.length);
-    console.log('Sample schedule data structure:', schedules[0]);
-    
-    // Log all semester values to debug
-    console.log('All semester values:', schedules.map(s => ({ id: s.id, subject: s.subject, semester: s.semester })));
-    
-    let filtered = schedules.filter((schedule) => {
-      // Enhanced search filter - search across all available fields
-      const searchMatch = !searchTerm || 
-        (schedule.subject && schedule.subject.toLowerCase().includes(searchTerm.toLowerCase())) ||
-        (schedule.subjectName && schedule.subjectName.toLowerCase().includes(searchTerm.toLowerCase())) ||
-        (schedule.subjectCode && schedule.subjectCode.toLowerCase().includes(searchTerm.toLowerCase())) ||
-        (schedule.subjectDescription && schedule.subjectDescription.toLowerCase().includes(searchTerm.toLowerCase())) ||
-        (schedule.faculty && schedule.faculty.toLowerCase().includes(searchTerm.toLowerCase())) ||
-        (schedule.facultyName && schedule.facultyName.toLowerCase().includes(searchTerm.toLowerCase())) ||
-        (schedule.room && schedule.room.toLowerCase().includes(searchTerm.toLowerCase())) ||
-        (schedule.roomName && schedule.roomName.toLowerCase().includes(searchTerm.toLowerCase())) ||
-        (schedule.day && schedule.day.toLowerCase().includes(searchTerm.toLowerCase())) ||
-        (schedule.time && schedule.time.toLowerCase().includes(searchTerm.toLowerCase())) ||
-        (schedule.type && schedule.type.toLowerCase().includes(searchTerm.toLowerCase())) ||
-        (schedule.section && schedule.section.toLowerCase().includes(searchTerm.toLowerCase()));
+    const programMatch =
+      !filterProgram ||
+      filterProgram === "all" ||
+      schedule.program === filterProgram;
 
-      // Enhanced semester filter with detailed logging
-      const semesterMatch = !filterSemester || 
-        filterSemester === 'all' || 
-        schedule.semester === filterSemester;
+    return searchMatch && semesterMatch && programMatch;
+  });
 
-      // Enhanced program filter
-      const programMatch = !filterProgram || 
-        filterProgram === 'all' || 
-        schedule.program === filterProgram;
+  // Step 2: If no filters applied, show all schedules
+  if (!searchTerm && filterSemester === "all" && filterProgram === "all") {
+    filtered = schedules;
+  }
 
-      // Log filtering decisions for debugging
-      if (!semesterMatch) {
-        console.log(`Schedule ${schedule.id} filtered out by semester: schedule.semester="${schedule.semester}", filterSemester="${filterSemester}"`);
-      }
+  // Step 3: Sort schedules based on program priority (BSIT → BSCS → BSIS)
+  const sortedSchedules =
+    programPriorities && programPriorities.length > 0
+      ? [...filtered].sort((a, b) => {
+          const indexA = programPriorities.indexOf(a.program);
+          const indexB = programPriorities.indexOf(b.program);
+          const priorityA = indexA === -1 ? 999 : indexA;
+          const priorityB = indexB === -1 ? 999 : indexB;
+          return priorityA - priorityB;
+        })
+      : filtered;
 
-      return searchMatch && semesterMatch && programMatch;
-    });
+  return sortedSchedules;
+}, [schedules, searchTerm, filterSemester, filterProgram, programPriorities]);
 
-    console.log('Filtered schedules count:', filtered.length);
-    console.log('Sample filtered schedules:', filtered.slice(0, 3));
-    
-    return filtered;
-  }, [schedules, searchTerm, filterSemester, filterProgram]);
 
-  console.log(schedules)
-
-  // Sort schedules by program priority
-  const processedSchedules = useMemo(() => {
-    return [...filteredSchedules].sort((a, b) => {
-      const aPriority = programPriorities.indexOf(a.program);
-      const bPriority = programPriorities.indexOf(b.program);
-      
-      // If both programs are in priorities, sort by priority order
-      if (aPriority !== -1 && bPriority !== -1) {
-        return aPriority - bPriority;
-      }
-      
-      // If only one is in priorities, prioritize it
-      if (aPriority !== -1) return -1;
-      if (bPriority !== -1) return 1;
-      
-      // If neither is in priorities, sort alphabetically
-      return a.program.localeCompare(b.program);
-    });
-  }, [filteredSchedules, programPriorities]);
-
-  // Handle priority reordering
-  const handlePriorityReorder = (startIndex: number, endIndex: number) => {
-    const result = Array.from(programPriorities);
-    const [removed] = result.splice(startIndex, 1);
-    result.splice(endIndex, 0, removed);
-    setProgramPriorities(result);
-  };
 
   const handleDragEnd = (event: any) => {
     const { active, over } = event;
 
     if (active.id !== over?.id) {
-      console.log('Drag end - active:', active.id, 'over:', over?.id);
-      console.log('Current programPriorities before reorder:', programPriorities);
-      
+
       setProgramPriorities((items) => {
         const oldIndex = items.indexOf(active.id as string);
         const newIndex = items.indexOf(over?.id as string);
         
-        console.log('Old index:', oldIndex, 'New index:', newIndex);
-        
+
         const newOrder = arrayMove(items, oldIndex, newIndex);
-        console.log('New order after arrayMove:', newOrder);
-        
+
         return newOrder;
       });
     }
@@ -457,8 +365,6 @@ const SortableItem = ({ id, children }: { id: string; children: React.ReactNode 
     transition,
     opacity: isDragging ? 0.5 : 1,
   };
-
-
 
   return (
     <div
@@ -491,11 +397,27 @@ const SortableItem = ({ id, children }: { id: string; children: React.ReactNode 
     // Implementation would go here
   };
 
-  // Handle schedule item click for details
-  const handleScheduleItemClick = (item: ScheduleItem) => {
-    setSelectedScheduleItem(item);
-    setShowScheduleDetail(true);
+  // Save the currently selected/generated schedule to the server (overwriting previous)
+  const handleSaveSchedule = async () => {
+    try {
+      // Save the raw schedules array exactly as generated/shown, without changing shape
+      if (!schedules || schedules.length === 0) {
+        toast.warning('No schedules to save. Generate a schedule first.');
+        return;
+      }
+
+      const response = await api.post('/schedule-generation/save', schedules);
+      if (response.data?.success) {
+        toast.success('Schedule saved successfully. Previous schedule has been overwritten.');
+      } else {
+        toast.error(response.data?.message || 'Failed to save schedule.');
+      }
+    } catch (error: any) {
+      console.error('Error saving schedule:', error);
+      toast.error(error?.response?.data?.message || 'Failed to save schedule.');
+    }
   };
+
 
   // State for faculty recommendations
   const [facultyRecommendations, setFacultyRecommendations] = useState<any[]>([]);
@@ -519,9 +441,6 @@ const SortableItem = ({ id, children }: { id: string; children: React.ReactNode 
     }
   };
 
-  console.log(generatedSchedules)
-  console.log(isGenerating)
-
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-50 via-blue-50 to-indigo-100">
       <div className="mx-auto space-y-8">
@@ -530,6 +449,8 @@ const SortableItem = ({ id, children }: { id: string; children: React.ReactNode 
           isGenerating={isGenerating}
           onGenerateSchedule={handleGenerateSchedule}
           onExportSchedule={handleExportSchedule}
+          onSaveSchedule={handleSaveSchedule}
+          canSave={!!selectedSchedule}
         />
 
         {/* Generation Progress */}
@@ -557,7 +478,7 @@ const SortableItem = ({ id, children }: { id: string; children: React.ReactNode 
                   </div>
                 </div>
                 <Badge variant="secondary" className="bg-white/20 text-white border-white/30 text-sm font-semibold px-3 py-1">
-                  {generatedSchedules.length > 0 && generatedSchedules[0]?.subjects ? generatedSchedules[0].subjects.length : 0} schedule items
+                  {schedules.length} schedule items
                 </Badge>
               </div>
               
@@ -567,7 +488,7 @@ const SortableItem = ({ id, children }: { id: string; children: React.ReactNode 
                   <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-white/60 h-4 w-4" />
                   <input
                     type="text"
-                    placeholder="Search schedules..."
+                    placeholder="Search faculty..."
                     value={searchTerm}
                     onChange={(e) => setSearchTerm(e.target.value)}
                     className="w-full pl-10 pr-4 py-2 bg-white/20 border border-white/30 rounded-lg text-white placeholder-white/60 focus:outline-none focus:ring-2 focus:ring-white/50"
@@ -606,7 +527,7 @@ const SortableItem = ({ id, children }: { id: string; children: React.ReactNode 
               </div>
             </div>
             
-            {generatedSchedules.length > 0 && generatedSchedules[0]?.subjects?.length > 0 ? (
+            {schedules.length > 0 ? (
               <div className="overflow-x-auto">
                 <table className="w-full">
                   <thead className="bg-gradient-to-r from-gray-50 to-gray-100 border-b border-gray-200">
@@ -659,12 +580,12 @@ const SortableItem = ({ id, children }: { id: string; children: React.ReactNode 
                           <span>Program</span>
                         </div>
                       </th>
-                      <th className="px-6 py-4 text-left text-xs font-bold text-gray-700 uppercase tracking-wider">
+                      {/* <th className="px-6 py-4 text-left text-xs font-bold text-gray-700 uppercase tracking-wider">
                         <div className="flex items-center space-x-2">
                           <AlertTriangle className="h-4 w-4 text-red-500" />
                           <span>Status</span>
                         </div>
-                      </th>
+                      </th> */}
                     </tr>
                   </thead>
                   <tbody className="bg-white divide-y divide-gray-100">
@@ -673,31 +594,13 @@ const SortableItem = ({ id, children }: { id: string; children: React.ReactNode 
                         <React.Fragment key={subject.id}>
                           <tr className={`hover:bg-gradient-to-r hover:from-blue-50 hover:to-indigo-50 transition-all duration-200 cursor-pointer ${
                             index % 2 === 0 ? 'bg-gray-50/30' : 'bg-white'
-                          }`}
-                            onClick={() => {
-                              setSelectedScheduleItem({
-                                id: subject.id,
-                                subjectName: subject.subjectName,
-                                facultyName: subject.facultyName,
-                                startTime: subject.startTime,
-                                endTime: subject.endTime,
-                                day: subject.day,
-                                roomName: subject.roomName,
-                                semester: subject.semester,
-                                program: subject.program,
-                                yearLevel: subject.yearLevel,
-                                subjectCode: subject.subjectCode,
-                                type: subject.type,
-                                units: subject.units
-                              } as ScheduleItem);
-                              setShowScheduleDetail(true);
-                            }}
+                          }`}                      
                           >
                             {/* Subject Code */}
                             <td className="px-6 py-5 whitespace-nowrap">
                               <div className="flex items-center space-x-3">
                                 <div>
-                                  <div className="text-sm font-bold text-gray-900">{subject.subjectCode}</div>
+                                  <div className="text-sm font-bold text-gray-900">{subject?.subjectCode || 'N/A'}</div>
                                 </div>
                               </div>
                             </td>
@@ -723,7 +626,7 @@ const SortableItem = ({ id, children }: { id: string; children: React.ReactNode 
                             <td className="px-6 py-5 whitespace-nowrap">
                               <div className="flex items-center text-sm font-semibold text-gray-900">
                                 <Clock className="w-4 h-4 text-orange-500 mr-2" />
-                                {formatTimeRange(subject.startTime, subject.endTime)}
+                                {formatTimeRange(subject.startTime || 'N/A', subject.endTime || 'N/A')}
                               </div>
                             </td>
                             
@@ -743,7 +646,7 @@ const SortableItem = ({ id, children }: { id: string; children: React.ReactNode 
                                   </div>
                                 </div>
                                 <div>
-                                  <div className="text-sm font-semibold text-gray-900">{subject.roomName}</div>
+                                  <div className="text-sm font-semibold text-gray-900">{subject.roomName || 'N/A'}</div>
                                 </div>
                               </div>
                             </td>
@@ -758,7 +661,7 @@ const SortableItem = ({ id, children }: { id: string; children: React.ReactNode 
                                 </div>
                                 <div>
                                   <div className="text-sm font-semibold text-gray-900">{subject.facultyName}</div>
-                                  <div className="text-xs text-gray-500">ID: {subject.facultyId}</div>
+                                  {/* <div className="text-xs text-gray-500">ID: {subject.facultyId}</div> */}
                                 </div>
                               </div>
                             </td>
@@ -772,14 +675,14 @@ const SortableItem = ({ id, children }: { id: string; children: React.ReactNode 
                             </td>
                             
                             {/* Status */}
-                            <td className="px-6 py-5 whitespace-nowrap">
+                            {/* <td className="px-6 py-5 whitespace-nowrap">
                               <Badge 
                                 variant="outline" 
                                 className={subject.hasConflict ? 'bg-red-50 text-red-700 border-red-300' : 'bg-green-50 text-green-700 border-green-300'}
                               >
                                 {subject.status || (subject.hasConflict ? 'Conflict' : 'OK')}
                               </Badge>
-                            </td>
+                            </td> */}
                           </tr>
                         </React.Fragment>
                       );
@@ -807,103 +710,6 @@ const SortableItem = ({ id, children }: { id: string; children: React.ReactNode 
             )}
           </CardContent>
         </Card>
-
-        {/* Schedule Detail Dialog */}
-        {showScheduleDetail && selectedScheduleItem && (
-          <Dialog open={showScheduleDetail} onOpenChange={setShowScheduleDetail}>
-            <DialogContent className="max-w-3xl">
-              <DialogHeader>
-                <DialogTitle className="flex items-center gap-3">
-                  <div className="p-2 bg-blue-100 rounded-lg">
-                    <BookOpen className="h-6 w-6 text-blue-600" />
-                  </div>
-                  <div>
-                    <span className="text-xl font-bold">Schedule Details</span>
-                    <p className="text-sm text-gray-500 font-normal">Comprehensive information about the selected schedule item</p>
-                  </div>
-                </DialogTitle>
-              </DialogHeader>
-              <div className="space-y-6">
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                  <div className="space-y-4">
-                    <div className="p-4 bg-gradient-to-br from-blue-50 to-blue-100 rounded-lg border border-blue-200">
-                      <label className="text-sm font-bold text-blue-800 uppercase tracking-wide">Subject Information</label>
-                      <p className="text-xl font-bold text-blue-900 mt-1">{selectedScheduleItem.subjectName || 'N/A'}</p>
-                      <div className="flex items-center space-x-2 mt-2">
-                        <Badge variant="outline" className="bg-blue-50 text-blue-700 border-blue-300">
-                          Course Code
-                        </Badge>
-                        <Badge variant="outline" className="bg-yellow-50 text-yellow-700 border-yellow-300">
-                          3 Credits
-                        </Badge>
-                      </div>
-                    </div>
-                    
-                    <div className="p-4 bg-gradient-to-br from-green-50 to-green-100 rounded-lg border border-green-200">
-                      <label className="text-sm font-bold text-green-800 uppercase tracking-wide">Faculty</label>
-                      <div className="flex items-center space-x-3 mt-2">
-                        <div className="h-12 w-12 rounded-full bg-gradient-to-br from-green-400 to-green-600 flex items-center justify-center">
-                          <User className="h-6 w-6 text-white" />
-                        </div>
-                        <div>
-                          <p className="text-lg font-bold text-green-900">{selectedScheduleItem.facultyName || 'N/A'}</p>
-                          <p className="text-sm text-green-700">Instructor</p>
-                        </div>
-                      </div>
-                    </div>
-                  </div>
-                  
-                  <div className="space-y-4">
-                    <div className="p-4 bg-gradient-to-br from-orange-50 to-orange-100 rounded-lg border border-orange-200">
-                      <label className="text-sm font-bold text-orange-800 uppercase tracking-wide">Schedule Time</label>
-                      <div className="flex items-center space-x-2 mt-2">
-                        <Clock className="h-5 w-5 text-orange-600" />
-                        <p className="text-lg font-bold text-orange-900">
-                          {formatTimeRange(selectedScheduleItem.startTime, selectedScheduleItem.endTime)}
-                        </p>
-                      </div>
-                      <Badge variant="outline" className="bg-orange-50 text-orange-700 border-orange-300 mt-2">
-                        Daily Schedule
-                      </Badge>
-                    </div>
-                    
-                    <div className="p-4 bg-gradient-to-br from-red-50 to-red-100 rounded-lg border border-red-200">
-                      <label className="text-sm font-bold text-red-800 uppercase tracking-wide">Location</label>
-                      <div className="flex items-center space-x-2 mt-2">
-                        <MapPin className="h-5 w-5 text-red-600" />
-                        <p className="text-lg font-bold text-red-900">{selectedScheduleItem.roomName || 'N/A'}</p>
-                      </div>
-                      <p className="text-sm text-red-700 mt-1">Classroom Assignment</p>
-                    </div>
-                  </div>
-                </div>
-                
-                {selectedScheduleItem.type === 'Laboratory' && (
-                  <div className="p-6 bg-gradient-to-br from-purple-50 to-purple-100 border border-purple-200 rounded-lg">
-                    <div className="flex items-center gap-3 text-purple-800 mb-3">
-                      <div className="p-2 bg-purple-200 rounded-lg">
-                        <Info className="h-5 w-5" />
-                      </div>
-                      <span className="font-bold text-lg">Laboratory Session</span>
-                    </div>
-                    <p className="text-purple-700 leading-relaxed">
-                      This is a laboratory session requiring special equipment and setup. Students should arrive 10 minutes early for proper preparation and safety briefing.
-                    </p>
-                  </div>
-                )}
-                
-                <div className="flex justify-end space-x-3 pt-4 border-t border-gray-200">
-                  <Button variant="outline" onClick={() => setShowScheduleDetail(false)}>
-                    Close
-                  </Button>
-                  <Button className="bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700">
-                    Edit Schedule
-                  </Button>
-                </div>
-              </div>
-            </DialogContent>
-          </Dialog>
-        )}
 
         {/* Faculty Recommendations Dialog */}
         {/* Priority Settings Dialog */}

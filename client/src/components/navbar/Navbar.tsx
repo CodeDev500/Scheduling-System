@@ -54,7 +54,7 @@ const Navbar = () => {
 
         <div className="hidden md:flex items-center justify-center flex-1 px-4">
           <ul className="flex gap-5 items-center justify-center text-white lg:text-lg text-sm">
-            <li>
+            {/* <li>
               <Link
                 to={"/home"}
                 className={`relative w-fit h-10 p-2 text-white focus:outline-none group ${
@@ -66,7 +66,7 @@ const Navbar = () => {
                 Home
                 <span className="absolute left-0 bottom-0 w-0 h-0.5 bg-white transition-all duration-300 group-hover:w-full"></span>
               </Link>
-            </li>
+            </li> */}
             {/* <li>
               <Link
                 to={"/about"}

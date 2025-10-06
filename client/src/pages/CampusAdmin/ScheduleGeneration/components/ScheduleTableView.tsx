@@ -244,6 +244,30 @@ export const ScheduleTableView: React.FC<ScheduleTableViewProps> = ({
                           <Building className="h-3 w-3 text-green-500" />
                           <span>Lab: {scheduledSubject.labHours || 0}h</span>
                         </div>
+                        {/* Distribution summary for 7-unit subjects */}
+                        {scheduledSubject.units === 7 && scheduledSubject.timeSlots && scheduledSubject.timeSlots.length > 0 && (
+                          <div className="mt-1 text-xs text-gray-500">
+                            {(() => {
+                              const toMinutes = (t: string) => {
+                                const [h, m] = t.split(":").map(Number);
+                                return h * 60 + m;
+                              };
+                              const durations = scheduledSubject.timeSlots.map((ts: any) => toMinutes(ts.endTime) - toMinutes(ts.startTime));
+                              const uniqueDurations = Array.from(new Set(durations));
+                              const sessions = scheduledSubject.timeSlots.length;
+                              const dur = uniqueDurations[0] || 0;
+                              const hours = Math.floor(dur / 60);
+                              const minutes = dur % 60;
+                              if (dur === 210 && sessions === 2) {
+                                return `Distribution: 2 meetings × ${hours}h ${minutes}m per week`;
+                              }
+                              if (dur === 60 && sessions === 7) {
+                                return `Distribution: 7 meetings × 1h per week`;
+                              }
+                              return `Distribution: ${sessions} meetings × ${hours}h${minutes ? ` ${minutes}m` : ''} per week`;
+                            })()}
+                          </div>
+                        )}
                       </div>
                     </div>
                   </td>
@@ -311,7 +335,16 @@ export const ScheduleTableView: React.FC<ScheduleTableViewProps> = ({
                         </span>
                       </div>
                       <div className="text-xs text-gray-500">
-                        Duration: {Math.round((new Date(`2000-01-01T${timeSlot.endTime}`).getTime() - new Date(`2000-01-01T${timeSlot.startTime}`).getTime()) / (1000 * 60 * 60 * 100)) / 10}h
+                        {(() => {
+                          const toMinutes = (t: string) => {
+                            const [h, m] = t.split(":").map(Number);
+                            return h * 60 + m;
+                          };
+                          const durationMinutes = toMinutes(timeSlot.endTime) - toMinutes(timeSlot.startTime);
+                          const hours = Math.floor(durationMinutes / 60);
+                          const minutes = durationMinutes % 60;
+                          return `Duration: ${hours}h${minutes ? ` ${minutes}m` : ''}`;
+                        })()}
                       </div>
                     </div>
                   </td>

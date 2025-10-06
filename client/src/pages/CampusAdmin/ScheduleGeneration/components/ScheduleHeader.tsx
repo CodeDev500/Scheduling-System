@@ -5,19 +5,24 @@ import {
   Calendar,
   FileText,
   FileSpreadsheet,
-  FileImage
+  FileImage,
+  Save
 } from 'lucide-react';
 
 interface ScheduleHeaderProps {
   isGenerating: boolean;
   onGenerateSchedule: () => void;
   onExportSchedule: (format: 'pdf' | 'excel' | 'csv') => void;
+  onSaveSchedule?: () => void;
+  canSave?: boolean;
 }
 
 export const ScheduleHeader: React.FC<ScheduleHeaderProps> = ({
   isGenerating,
   onGenerateSchedule,
-  onExportSchedule
+  onExportSchedule,
+  onSaveSchedule,
+  canSave = true
 }) => {
   return (
     <div className="space-y-8">
@@ -52,6 +57,15 @@ export const ScheduleHeader: React.FC<ScheduleHeaderProps> = ({
                 </SelectItem>
               </SelectContent>
             </Select>
+            <Button 
+              onClick={onSaveSchedule}
+              disabled={!canSave || isGenerating}
+              variant="outline"
+              className="border-blue-200 hover:bg-blue-50 text-blue-700"
+            >
+              <Save className="h-5 w-5 mr-2" />
+              Save Schedule
+            </Button>
             <Button 
               onClick={onGenerateSchedule}
               disabled={isGenerating}
