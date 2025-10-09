@@ -23,6 +23,7 @@ import scheduleGenerationRoutes from "./routes/scheduleGeneration.router";
 import specializationRoutes from "./routes/specialization.router";
 import programPriorityRoutes from "./routes/programPriority.router";
 import { facultyRecommendationRouter } from "./routes/facultyRecommendation.router";
+import academicYearRoutes from "./routes/academicYear.router";
 
 dotenv.config();
 const PORT: number = process.env.PORT ? parseInt(process.env.PORT) : 3000;
@@ -75,6 +76,7 @@ app.use("/schedule-generation", scheduleGenerationRoutes);
 app.use("/specializations", specializationRoutes);
 app.use("/program-priorities", programPriorityRoutes);
 app.use("/faculty-recommendations", facultyRecommendationRouter);
+app.use("/academic-years", academicYearRoutes);
 
 app.listen(PORT, () => {
   console.log(`Server running on port ${PORT}`);

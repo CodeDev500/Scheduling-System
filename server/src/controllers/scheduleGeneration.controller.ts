@@ -154,7 +154,6 @@ export const generateSchedule = async (req: Request, res: Response): Promise<voi
         academicYear,
         semester,
         yearLevel,
-        generatedBy: userId,
         status: 'IN_PROGRESS'
       }
     });
@@ -227,13 +226,7 @@ export const getGenerationHistory = async (req: Request, res: Response): Promise
     const generations = await prisma.scheduleGeneration.findMany({
       where: { department },
       include: {
-        generatedByUser: {
-          select: {
-            firstname: true,
-            lastname: true,
-            email: true
-          }
-        },
+
         conflicts: true
       },
       orderBy: {
@@ -262,13 +255,7 @@ export const getGeneration = async (req: Request, res: Response): Promise<void> 
     const generation = await prisma.scheduleGeneration.findUnique({
       where: { id: parseInt(id) },
       include: {
-        generatedByUser: {
-          select: {
-            firstname: true,
-            lastname: true,
-            email: true
-          }
-        },
+
         conflicts: true
       }
     });
@@ -345,5 +332,139 @@ export const resolveConflict = async (req: Request, res: Response): Promise<void
       success: false,
       message: 'Failed to resolve conflict'
     });
+  }
+};
+
+// Save latest schedule (create or overwrite for department+academicYear+semester+yearLevel)
+export const saveLatestSchedule = async (req: Request, res: Response): Promise<void> => {
+  try {
+    console.log('Received save request:', req.body);
+    // If body is an array, treat it as the schedule rows to persist directly.
+    const isArrayBody = Array.isArray(req.body);
+
+    // Persist each schedule item as its own row (do not change item shape)
+    const subjects: any[] = isArrayBody
+      ? (req.body as any[])
+      : Array.isArray((req.body as any)?.schedules)
+        ? (req.body as any).schedules
+        : Array.isArray((req.body as any)?.scheduleData?.subjects)
+          ? (req.body as any).scheduleData.subjects
+          : [];
+
+    if (!subjects || subjects.length === 0) {
+      res.status(400).json({ success: false, message: 'No schedule items provided to save' });
+      return;
+    }
+
+    // Delete ALL previous subject schedule rows before inserting new ones
+    await prisma.subjectSchedule.deleteMany({});
+
+    await prisma.subjectSchedule.createMany({
+      data: subjects.map((item: any) => ({
+        // keep all data as provided; fall back to empty strings/numbers to satisfy required columns
+        sourceId: String(item.id ?? ''),
+        subjectId: String(item.subjectId ?? ''),
+        subject: String(item.subject ?? item.subjectName ?? ''),
+        subjectCode: String(item.subjectCode ?? ''),
+        subjectName: String(item.subjectName ?? item.subject ?? ''),
+        subjectDescription: item.subjectDescription ?? null,
+        faculty: String(item.faculty ?? item.facultyName ?? ''),
+        facultyId: String(item.facultyId ?? ''),
+        facultyName: String(item.facultyName ?? item.faculty ?? ''),
+        room: String(item.room ?? item.roomName ?? ''),
+        roomId: String(item.roomId ?? ''),
+        roomName: String(item.roomName ?? item.room ?? ''),
+        time: String(item.time ?? ''),
+        day: String(item.day ?? ''),
+        days: item.days ?? null,
+        startTime: String(item.startTime ?? ''),
+        endTime: String(item.endTime ?? ''),
+        semester: String(item.semester ?? ''),
+        academicYear: String(item.academicYear ?? ''),
+        program: String(item.program ?? ''),
+        yearLevel: String(item.yearLevel ?? ''),
+        units: Number(item.units ?? 0),
+        lec: Number(item.lec ?? 0),
+        lab: Number(item.lab ?? 0),
+        students: item.students ?? null,
+        tags: Array.isArray(item.tags) || typeof item.tags === 'object' ? (item.tags as any) : undefined,
+        recommendedFaculty: Array.isArray(item.recommendedFaculty) || typeof item.recommendedFaculty === 'object' ? (item.recommendedFaculty as any) : undefined,
+        hasConflict: typeof item.hasConflict === 'boolean' ? item.hasConflict : null,
+        status: item.status ?? null,
+        conflictType: item.conflictType ?? null,
+        department: item.department ?? null,
+        curriculumId: item.curriculumId ?? null,
+        instructorId: item.instructorId ?? null,
+        roomLegacyId: item.roomLegacyId ?? null,
+        isActive: typeof item.isActive === 'boolean' ? item.isActive : true,
+      })) as any
+    });
+
+    res.json({ success: true, data: { deletedPrevious: true, inserted: subjects.length } });
+  } catch (error) {
+    console.error('Error saving latest schedule:', error);
+    res.status(500).json({ success: false, message: 'Failed to save latest schedule' });
+  }
+};
+
+// Get latest saved schedule for filters
+export const getLatestSchedule = async (req: Request, res: Response): Promise<void> => {
+  try {
+    const { department, academicYear, semester, yearLevel } = req.query as Record<string, string | undefined>;
+
+    if (!department) {
+      res.status(400).json({ success: false, message: 'department is required' });
+      return;
+    }
+
+    const where: any = { department };
+    if (academicYear) where.academicYear = academicYear;
+    if (semester) where.semester = semester;
+    if (yearLevel) where.yearLevel = yearLevel;
+
+    const generation = await prisma.scheduleGeneration.findFirst({
+      where,
+      orderBy: { createdAt: 'desc' }
+    });
+
+    if (!generation) {
+      res.status(404).json({ success: false, message: 'No saved schedule found' });
+      return;
+    }
+
+    let data: any = null;
+    try {
+      data = generation.scheduleData ? JSON.parse(generation.scheduleData) : null;
+    } catch {
+      data = generation.scheduleData;
+    }
+
+    // Also fetch subject schedule rows stored for this filter
+    const items = await prisma.subjectSchedule.findMany({
+      where: {
+        department,
+        academicYear: academicYear ?? undefined,
+        semester: semester ?? undefined,
+        yearLevel: yearLevel ?? undefined,
+      },
+      orderBy: [{ day: 'asc' }, { startTime: 'asc' }]
+    });
+
+    res.json({ success: true, data: { generation, scheduleData: data, scheduleItems: items } });
+  } catch (error) {
+    console.error('Error fetching latest schedule:', error);
+    res.status(500).json({ success: false, message: 'Failed to fetch latest schedule' });
+  }
+};
+
+export const getAllSubjectSchedule = async (req: Request, res: Response): Promise<void> => {
+  try { 
+    const items = await prisma.subjectSchedule.findMany({
+      orderBy: [{ day: 'asc' }, { startTime: 'asc' }]
+    });
+    res.json({ success: true, data: items });
+  } catch (error) {
+    console.error('Error fetching all subject schedules:', error);
+    res.status(500).json({ success: false, message: 'Failed to fetch all subject schedules' });
   }
 };

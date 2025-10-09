@@ -5,6 +5,11 @@ import { UserRegisterInput } from "../schema/user.schema";
 
 export const listUsers = async (): Promise<User[]> => {
   return db.user.findMany({
+    where: {
+      status: {
+        in: [statusList.VERIFIED, statusList.APPROVED],
+      },
+    },
     select: {
       id: true,
       image: true,

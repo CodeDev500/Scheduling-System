@@ -24,7 +24,6 @@ model User {
   specialization            Json?
   facultySubjectAssignments FacultySubjectAssignment[]
   roomSchedules             RoomSchedules[]
-  scheduleGenerations       ScheduleGeneration[]
   units_loads               Units_Loads[]
   userSubjects              UserSubject[]
 
@@ -174,6 +173,16 @@ model TotalUnits {
   @@map("total_units")
 }
 
+model AcademicYear {
+  id          Int      @id @default(autoincrement())
+  year        String   @unique // e.g., "2024-2025"
+  isActive    Boolean  @default(false)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@map("academic_years")
+}
+
 model FacultySubjectAssignment {
   id                 Int              @id @default(autoincrement())
   facultyId          Int
@@ -243,7 +252,6 @@ model ScheduleGeneration {
   semester        String
   yearLevel       String?
   status          GenerationStatus   @default(PENDING)
-  generatedBy     Int
   constraintsUsed String?
   conflictsFound  String?
   scheduleData    String?
@@ -251,10 +259,61 @@ model ScheduleGeneration {
   createdAt       DateTime           @default(now())
   updatedAt       DateTime           @updatedAt
   conflicts       ScheduleConflict[]
-  generatedByUser User               @relation(fields: [generatedBy], references: [id])
+  subjectSchedules SubjectSchedule[]
 
-  @@index([generatedBy], map: "schedule_generations_generatedBy_fkey")
   @@map("schedule_generations")
+}
+
+// Store each generated schedule item as a normalized row
+model SubjectSchedule {
+  id              Int      @id @default(autoincrement())
+  // original client-provided id for the item
+  sourceId        String?
+  subjectId       String
+  subject         String
+  subjectCode     String
+  subjectName     String
+  subjectDescription String?
+  faculty         String
+  facultyId       String
+  facultyName     String
+  room            String
+  roomId          String
+  roomName        String
+  time            String
+  day             String
+  // legacy column retained from initial migration for compatibility
+  days            String?
+  startTime       String
+  endTime         String
+  semester        String   @db.VarChar(32)
+  academicYear    String   @db.VarChar(16)
+  program         String   @db.VarChar(32)
+  yearLevel       String   @db.VarChar(32)
+  units           Int
+  lec             Int      @default(0)
+  lab             Int      @default(0)
+  students        String?
+  tags            Json?
+  recommendedFaculty Json?
+  hasConflict     Boolean?
+  status          String?
+  conflictType    String?
+  department      String?
+  // legacy foreign key columns retained for compatibility with existing DB
+  curriculumId    Int?
+  instructorId    Int?
+  roomLegacyId    Int?
+  isActive        Boolean? @default(true)
+  // optional relation to a generation record
+  generationId    Int?
+  generation      ScheduleGeneration? @relation(fields: [generationId], references: [id], onDelete: Cascade)
+
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  @@index([department, academicYear, semester, yearLevel, program])
+  @@map("subject_schedules")
 }
 
 model ScheduleConflict {

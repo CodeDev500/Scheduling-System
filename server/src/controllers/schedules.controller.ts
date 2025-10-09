@@ -1,6 +1,35 @@
 import { Request, Response } from "express";
 import { db } from "../utils/db.server";
 
+// Get latest subject schedules (all active schedules)
+export const getLatestSchedules = async (
+  req: Request,
+  res: Response
+): Promise<void> => {
+  try {
+    const scheduleItems = await db.subjectSchedule.findMany({
+      where: {
+        isActive: true,
+      },
+      orderBy: [
+        { day: 'asc' },
+        { startTime: 'asc' }
+      ]
+    });
+
+    res.status(200).json({
+      success: true,
+      scheduleItems
+    });
+  } catch (error) {
+    console.error("Error fetching latest schedules:", error);
+    res.status(500).json({
+      success: false,
+      message: "Failed to fetch latest schedules"
+    });
+  }
+};
+
 // Get all subjects with their schedules filtered by program, year level, and semester
 export const getSubjectsWithSchedules = async (
   req: Request,

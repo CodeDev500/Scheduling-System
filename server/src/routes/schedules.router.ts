@@ -7,9 +7,13 @@ import {
   deleteSchedule,
   getInstructors,
   submitForApproval,
+  getLatestSchedules,
 } from "../controllers/schedules.controller";
 
 const router = Router();
+
+// Get latest schedules (all active subject schedules)
+router.get("/latest", getLatestSchedules);
 
 // Get all subjects with schedules filtered by program, year level, and semester
 router.get("/subjects/:programCode/:yearLevel/:semester", getSubjectsWithSchedules);
