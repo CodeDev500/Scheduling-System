@@ -1,5 +1,5 @@
 import api from '@/api/axios';
-import type { Subject, Faculty, Room, GeneratedSchedule, ScheduleItem } from '../../../../types';
+import type { Faculty, Room, ScheduleItem } from '../../../../types';
 // Day utilities not required here; constrain patterns internally to MW, TTh, and S.
 
 export interface CurriculumCourse {
@@ -265,20 +265,37 @@ export class ScheduleGenerationService {
     });
   }
 
-  // Overloaded main generation method (unchanged interface)
-  static async generateScheduleDataFromCurriculum(
-    courses: CourseInput[],
-    instructors: any[],
-    rooms: Room[]
-  ): Promise<ScheduleItem[]>;
-  static async generateScheduleDataFromCurriculum(
-    curriculumData: any[],
-    instructors: any[],
-    programCode: string,
-    yearLevel: string,
-    semester: string,
-    department?: string
-  ): Promise<ScheduleItem[]>;
+  // Validation and auto-correction helper
+  private static validateAndCorrectCourse(course: CourseInput): CourseInput {
+    const corrected = { ...course };
+    
+    // Ensure lec and lab are numbers
+    corrected.lec = Number(corrected.lec) || 0;
+    corrected.lab = Number(corrected.lab) || 0;
+    corrected.units = Number(corrected.units) || 0;
+    
+    // VALIDATION RULE: Prevent scheduling if both lec and lab are 0
+    if (corrected.lec === 0 && corrected.lab === 0) {
+      console.warn(`⚠️ SKIPPING: ${corrected.code || corrected.subjectCode} has 0 lec and 0 lab units`);
+      return { ...corrected, units: 0 }; // Mark as invalid
+    }
+    
+    // AUTO-CORRECT: If units don't match lec + lab, recalculate
+    const calculatedUnits = corrected.lec + corrected.lab;
+    if (corrected.units !== calculatedUnits) {
+      console.warn(`⚠️ AUTO-CORRECTING: ${corrected.code || corrected.subjectCode} units: ${corrected.units} → ${calculatedUnits} (lec: ${corrected.lec}, lab: ${corrected.lab})`);
+      corrected.units = calculatedUnits;
+    }
+    
+    // Calculate total hours per week using the formula
+    const hoursPerWeek = (corrected.lec * 1) + (corrected.lab * 3);
+    corrected.hours = hoursPerWeek;
+    
+    console.log(`✅ VALIDATED: ${corrected.code || corrected.subjectCode} - Lec: ${corrected.lec}, Lab: ${corrected.lab}, Units: ${corrected.units}, Hours/Week: ${hoursPerWeek}`);
+    
+    return corrected;
+  }
+
   static async generateScheduleDataFromCurriculum(
     arg0: any[],
     instructors: any[],
@@ -295,8 +312,12 @@ export class ScheduleGenerationService {
       const isNewApi = Array.isArray(arg2);
       const courses: CourseInput[] = isNewApi ? (arg0 as CourseInput[]) : (arg0 as CourseInput[]);
 
+      // VALIDATE AND AUTO-CORRECT ALL COURSES
+      const validatedCourses = courses.map(c => this.validateAndCorrectCourse(c));
+      
+      // FILTER OUT INVALID COURSES (0 lec and 0 lab)
       const filteredCourses = isNewApi
-        ? courses
+        ? validatedCourses.filter(c => c.units > 0)
         : (courses as any[]).filter(course => {
             const programMatch = course.programCode === arg2;
             const yearMatch = course.yearLevel === yearLevel;
@@ -346,7 +367,8 @@ export class ScheduleGenerationService {
 
         // compute total scheduled minutes for sanity check
         const totalScheduledMinutes = timeSlots.reduce((sum, t) => sum + (t.duration || (this.timeToMinutes(t.endTime) - this.timeToMinutes(t.startTime))), 0);
-        const expectedMinutes = (course.units || 3) * 60;
+        // New logic: Lec 1 unit = 1 hour, Lab 1 unit = 3 hours
+        const expectedMinutes = ((course.lec || 0) * 60) + ((course.lab || 0) * 180);
         if (totalScheduledMinutes < expectedMinutes) {
           console.warn(`⚠️ WARNING: Scheduled minutes (${totalScheduledMinutes}) < expected (${expectedMinutes}) for ${course.subjectCode || course.code}`);
         }
@@ -416,8 +438,8 @@ export class ScheduleGenerationService {
         const scheduleItem: ScheduleItem = {
           id: `${course.id}`,
           subjectId: course.id.toString(),
-          subjectCode: course.subjectCode || course.code,
-          subjectName: course.subjectDescription || course.name || course.subjectName,
+          subjectCode: course.subjectCode ?? "",
+          subjectName: course.subjectDescription ?? "",
           facultyId: facultyId,
           facultyName: subjectFaculty?.firstname
             ? `${subjectFaculty.firstname} ${subjectFaculty.lastname || ''}`.trim()
@@ -428,6 +450,8 @@ export class ScheduleGenerationService {
           startTime: displayStart,
           endTime: displayEnd,
           units: course.units || 3,
+          lec: lecHours,
+          lab: labHours,
           yearLevel: course.yearLevel || "1st Year",
           semester: semesterValue || '1st Semester',
           type: subjectType as 'Lec' | 'Lab' | 'Lec/Lab'
@@ -452,7 +476,19 @@ export class ScheduleGenerationService {
       }
 
       console.log(`✅ Generated ${scheduleItems.length} total schedule items`);
-      return scheduleItems;
+      
+      // APPLY COMPREHENSIVE VALIDATION AND AUTO-CORRECTION
+      const availableRooms = isNewApi ? arg2 : await this.getRooms();
+      const { correctedSchedule, conflicts, warnings } = this.validateAndFixSchedule(scheduleItems, availableRooms);
+      
+      if (conflicts.length > 0 || warnings.length > 0) {
+        console.log('\n📊 VALIDATION SUMMARY:');
+        console.log(`   ✅ Auto-fixed issues: ${scheduleItems.length - conflicts.length - warnings.length}`);
+        console.log(`   ⚠️ Warnings: ${warnings.length}`);
+        console.log(`   ❌ Unresolved conflicts: ${conflicts.length}`);
+      }
+      
+      return correctedSchedule;
     } catch (error) {
       console.error('Error generating schedule:', error);
       throw new Error('Failed to generate schedule data from curriculum');
@@ -490,20 +526,23 @@ export class ScheduleGenerationService {
     if (totalUnits === 0) return [];
 
     const timeSlots: any[] = [];
-    const totalWeeklyMinutes = totalUnits * 60;
+    const totalWeeklyMinutes = (lecHours * 60) + (labHours * 180);
 
     // Decide sessionsNeeded
     let sessionsNeeded: number;
     if (options?.sessionsPerWeekOverride) {
       sessionsNeeded = options.sessionsPerWeekOverride;
     } else {
-      if (totalWeeklyMinutes === 420) { // 7 units
+      if (totalWeeklyMinutes === 420) { // 7 units (7 hours)
         sessionsNeeded = 2;
-      } else if (totalWeeklyMinutes <= 120) {
+      } else if (totalWeeklyMinutes <= 90) { // 1.5 hours or less
         sessionsNeeded = 1;
-      } else if (totalWeeklyMinutes === 180) {
-        sessionsNeeded = 2;
+      } else if (totalWeeklyMinutes === 180) { // 3 hours (3 lec units)
+        sessionsNeeded = 2; // Split into 2 sessions of 1.5 hours each
+      } else if (totalWeeklyMinutes === 120) { // 2 hours
+        sessionsNeeded = 1; // Single 2-hour session
       } else {
+        // For other durations, split into sessions of max 2 hours (120 min) each
         sessionsNeeded = Math.ceil(totalWeeklyMinutes / 120);
       }
     }
@@ -521,117 +560,86 @@ export class ScheduleGenerationService {
       sessionDurations.push(dur);
     }
     if (remainder > 0) sessionDurations[sessionDurations.length - 1] += remainder;
+    
+    // Debug log for session distribution
+    console.log(`📊 Session Distribution: ${totalWeeklyMinutes}min total → ${sessionsNeeded} sessions of [${sessionDurations.map(d => `${d}min (${(d/60).toFixed(1)}h)`).join(', ')}]`);
 
     // Day patterns and selection
     const dayPatterns = this.getDayPatternForUnits(totalUnits);
     const selectedDayPattern = dayPatterns[dayPatternIndex % dayPatterns.length];
 
-    // Candidate start times (30-min increments)
-    const baseTimeSlotOptions = this.getTimeSlotOptions(30); // all possible 30-min starts (validated)
-    if (baseTimeSlotOptions.length === 0) return [];
+    // Candidate start times - generate all possible start times in 30-min increments
+    // We'll validate against actual session durations when creating slots
+    const allPossibleStarts: string[] = [];
+    for (let hour = 7; hour < 20; hour++) {
+      for (let minute = 0; minute < 60; minute += 30) {
+        allPossibleStarts.push(`${String(hour).padStart(2, '0')}:${String(minute).padStart(2, '0')}`);
+      }
+    }
+    if (allPossibleStarts.length === 0) return [];
 
-    // If pattern is single-day and sessionsNeeded > 1, try to fit the FULL weekly minutes as a single continuous block
-    // inside morning or inside afternoon (this avoids splitting around lunch and displaying e.g., 9:00-15:00)
-    const isSingleDayPattern = selectedDayPattern.length === 1;
-    if (isSingleDayPattern && sessionsNeeded > 1) {
-      const day = selectedDayPattern[0];
+    // REMOVED: Single-day continuous block logic
+    // This was causing issues where multi-day patterns (MW, TTh) were being treated as single blocks
+    // Now all courses properly distribute sessions across their designated days
 
-      // look for a start time such that start + totalWeeklyMinutes fits entirely inside morning OR inside afternoon
-      for (const option of baseTimeSlotOptions) {
-        const start = option.startTime;
-        const end = this.addMinutes(start, totalWeeklyMinutes);
-        if (!this.isValidTimeSlot(start, end)) continue;
-
-        // ensure requested day/time doesn't collide with lunch by isValidTimeSlot already
-        timeSlots.push({
-          id: `singleblock-${day}-${start}`,
+    // Try systematic placement - all sessions use the SAME start time on different days
+    const maxAttempts = allPossibleStarts.length * 10;
+    let attempts = 0;
+    
+    // Try each possible start time until we find one that works for ALL sessions
+    while (timeSlots.length === 0 && attempts < maxAttempts) {
+      const candidateStartIndex = (startingTimeSlotIndex + attempts) % allPossibleStarts.length;
+      const candidateStart = allPossibleStarts[candidateStartIndex];
+      
+      // Try to create all sessions with this same start time on different days
+      const tempSlots: any[] = [];
+      let allSessionsValid = true;
+      
+      for (let sessionIdx = 0; sessionIdx < sessionsNeeded; sessionIdx++) {
+        const day = selectedDayPattern[sessionIdx % selectedDayPattern.length] || selectedDayPattern[0];
+        const duration = sessionDurations[sessionIdx];
+        const candidateEnd = this.addMinutes(candidateStart, duration);
+        
+        // Validate this time slot
+        if (!this.isValidTimeSlot(candidateStart, candidateEnd)) {
+          allSessionsValid = false;
+          break;
+        }
+        
+        // Check for overlap with already created sessions on the same day
+        const overlapsWithOtherSession = tempSlots.some(s =>
+          s.day === day && this.timeRangesOverlap(s.startTime, s.endTime, candidateStart, candidateEnd)
+        );
+        
+        if (overlapsWithOtherSession) {
+          allSessionsValid = false;
+          break;
+        }
+        
+        // Add to temp slots
+        tempSlots.push({
+          id: `slot-${sessionIdx}-${day}-${candidateStart}`,
           day,
-          startTime: start,
-          endTime: end,
-          duration: totalWeeklyMinutes,
+          startTime: candidateStart,
+          endTime: candidateEnd,
+          duration,
           type: (lecHours > 0 && labHours > 0) ? 'Lec/Lab' : (lecHours > 0 ? 'Lecture' : 'Lab')
         });
-        return timeSlots; // perfect single continuous block found
       }
-      // if no single-block fits, fall back to splitting across days or back-to-back same-day sessions (below)
-    }
-
-    // Otherwise try systematic placement of each session (distribute across selectedDayPattern)
-    const maxAttempts = baseTimeSlotOptions.length * selectedDayPattern.length * sessionsNeeded * 4;
-    let attempts = 0;
-    const usedStartsForThisCourse: { day: string; startTime: string; endTime: string }[] = [];
-    let createdSessions = 0;
-    let searchIndexOffset = startingTimeSlotIndex % baseTimeSlotOptions.length;
-
-    while (createdSessions < sessionsNeeded && attempts < maxAttempts) {
+      
+      // If all sessions are valid with this start time, use them
+      if (allSessionsValid && tempSlots.length === sessionsNeeded) {
+        timeSlots.push(...tempSlots);
+        console.log(`✅ All ${sessionsNeeded} sessions scheduled at ${candidateStart} on different days`);
+      }
+      
       attempts++;
-
-      // pick day in round-robin across pattern days
-      const day = selectedDayPattern[createdSessions % selectedDayPattern.length] || selectedDayPattern[0];
-
-      // choose a candidate start index (rotates to give AM/PM balance)
-      const candidateStartIndex = (searchIndexOffset + createdSessions + attempts) % baseTimeSlotOptions.length;
-      const candidateStart = baseTimeSlotOptions[candidateStartIndex].startTime;
-      const duration = sessionDurations[createdSessions];
-      const candidateEnd = this.addMinutes(candidateStart, duration);
-
-      if (!this.isValidTimeSlot(candidateStart, candidateEnd)) {
-        continue;
-      }
-
-      // ensure no local overlap with already chosen sessions for this course
-      const overlapsLocal = usedStartsForThisCourse.some(s =>
-        s.day === day && this.timeRangesOverlap(s.startTime, s.endTime, candidateStart, candidateEnd)
-      );
-      if (overlapsLocal) {
-        continue;
-      }
-
-      // Good candidate -> add
-      const slot = {
-        id: `slot-${createdSessions}-${day}-${candidateStart}`,
-        day,
-        startTime: candidateStart,
-        endTime: candidateEnd,
-        duration,
-        type: (lecHours > 0 && labHours > 0) ? 'Lec/Lab' : (lecHours > 0 ? 'Lecture' : 'Lab')
-      };
-
-      timeSlots.push(slot);
-      usedStartsForThisCourse.push({ day, startTime: candidateStart, endTime: candidateEnd });
-      createdSessions++;
     }
-
-    // If not all sessions created, do exhaustive fallback trying all days x starts
-    if (createdSessions < sessionsNeeded) {
-      for (let s = createdSessions; s < sessionsNeeded; s++) {
-        let filled = false;
-        for (let dayIdx = 0; dayIdx < selectedDayPattern.length && !filled; dayIdx++) {
-          const d = selectedDayPattern[dayIdx];
-          for (let startIdx = 0; startIdx < baseTimeSlotOptions.length && !filled; startIdx++) {
-            const candidateStart = baseTimeSlotOptions[(startIdx + startingTimeSlotIndex) % baseTimeSlotOptions.length].startTime;
-            const duration = sessionDurations[s];
-            const candidateEnd = this.addMinutes(candidateStart, duration);
-            if (!this.isValidTimeSlot(candidateStart, candidateEnd)) continue;
-            const overlapsLocal = usedStartsForThisCourse.some(st =>
-              st.day === d && this.timeRangesOverlap(st.startTime, st.endTime, candidateStart, candidateEnd)
-            );
-            if (overlapsLocal) continue;
-            const slot = {
-              id: `slot-fallback-${s}-${d}-${candidateStart}`,
-              day: d,
-              startTime: candidateStart,
-              endTime: candidateEnd,
-              duration,
-              type: (lecHours > 0 && labHours > 0) ? 'Lec/Lab' : (lecHours > 0 ? 'Lecture' : 'Lab')
-            };
-            timeSlots.push(slot);
-            usedStartsForThisCourse.push({ day: d, startTime: candidateStart, endTime: candidateEnd });
-            filled = true;
-            break;
-          }
-        }
-      }
+    
+    // If no valid time slots found after all attempts, log warning
+    if (timeSlots.length === 0) {
+      console.warn(`⚠️ Could not find valid time slots for course after ${attempts} attempts`);
+      return [];
     }
 
     // Final sanity: ensure total scheduled minutes equal expected; try best-effort adjust last session by 30s if necessary
@@ -658,152 +666,185 @@ export class ScheduleGenerationService {
     return timeSlots;
   }
 
-  // Improved conflict-free scheduling
-  static findConflictFreeSchedule(
-    course: any,
-    instructors: any[],
-    rooms: any[],
-    maxRetries: number = 100
-  ): { timeSlots: any[], faculty: any, room: any } | null {
-    const lecHours = course.lec || 0;
-    const labHours = course.lab || 0;
-    const totalUnits = course.units || 3;
+// Improved conflict-free scheduling
+static findConflictFreeSchedule(
+  course: any,
+  instructors: any[],
+  rooms: any[],
+  maxRetries: number = 100
+): { timeSlots: any[], faculty: any, room: any } | null {
+  const lecHours = course.lec || 0;
+  const labHours = course.lab || 0;
+  const totalUnits = course.units || 3;
 
-    const dayPatterns = this.getDayPatternForUnits(totalUnits);
-    const totalWeeklyHours = totalUnits;
+  const dayPatterns = this.getDayPatternForUnits(totalUnits);
+  // New logic: Lab counts as 3 hours per unit
+  const totalWeeklyHours = (lecHours * 1) + (labHours * 3);
 
-    // Build candidate distributions
-    const distributionCandidates: { duration: number; sessions: number }[] = [];
-    if (totalWeeklyHours === 7) {
-      distributionCandidates.push({ duration: 210, sessions: 2 });
-      distributionCandidates.push({ duration: 60, sessions: 7 });
-    } else if (totalWeeklyHours <= 2) {
-      distributionCandidates.push({ duration: 120, sessions: 1 });
-    } else if (totalWeeklyHours === 3) {
-      distributionCandidates.push({ duration: 90, sessions: 2 });
-    } else {
-      const baseDuration = 120;
-      const sessions = Math.ceil((totalWeeklyHours * 60) / baseDuration);
-      distributionCandidates.push({ duration: baseDuration, sessions });
-    }
+  // Build candidate distributions
+  const distributionCandidates: { duration: number; sessions: number }[] = [];
+  const totalWeeklyMinutes = totalWeeklyHours * 60;
+  
+  if (totalWeeklyHours === 7) {
+    distributionCandidates.push({ duration: 210, sessions: 2 }); // 3.5 hours per session
+    distributionCandidates.push({ duration: 60, sessions: 7 });  // 1 hour per session
+  } else if (totalWeeklyHours <= 1.5) {
+    distributionCandidates.push({ duration: totalWeeklyMinutes, sessions: 1 }); // Single session
+  } else if (totalWeeklyHours === 2) {
+    distributionCandidates.push({ duration: 120, sessions: 1 }); // Single 2-hour session
+  } else if (totalWeeklyHours === 3) {
+    distributionCandidates.push({ duration: 90, sessions: 2 }); // Two 1.5-hour sessions
+  } else {
+    // For other durations, split into sessions of max 2 hours (120 min) each
+    const baseDuration = 120;
+    const sessions = Math.ceil(totalWeeklyMinutes / baseDuration);
+    distributionCandidates.push({ duration: baseDuration, sessions });
+  }
 
-    const qualifiedFaculty = this.findBestFacultyMatches(course, instructors, instructors.length);
-    const roomsShuffled = [...rooms].sort(() => Math.random() - 0.5);
-    const facultyShuffled = [...qualifiedFaculty].sort(() => Math.random() - 0.5);
+  const qualifiedFaculty = this.findBestFacultyMatches(course, instructors, instructors.length);
+  const roomsShuffled = [...rooms].sort(() => Math.random() - 0.5);
+  const facultyShuffled = [...qualifiedFaculty].sort(() => Math.random() - 0.5);
 
-    if (qualifiedFaculty.length === 0 && instructors.length > 0) {
-      qualifiedFaculty.push(...instructors);
-    }
+  if (qualifiedFaculty.length === 0 && instructors.length > 0) {
+    qualifiedFaculty.push(...instructors);
+  }
 
-    // Strategy: try combinations
-    for (const candidate of distributionCandidates) {
-      const timeSlotOptions = this.getTimeSlotOptions(candidate.duration);
-      const balancedOrder = this.getBalancedStartOrder(timeSlotOptions);
+  // Strategy: try combinations
+  for (const candidate of distributionCandidates) {
+    const timeSlotOptions = this.getTimeSlotOptions(candidate.duration);
+    const balancedOrder = this.getBalancedStartOrder(timeSlotOptions);
 
-      for (let timeSlotAttempt = 0; timeSlotAttempt < maxRetries; timeSlotAttempt++) {
-        for (let dayPatternIndex = 0; dayPatternIndex < dayPatterns.length; dayPatternIndex++) {
-          if (totalWeeklyHours === 7 && candidate.duration === 210 && dayPatterns[dayPatternIndex].length < 2) {
-            continue;
+    for (let timeSlotAttempt = 0; timeSlotAttempt < maxRetries; timeSlotAttempt++) {
+      for (let dayPatternIndex = 0; dayPatternIndex < dayPatterns.length; dayPatternIndex++) {
+        if (totalWeeklyHours === 7 && candidate.duration === 210 && dayPatterns[dayPatternIndex].length < 2) {
+          continue;
+        }
+
+        const startingTimeSlotIndex = balancedOrder[(this.globalTimeSlotIndex + timeSlotAttempt) % balancedOrder.length];
+
+        const timeSlots = this.generateTimeSlots(
+          lecHours,
+          labHours,
+          totalUnits,
+          startingTimeSlotIndex,
+          dayPatternIndex,
+          { sessionDurationMinutesOverride: candidate.duration, sessionsPerWeekOverride: candidate.sessions }
+        );
+
+        if (timeSlots.length === 0) continue;
+
+        // NEW: ensure only one session per subject per calendar day
+        const seenDays = new Set<string>();
+        let duplicateDay = false;
+        for (const ts of timeSlots) {
+          if (seenDays.has(ts.day)) {
+            duplicateDay = true;
+            break;
+          }
+          seenDays.add(ts.day);
+        }
+        if (duplicateDay) {
+          // skip this generated combination — it places multiple sessions on same day
+          continue;
+        }
+
+        // Prevent overlapping within same program/year
+        let programYearOk = true;
+        const courseProgram = (course as any).programCode || (course as any).program;
+        const courseYear = (course as any).yearLevel;
+        for (const timeSlot of timeSlots) {
+          const overlapWithinProgramYear = this.usedTimeSlots.some(slot =>
+            slot.day === timeSlot.day &&
+            slot.programCode === courseProgram &&
+            String(slot.yearLevel) === String(courseYear) &&
+            this.timeRangesOverlap(slot.startTime, slot.endTime, timeSlot.startTime, timeSlot.endTime)
+          );
+          if (overlapWithinProgramYear) {
+            programYearOk = false;
+            break;
+          }
+        }
+        if (!programYearOk) continue;
+
+        // Try rooms first
+        for (const room of roomsShuffled) {
+          const roomId = room.id?.toString() || 'unassigned';
+          const roomName = room.name || '';
+          const isLabRoom = roomName.toLowerCase().includes('lab');
+
+          // ROOM TYPE VALIDATION: Enforce lab/non-lab room assignment rules
+          // If course has lab units, it MUST be assigned to a lab room
+          if (labHours > 0 && !isLabRoom) {
+            continue; // Skip non-lab rooms for courses with lab component
+          }
+          // If course has NO lab units, it must NOT be assigned to a lab room
+          if (labHours === 0 && isLabRoom) {
+            continue; // Skip lab rooms for lecture-only courses
           }
 
-          const startingTimeSlotIndex = balancedOrder[(this.globalTimeSlotIndex + timeSlotAttempt) % balancedOrder.length];
-
-          const timeSlots = this.generateTimeSlots(
-            lecHours,
-            labHours,
-            totalUnits,
-            startingTimeSlotIndex,
-            dayPatternIndex,
-            { sessionDurationMinutesOverride: candidate.duration, sessionsPerWeekOverride: candidate.sessions }
-          );
-
-          if (timeSlots.length === 0) continue;
-
-          // Prevent overlapping within same program/year
-          let programYearOk = true;
-          const courseProgram = (course as any).programCode || (course as any).program;
-          const courseYear = (course as any).yearLevel;
+          let roomAvailable = true;
           for (const timeSlot of timeSlots) {
-            const overlapWithinProgramYear = this.usedTimeSlots.some(slot =>
+            const roomConflict = this.usedTimeSlots.some(slot =>
               slot.day === timeSlot.day &&
-              slot.programCode === courseProgram &&
-              String(slot.yearLevel) === String(courseYear) &&
+              slot.roomId === roomId &&
               this.timeRangesOverlap(slot.startTime, slot.endTime, timeSlot.startTime, timeSlot.endTime)
             );
-            if (overlapWithinProgramYear) {
-              programYearOk = false;
+            if (roomConflict) {
+              roomAvailable = false;
               break;
             }
           }
-          if (!programYearOk) continue;
+          if (!roomAvailable) continue;
 
-          // Try rooms first
-          for (const room of roomsShuffled) {
-            const roomId = room.id?.toString() || 'unassigned';
+          // Try faculties
+          for (const faculty of facultyShuffled) {
+            const facultyId = faculty.id?.toString() || 'unassigned';
 
-            let roomAvailable = true;
+            let facultyAvailable = true;
             for (const timeSlot of timeSlots) {
-              const roomConflict = this.usedTimeSlots.some(slot =>
+              const facultyConflict = this.usedTimeSlots.some(slot =>
                 slot.day === timeSlot.day &&
-                slot.roomId === roomId &&
+                slot.facultyId === facultyId &&
                 this.timeRangesOverlap(slot.startTime, slot.endTime, timeSlot.startTime, timeSlot.endTime)
               );
-              if (roomConflict) {
-                roomAvailable = false;
+              if (facultyConflict) {
+                facultyAvailable = false;
                 break;
               }
             }
-            if (!roomAvailable) continue;
+            if (!facultyAvailable) continue;
 
-            // Try faculties
-            for (const faculty of facultyShuffled) {
-              const facultyId = faculty.id?.toString() || 'unassigned';
+            // Avoid repeating exact Time+Day+Room for same subject or same faculty
+            const repeatsPreviousCombo = timeSlots.some(ts =>
+              this.usedTimeSlots.some(slot =>
+                slot.day === ts.day &&
+                slot.startTime === ts.startTime &&
+                slot.endTime === ts.endTime &&
+                slot.roomId === roomId &&
+                (slot.subjectId === String(course.id) || slot.facultyId === facultyId)
+              )
+            );
+            if (repeatsPreviousCombo) continue;
 
-              let facultyAvailable = true;
-              for (const timeSlot of timeSlots) {
-                const facultyConflict = this.usedTimeSlots.some(slot =>
-                  slot.day === timeSlot.day &&
-                  slot.facultyId === facultyId &&
-                  this.timeRangesOverlap(slot.startTime, slot.endTime, timeSlot.startTime, timeSlot.endTime)
-                );
-                if (facultyConflict) {
-                  facultyAvailable = false;
-                  break;
-                }
-              }
-              if (!facultyAvailable) continue;
+            // Success
+            console.log(`✅ Found conflict-free schedule for ${course.subjectCode || course.code}:`);
+            console.log(`   Faculty: ${faculty.firstname} ${faculty.lastname} (ID: ${facultyId})`);
+            console.log(`   Room: ${room.name} (ID: ${roomId})`);
+            console.log(`   Time: ${timeSlots.map(t => `${t.day} ${t.startTime}-${t.endTime}`).join('; ')}`);
+            console.log(`   Attempt: ${timeSlotAttempt + 1}/${maxRetries}`);
 
-              // Avoid repeating exact Time+Day+Room for same subject or same faculty
-              const repeatsPreviousCombo = timeSlots.some(ts =>
-                this.usedTimeSlots.some(slot =>
-                  slot.day === ts.day &&
-                  slot.startTime === ts.startTime &&
-                  slot.endTime === ts.endTime &&
-                  slot.roomId === roomId &&
-                  (slot.subjectId === String(course.id) || slot.facultyId === facultyId)
-                )
-              );
-              if (repeatsPreviousCombo) continue;
-
-              // Success
-              console.log(`✅ Found conflict-free schedule for ${course.subjectCode || course.code}:`);
-              console.log(`   Faculty: ${faculty.firstname} ${faculty.lastname} (ID: ${facultyId})`);
-              console.log(`   Room: ${room.name} (ID: ${roomId})`);
-              console.log(`   Time: ${timeSlots.map(t => `${t.day} ${t.startTime}-${t.endTime}`).join('; ')}`);
-              console.log(`   Attempt: ${timeSlotAttempt + 1}/${maxRetries}`);
-
-              this.globalTimeSlotIndex = (this.globalTimeSlotIndex + 1) % balancedOrder.length;
-              return { timeSlots, faculty, room };
-            }
+            this.globalTimeSlotIndex = (this.globalTimeSlotIndex + 1) % balancedOrder.length;
+            return { timeSlots, faculty, room };
           }
         }
       }
     }
-
-    console.warn(`⚠️ No conflict-free schedule found for ${course.subjectCode || course.code} after ${maxRetries} attempts`);
-    console.log(`   Tried ${dayPatterns.length} day patterns x multiple time slots x ${rooms.length} rooms x ${qualifiedFaculty.length} faculty`);
-    return null;
   }
+
+  console.warn(`⚠️ No conflict-free schedule found for ${course.subjectCode || course.code} after ${maxRetries} attempts`);
+  console.log(`   Tried ${dayPatterns.length} day patterns x multiple time slots x ${rooms.length} rooms x ${qualifiedFaculty.length} faculty`);
+  return null;
+}
 
   static isValidTimeSlot(startTime: string, endTime: string): boolean {
     const start = this.timeToMinutes(startTime);
@@ -823,6 +864,263 @@ export class ScheduleGenerationService {
   }
 
   static getTimeSlotOptions(sessionDurationMinutes: number = 60) {
+    const options: { startTime: string; endTime: string; duration: number }[] = [];
+    // Start from 7:00 AM and generate slots every 30 minutes
+    const startHour = 7;
+    const endHour = 20;
+    
+    for (let hour = startHour; hour < endHour; hour++) {
+      for (let minute = 0; minute < 60; minute += 30) {
+        const start = `${String(hour).padStart(2, '0')}:${String(minute).padStart(2, '0')}`;
+        const end = this.addMinutes(start, sessionDurationMinutes);
+        if (this.isValidTimeSlot(start, end)) {
+          options.push({ startTime: start, endTime: end, duration: sessionDurationMinutes });
+        }
+      }
+    }
+    return options;
+  }
+
+  // COMPREHENSIVE SCHEDULE VALIDATION AND AUTO-CORRECTION
+  static validateAndFixSchedule(
+    scheduleItems: ScheduleItem[],
+    rooms: Room[]
+  ): { 
+    correctedSchedule: ScheduleItem[], 
+    conflicts: string[], 
+    warnings: string[] 
+  } {
+    const conflicts: string[] = [];
+    const warnings: string[] = [];
+    const correctedSchedule = [...scheduleItems];
+
+    console.log('\n🔍 STARTING SCHEDULE VALIDATION AND AUTO-CORRECTION...\n');
+
+    for (let i = 0; i < correctedSchedule.length; i++) {
+      const item = correctedSchedule[i];
+      const lec = item.lec || 0;
+      const lab = item.lab || 0;
+      
+      // Calculate required hours per week
+      const requiredHoursPerWeek = (lec * 1) + (lab * 3);
+      
+      // Parse the day string to count sessions
+      // Day format can be: "MW" (combined), "M; W" (separated), or "M 08:30-10:00; W 08:30-10:00" (detailed)
+      const dayString = item.day || '';
+      let sessionsCount = 1;
+      
+      // Check if day string contains semicolons (indicates multiple sessions)
+      if (dayString.includes(';')) {
+        sessionsCount = dayString.split(';').length;
+      } else if (dayString.length > 1 && !dayString.includes(' ')) {
+        // Combined format like "MW" or "TTh"
+        if (dayString.includes('Th')) {
+          sessionsCount = (dayString.match(/Th/g) || []).length + (dayString.replace(/Th/g, '').length);
+        } else {
+          sessionsCount = dayString.length;
+        }
+      }
+      
+      // Calculate total scheduled hours (convert minutes to hours)
+      const startMinutes = this.timeToMinutes(item.startTime);
+      const endMinutes = this.timeToMinutes(item.endTime);
+      const scheduledMinutesPerSession = endMinutes - startMinutes;
+      const scheduledHoursPerSession = scheduledMinutesPerSession / 60;
+      const totalScheduledHoursPerWeek = scheduledHoursPerSession * sessionsCount;
+      
+      console.log(`\n📋 Validating: ${item.subjectCode} - ${item.subjectName}`);
+      console.log(`   Lec: ${lec}, Lab: ${lab}, Required Hours/Week: ${requiredHoursPerWeek}`);
+      console.log(`   Scheduled: ${item.day} ${item.startTime}-${item.endTime}`);
+      console.log(`   Sessions: ${sessionsCount}, Hours/Session: ${scheduledHoursPerSession.toFixed(2)}, Total/Week: ${totalScheduledHoursPerWeek.toFixed(2)}`);
+      console.log(`   Room: ${item.roomName}`);
+
+      // RULE 1: Lab room validation
+      const isLabRoom = (item.roomName || '').toLowerCase().includes('lab');
+      
+      if (lab > 0 && !isLabRoom) {
+        console.warn(`   ⚠️ Lab course in non-lab room!`);
+        // Try to find an available lab room
+        const labRooms = rooms.filter(r => r.name.toLowerCase().includes('lab'));
+        let fixed = false;
+        
+        for (const labRoom of labRooms) {
+          const hasConflict = correctedSchedule.some((other, idx) => 
+            idx !== i &&
+            other.roomId === labRoom.id.toString() &&
+            other.day === item.day &&
+            this.timeRangesOverlap(other.startTime, other.endTime, item.startTime, item.endTime)
+          );
+          
+          if (!hasConflict) {
+            item.roomId = labRoom.id.toString();
+            item.roomName = labRoom.name;
+            console.log(`   ✅ AUTO-FIX: Moved to ${labRoom.name}`);
+            fixed = true;
+            break;
+          }
+        }
+        
+        if (!fixed) {
+          conflicts.push(`${item.subjectCode}: Lab course (${lab} lab units) in non-lab room "${item.roomName}". Move to Lab 1 or Lab 2.`);
+        }
+      }
+      
+      if (lab === 0 && isLabRoom) {
+        console.warn(`   ⚠️ Lecture-only course in lab room!`);
+        // Try to find an available regular room
+        const regularRooms = rooms.filter(r => !r.name.toLowerCase().includes('lab'));
+        let fixed = false;
+        
+        for (const regularRoom of regularRooms) {
+          const hasConflict = correctedSchedule.some((other, idx) => 
+            idx !== i &&
+            other.roomId === regularRoom.id.toString() &&
+            other.day === item.day &&
+            this.timeRangesOverlap(other.startTime, other.endTime, item.startTime, item.endTime)
+          );
+          
+          if (!hasConflict) {
+            item.roomId = regularRoom.id.toString();
+            item.roomName = regularRoom.name;
+            console.log(`   ✅ AUTO-FIX: Moved to ${regularRoom.name}`);
+            fixed = true;
+            break;
+          }
+        }
+        
+        if (!fixed) {
+          conflicts.push(`${item.subjectCode}: Lecture-only course in lab room "${item.roomName}". Move to Room 1, 2, or 3.`);
+        }
+      }
+
+      // RULE 2: 3-UNIT LECTURE VALIDATION (Critical Rule)
+      // For lecture subjects with 3 units (lec=3, lab=0), enforce 3 hours/week = 1.5 hours/session
+      if (lec === 3 && lab === 0) {
+        const expectedHoursPerSession = 1.5; // 90 minutes
+        const expectedTotalHoursPerWeek = 3.0;
+        
+        if (Math.abs(totalScheduledHoursPerWeek - expectedTotalHoursPerWeek) > 0.1) {
+          console.warn(`   ❌ 3-UNIT LECTURE VIOLATION: Scheduled ${totalScheduledHoursPerWeek.toFixed(2)}h/week but should be ${expectedTotalHoursPerWeek}h/week`);
+          
+          // Auto-correct: adjust to 1.5 hours per session
+          if (sessionsCount >= 2) {
+            const correctedEndTime = this.addMinutes(item.startTime, 90); // 1.5 hours = 90 minutes
+            
+            if (this.isValidTimeSlot(item.startTime, correctedEndTime)) {
+              const hasConflict = correctedSchedule.some((other, idx) => 
+                idx !== i &&
+                ((other.roomId === item.roomId && other.day === item.day) ||
+                 (other.facultyId === item.facultyId && other.day === item.day)) &&
+                this.timeRangesOverlap(other.startTime, other.endTime, item.startTime, correctedEndTime)
+              );
+              
+              if (!hasConflict) {
+                const oldEndTime = item.endTime;
+                item.endTime = correctedEndTime;
+                console.log(`   ✅ AUTO-FIX: 3-unit lecture corrected from ${item.startTime}-${oldEndTime} to ${item.startTime}-${correctedEndTime} (1.5h/session × ${sessionsCount} sessions = 3h/week)`);
+              } else {
+                conflicts.push(`${item.subjectCode}: 3-unit lecture has ${totalScheduledHoursPerWeek.toFixed(2)}h/week (should be 3h/week = 1.5h/session). Cannot auto-correct due to conflicts.`);
+              }
+            } else {
+              conflicts.push(`${item.subjectCode}: 3-unit lecture has ${totalScheduledHoursPerWeek.toFixed(2)}h/week (should be 3h/week = 1.5h/session). Cannot adjust to valid time slot.`);
+            }
+          } else {
+            warnings.push(`${item.subjectCode}: 3-unit lecture needs 2 sessions/week but only ${sessionsCount} session(s) scheduled.`);
+          }
+        } else {
+          console.log(`   ✅ 3-unit lecture rule satisfied: ${totalScheduledHoursPerWeek.toFixed(2)}h/week`);
+        }
+      }
+      
+      // RULE 3: General duration validation for non-3-unit lectures
+      if (!(lec === 3 && lab === 0)) {
+        const hoursDifference = Math.abs(totalScheduledHoursPerWeek - requiredHoursPerWeek);
+        if (hoursDifference > 0.1) {
+          console.warn(`   ⚠️ Duration mismatch: Scheduled ${totalScheduledHoursPerWeek.toFixed(2)}h/week vs Required ${requiredHoursPerWeek}h/week`);
+          
+          // For lab courses, keep longer sessions (3-4 hours)
+          if (lab > 0) {
+            console.log(`   ℹ️ Laboratory course - longer sessions are acceptable`);
+          } else {
+            // Try to adjust end time to match required hours per session
+            const requiredMinutesPerSession = (requiredHoursPerWeek / sessionsCount) * 60;
+            const newEndTime = this.addMinutes(item.startTime, requiredMinutesPerSession);
+            
+            if (this.isValidTimeSlot(item.startTime, newEndTime)) {
+              const hasConflict = correctedSchedule.some((other, idx) => 
+                idx !== i &&
+                ((other.roomId === item.roomId && other.day === item.day) ||
+                 (other.facultyId === item.facultyId && other.day === item.day)) &&
+                this.timeRangesOverlap(other.startTime, other.endTime, item.startTime, newEndTime)
+              );
+              
+              if (!hasConflict) {
+                item.endTime = newEndTime;
+                console.log(`   ✅ AUTO-FIX: Adjusted duration to ${item.startTime}-${newEndTime} (${(requiredMinutesPerSession/60).toFixed(2)}h/session)`);
+              } else {
+                warnings.push(`${item.subjectCode}: Duration is ${totalScheduledHoursPerWeek.toFixed(2)}h/week but requires ${requiredHoursPerWeek}h/week. Adjusting would cause conflicts.`);
+              }
+            } else {
+              warnings.push(`${item.subjectCode}: Duration is ${totalScheduledHoursPerWeek.toFixed(2)}h/week but requires ${requiredHoursPerWeek}h/week. Cannot extend beyond valid time range.`);
+            }
+          }
+        }
+      }
+    }
+
+    // RULE 4: Detect room conflicts
+    for (let i = 0; i < correctedSchedule.length; i++) {
+      for (let j = i + 1; j < correctedSchedule.length; j++) {
+        const item1 = correctedSchedule[i];
+        const item2 = correctedSchedule[j];
+        
+        if (item1.roomId === item2.roomId && 
+            item1.day === item2.day &&
+            this.timeRangesOverlap(item1.startTime, item1.endTime, item2.startTime, item2.endTime)) {
+          conflicts.push(`ROOM CONFLICT: ${item1.subjectCode} and ${item2.subjectCode} both use ${item1.roomName} on ${item1.day} at overlapping times.`);
+        }
+        
+        // RULE 5: Detect faculty conflicts
+        if (item1.facultyId === item2.facultyId && 
+            item1.day === item2.day &&
+            this.timeRangesOverlap(item1.startTime, item1.endTime, item2.startTime, item2.endTime)) {
+          conflicts.push(`FACULTY CONFLICT: ${item1.facultyName} is assigned to both ${item1.subjectCode} and ${item2.subjectCode} on ${item1.day} at overlapping times.`);
+        }
+      }
+    }
+
+    console.log('\n✅ VALIDATION COMPLETE\n');
+    console.log(`   Conflicts: ${conflicts.length}`);
+    console.log(`   Warnings: ${warnings.length}`);
+    
+    if (conflicts.length > 0) {
+      console.log('\n❌ UNRESOLVED CONFLICTS:');
+      conflicts.forEach(c => console.log(`   - ${c}`));
+    }
+    
+    if (warnings.length > 0) {
+      console.log('\n⚠️ WARNINGS:');
+      warnings.forEach(w => console.log(`   - ${w}`));
+    }
+    
+    // Print corrected schedule summary
+    console.log('\n📋 CORRECTED SCHEDULE SUMMARY:');
+    console.log('═'.repeat(100));
+    correctedSchedule.forEach(item => {
+      const lec = item.lec || 0;
+      const lab = item.lab || 0;
+      const totalHoursPerWeek = (lec * 1) + (lab * 3);
+      const type = lab > 0 ? `Lec ${lec} + Lab ${lab}` : `Lec ${lec}`;
+      console.log(`✓ ${item.subjectCode} – ${item.subjectName}`);
+      console.log(`  ${item.day} ${item.startTime}–${item.endTime} | ${totalHoursPerWeek}h/week (${type}) | ${item.roomName} | ${item.program} ${item.yearLevel}`);
+    });
+    console.log('═'.repeat(100));
+
+    return { correctedSchedule, conflicts, warnings };
+  }
+
+  // Legacy method kept for compatibility
+  static getTimeSlotOptions_OLD(sessionDurationMinutes: number = 60) {
     const options: { startTime: string; endTime: string; duration: number }[] = [];
     let hour = 7;
     let minute = 0;

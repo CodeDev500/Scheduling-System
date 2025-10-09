@@ -1,151 +1,102 @@
 import React, { useState, useEffect } from "react";
-import { Search, User, Mail, Phone, MapPin, Calendar, Edit, Eye, Plus, Award, BookOpen } from "lucide-react";
-import DashboardHeader from "../../../components/dashboard/DashboardHeader";
+import { Search, User, Mail, MapPin, Calendar, Eye, BookOpen } from "lucide-react";
+import api from "../../../api/axios";
+import { useToast } from "../../../hooks/useToast";
 
 interface Faculty {
-  id: string;
-  name: string;
+  id: number;
+  firstname: string;
+  lastname: string;
+  middleInitial: string;
   email: string;
-  phone: string;
+  designation: string;
   department: string;
-  position: string;
-  specialization: string;
-  employmentStatus: 'Full-time' | 'Part-time' | 'Contractual';
-  dateHired: string;
-  totalSubjects: number;
-  totalUnits: number;
-  maxUnits: number;
-  currentSemesterLoad: number;
-  avatar?: string;
-  education: string;
-  experience: string;
+  role: string;
+  status: string;
+  specialization?: any;
+  createdAt: string;
+  updatedAt: string;
+  image?: string;
+  totalSubjects?: number;
+  totalUnits?: number;
+  currentSemesterLoad?: number;
+  maxUnits?: number;
 }
 
 const FacultyProfile = () => {
   const [faculty, setFaculty] = useState<Faculty[]>([]);
   const [searchTerm, setSearchTerm] = useState("");
   const [filterDepartment, setFilterDepartment] = useState("all");
-  const [filterStatus, setFilterStatus] = useState("all");
   const [selectedFaculty, setSelectedFaculty] = useState<Faculty | null>(null);
   const [showModal, setShowModal] = useState(false);
+  const [isLoading, setIsLoading] = useState(false);
+  const [departments, setDepartments] = useState<string[]>([]);
+  const toast = useToast();
 
+  // Fetch faculty from API
   useEffect(() => {
-    // Mock data for faculty
-    const mockFaculty: Faculty[] = [
-      {
-        id: "FAC001",
-        name: "Dr. Maria Santos",
-        email: "maria.santos@university.edu",
-        phone: "+63 912 345 6789",
-        department: "Computer Science",
-        position: "Professor",
-        specialization: "Data Structures, Algorithms",
-        employmentStatus: "Full-time",
-        dateHired: "2018-08-15",
-        totalSubjects: 4,
-        totalUnits: 18,
-        maxUnits: 21,
-        currentSemesterLoad: 18,
-        education: "PhD in Computer Science",
-        experience: "6 years"
-      },
-      {
-        id: "FAC002",
-        name: "Prof. John Dela Cruz",
-        email: "john.delacruz@university.edu",
-        phone: "+63 917 234 5678",
-        department: "Information Technology",
-        position: "Associate Professor",
-        specialization: "Database Systems, Web Development",
-        employmentStatus: "Full-time",
-        dateHired: "2020-01-10",
-        totalSubjects: 3,
-        totalUnits: 15,
-        maxUnits: 21,
-        currentSemesterLoad: 15,
-        education: "MS in Information Technology",
-        experience: "4 years"
-      },
-      {
-        id: "FAC003",
-        name: "Ms. Ana Rodriguez",
-        email: "ana.rodriguez@university.edu",
-        phone: "+63 918 345 6789",
-        department: "Information Technology",
-        position: "Assistant Professor",
-        specialization: "Mobile Development, UI/UX",
-        employmentStatus: "Part-time",
-        dateHired: "2021-06-01",
-        totalSubjects: 2,
-        totalUnits: 9,
-        maxUnits: 12,
-        currentSemesterLoad: 9,
-        education: "BS in Information Technology",
-        experience: "3 years"
-      },
-      {
-        id: "FAC004",
-        name: "Dr. Robert Garcia",
-        email: "robert.garcia@university.edu",
-        phone: "+63 919 456 7890",
-        department: "Computer Science",
-        position: "Professor",
-        specialization: "Software Engineering, Project Management",
-        employmentStatus: "Full-time",
-        dateHired: "2015-03-20",
-        totalSubjects: 3,
-        totalUnits: 15,
-        maxUnits: 21,
-        currentSemesterLoad: 15,
-        education: "PhD in Software Engineering",
-        experience: "9 years"
-      },
-      {
-        id: "FAC005",
-        name: "Prof. Lisa Chen",
-        email: "lisa.chen@university.edu",
-        phone: "+63 920 567 8901",
-        department: "Information Technology",
-        position: "Assistant Professor",
-        specialization: "Mobile Apps, Cross-platform Development",
-        employmentStatus: "Contractual",
-        dateHired: "2022-08-01",
-        totalSubjects: 2,
-        totalUnits: 6,
-        maxUnits: 15,
-        currentSemesterLoad: 6,
-        education: "MS in Computer Science",
-        experience: "2 years"
-      }
-    ];
-    setFaculty(mockFaculty);
+    fetchFaculty();
   }, []);
 
+  const fetchFaculty = async () => {
+    try {
+      setIsLoading(true);
+      const response = await api.get('/user/faculty/with-load');
+      console.log('Fetched faculty with load:', response.data);
+      // Filter only APPROVED faculty
+      const approvedFaculty = response.data.filter((user: Faculty) => user.status === 'APPROVED');
+      setFaculty(approvedFaculty);
+      
+      // Extract unique departments
+      const uniqueDepartments = Array.from(
+        new Set(approvedFaculty.map((f: Faculty) => f.department).filter(Boolean))
+      ) as string[];
+      setDepartments(uniqueDepartments.sort());
+    } catch (error) {
+      console.error('Error fetching faculty:', error);
+      toast.error('Failed to fetch faculty');
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
   const filteredFaculty = faculty.filter(member => {
-    const matchesSearch = member.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+    const fullName = `${member.firstname} ${member.lastname}`.toLowerCase();
+    const specializationStr = Array.isArray(member.specialization) ? member.specialization.join(', ') : '';
+    const matchesSearch = fullName.includes(searchTerm.toLowerCase()) ||
                          member.email.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                         member.specialization.toLowerCase().includes(searchTerm.toLowerCase());
+                         specializationStr.toLowerCase().includes(searchTerm.toLowerCase());
     const matchesDepartment = filterDepartment === "all" || member.department === filterDepartment;
-    const matchesStatus = filterStatus === "all" || member.employmentStatus === filterStatus;
     
-    return matchesSearch && matchesDepartment && matchesStatus;
+    return matchesSearch && matchesDepartment;
   });
 
   const getStatusBadge = (status: string) => {
     const baseClasses = "px-2 py-1 text-xs font-medium rounded-full";
     switch (status) {
-      case "Full-time":
+      case "APPROVED":
         return `${baseClasses} bg-green-100 text-green-800`;
-      case "Part-time":
-        return `${baseClasses} bg-yellow-100 text-yellow-800`;
-      case "Contractual":
+      case "VERIFIED":
         return `${baseClasses} bg-blue-100 text-blue-800`;
+      case "PENDING":
+        return `${baseClasses} bg-yellow-100 text-yellow-800`;
       default:
         return `${baseClasses} bg-gray-100 text-gray-800`;
     }
   };
 
-  const getLoadPercentage = (current: number, max: number) => {
+  const getFullName = (member: Faculty) => {
+    return `${member.firstname} ${member.middleInitial}. ${member.lastname}`;
+  };
+
+  const getSpecialization = (spec: any) => {
+    if (Array.isArray(spec)) {
+      return spec.join(', ');
+    }
+    return spec || 'Not specified';
+  };
+
+  const getLoadPercentage = (current: number = 0, max: number = 21) => {
     return Math.round((current / max) * 100);
   };
 
@@ -183,43 +134,18 @@ const FacultyProfile = () => {
               onChange={(e) => setFilterDepartment(e.target.value)}
             >
               <option value="all">All Departments</option>
-              <option value="Computer Science">Computer Science</option>
-              <option value="Information Technology">Information Technology</option>
+              {departments.map(department => (
+                <option key={department} value={department}>{department}</option>
+              ))}
             </select>
           </div>
 
-          {/* Status Filter */}
-          <div>
-            <select
-              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-              value={filterStatus}
-              onChange={(e) => setFilterStatus(e.target.value)}
-            >
-              <option value="all">All Status</option>
-              <option value="Full-time">Full-time</option>
-              <option value="Part-time">Part-time</option>
-              <option value="Contractual">Contractual</option>
-            </select>
-          </div>
-        </div>
-
-        {/* Action Buttons */}
-        <div className="flex flex-wrap gap-3 mt-4">
-          <button className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors">
-            <Plus className="w-4 h-4" />
-            Add Faculty
-          </button>
-          <button className="flex items-center gap-2 px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors">
-            <Award className="w-4 h-4" />
-            Export Report
-          </button>
         </div>
       </div>
 
       {/* Faculty Grid */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
         {filteredFaculty.map((member) => {
-          const loadPercentage = getLoadPercentage(member.currentSemesterLoad, member.maxUnits);
           return (
             <div key={member.id} className="bg-white rounded-lg shadow-sm p-6 hover:shadow-md transition-shadow">
               {/* Faculty Header */}
@@ -229,12 +155,12 @@ const FacultyProfile = () => {
                     <User className="w-6 h-6 text-white" />
                   </div>
                   <div>
-                    <h3 className="text-lg font-semibold text-gray-900">{member.name}</h3>
-                    <p className="text-sm text-gray-500">{member.position}</p>
+                    <h3 className="text-lg font-semibold text-gray-900">{getFullName(member)}</h3>
+                    <p className="text-sm text-gray-500">{member.designation}</p>
                   </div>
                 </div>
-                <span className={getStatusBadge(member.employmentStatus)}>
-                  {member.employmentStatus}
+                <span className={getStatusBadge(member.status)}>
+                  {member.status}
                 </span>
               </div>
 
@@ -245,49 +171,51 @@ const FacultyProfile = () => {
                   {member.email}
                 </div>
                 <div className="flex items-center text-sm text-gray-600">
-                  <Phone className="w-4 h-4 mr-2" />
-                  {member.phone}
-                </div>
-                <div className="flex items-center text-sm text-gray-600">
                   <MapPin className="w-4 h-4 mr-2" />
                   {member.department}
+                </div>
+                <div className="flex items-center text-sm text-gray-600">
+                  <User className="w-4 h-4 mr-2" />
+                  {member.role}
                 </div>
               </div>
 
               {/* Specialization */}
               <div className="mb-4">
                 <p className="text-sm font-medium text-gray-700 mb-1">Specialization:</p>
-                <p className="text-sm text-gray-600">{member.specialization}</p>
+                <p className="text-sm text-gray-600">{getSpecialization(member.specialization)}</p>
               </div>
 
               {/* Teaching Load */}
-              <div className="mb-4">
-                <div className="flex justify-between items-center mb-2">
-                  <span className="text-sm font-medium text-gray-700">Teaching Load</span>
-                  <span className={`text-sm font-medium ${getLoadColor(loadPercentage)}`}>
-                    {member.currentSemesterLoad}/{member.maxUnits} units ({loadPercentage}%)
-                  </span>
+              {member.totalUnits !== undefined && member.maxUnits && (
+                <div className="mb-4">
+                  <div className="flex justify-between items-center mb-2">
+                    <span className="text-sm font-medium text-gray-700">Teaching Load</span>
+                    <span className={`text-sm font-medium ${getLoadColor(getLoadPercentage(member.totalUnits, member.maxUnits))}`}>
+                      {member.totalUnits}/{member.maxUnits} units ({getLoadPercentage(member.totalUnits, member.maxUnits)}%)
+                    </span>
+                  </div>
+                  <div className="w-full bg-gray-200 rounded-full h-2">
+                    <div 
+                      className={`h-2 rounded-full ${
+                        getLoadPercentage(member.totalUnits, member.maxUnits) >= 90 ? 'bg-red-500' : 
+                        getLoadPercentage(member.totalUnits, member.maxUnits) >= 75 ? 'bg-yellow-500' : 'bg-green-500'
+                      }`}
+                      style={{ width: `${Math.min(getLoadPercentage(member.totalUnits, member.maxUnits), 100)}%` }}
+                    ></div>
+                  </div>
                 </div>
-                <div className="w-full bg-gray-200 rounded-full h-2">
-                  <div 
-                    className={`h-2 rounded-full ${
-                      loadPercentage >= 90 ? 'bg-red-500' : 
-                      loadPercentage >= 75 ? 'bg-yellow-500' : 'bg-green-500'
-                    }`}
-                    style={{ width: `${loadPercentage}%` }}
-                  ></div>
-                </div>
-              </div>
+              )}
 
-              {/* Subjects Count */}
+              {/* Subjects and Date Info */}
               <div className="flex items-center justify-between text-sm text-gray-600 mb-4">
                 <div className="flex items-center">
                   <BookOpen className="w-4 h-4 mr-1" />
-                  {member.totalSubjects} subjects
+                  {member.totalSubjects || 0} subjects
                 </div>
                 <div className="flex items-center">
                   <Calendar className="w-4 h-4 mr-1" />
-                  Since {new Date(member.dateHired).getFullYear()}
+                  Since {new Date(member.createdAt).getFullYear()}
                 </div>
               </div>
 
@@ -303,10 +231,7 @@ const FacultyProfile = () => {
                   <Eye className="w-4 h-4" />
                   View Details
                 </button>
-                <button className="flex items-center justify-center gap-2 px-3 py-2 bg-gray-600 text-white rounded-lg hover:bg-gray-700 transition-colors text-sm">
-                  <Edit className="w-4 h-4" />
-                  Edit
-                </button>
+                
               </div>
             </div>
           );
@@ -325,15 +250,17 @@ const FacultyProfile = () => {
 
       {/* Faculty Details Modal */}
       {showModal && selectedFaculty && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-          <div className="bg-white rounded-lg p-6 max-w-2xl w-full mx-4 max-h-[90vh] overflow-y-auto">
+        <div className="fixed inset-0 bg-black/30 backdrop-blur-sm flex items-center justify-center z-50" onClick={() => setShowModal(false)}>
+          <div className="bg-white rounded-xl p-6 max-w-2xl w-full mx-4 max-h-[90vh] overflow-y-auto shadow-2xl" onClick={(e) => e.stopPropagation()}>
             <div className="flex justify-between items-start mb-6">
               <h2 className="text-2xl font-bold text-gray-900">Faculty Details</h2>
               <button 
                 onClick={() => setShowModal(false)}
-                className="text-gray-400 hover:text-gray-600"
+                className="text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded-full p-1 transition-colors"
               >
-                ×
+                <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                </svg>
               </button>
             </div>
             
@@ -343,30 +270,30 @@ const FacultyProfile = () => {
                 <h3 className="text-lg font-semibold text-gray-900 mb-3">Basic Information</h3>
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   <div>
-                    <label className="block text-sm font-medium text-gray-700">Name</label>
-                    <p className="text-sm text-gray-900">{selectedFaculty.name}</p>
+                    <label className="block text-xs font-medium text-gray-500 uppercase tracking-wider mb-1">Full Name</label>
+                    <p className="text-sm font-medium text-gray-900">{getFullName(selectedFaculty)}</p>
                   </div>
                   <div>
-                    <label className="block text-sm font-medium text-gray-700">Position</label>
-                    <p className="text-sm text-gray-900">{selectedFaculty.position}</p>
+                    <label className="block text-xs font-medium text-gray-500 uppercase tracking-wider mb-1">Designation</label>
+                    <p className="text-sm font-medium text-gray-900">{selectedFaculty.designation}</p>
                   </div>
                   <div>
-                    <label className="block text-sm font-medium text-gray-700">Department</label>
-                    <p className="text-sm text-gray-900">{selectedFaculty.department}</p>
+                    <label className="block text-xs font-medium text-gray-500 uppercase tracking-wider mb-1">Department</label>
+                    <p className="text-sm font-medium text-gray-900">{selectedFaculty.department}</p>
                   </div>
                   <div>
-                    <label className="block text-sm font-medium text-gray-700">Employment Status</label>
-                    <span className={getStatusBadge(selectedFaculty.employmentStatus)}>
-                      {selectedFaculty.employmentStatus}
+                    <label className="block text-xs font-medium text-gray-500 uppercase tracking-wider mb-1">Role</label>
+                    <p className="text-sm font-medium text-gray-900">{selectedFaculty.role}</p>
+                  </div>
+                  <div>
+                    <label className="block text-xs font-medium text-gray-500 uppercase tracking-wider mb-1">Status</label>
+                    <span className={getStatusBadge(selectedFaculty.status)}>
+                      {selectedFaculty.status}
                     </span>
                   </div>
                   <div>
-                    <label className="block text-sm font-medium text-gray-700">Education</label>
-                    <p className="text-sm text-gray-900">{selectedFaculty.education}</p>
-                  </div>
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700">Experience</label>
-                    <p className="text-sm text-gray-900">{selectedFaculty.experience}</p>
+                    <label className="block text-xs font-medium text-gray-500 uppercase tracking-wider mb-1">Date Joined</label>
+                    <p className="text-sm font-medium text-gray-900">{new Date(selectedFaculty.createdAt).toLocaleDateString()}</p>
                   </div>
                 </div>
               </div>
@@ -374,33 +301,10 @@ const FacultyProfile = () => {
               {/* Contact Information */}
               <div>
                 <h3 className="text-lg font-semibold text-gray-900 mb-3">Contact Information</h3>
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div className="grid grid-cols-1 gap-4">
                   <div>
-                    <label className="block text-sm font-medium text-gray-700">Email</label>
-                    <p className="text-sm text-gray-900">{selectedFaculty.email}</p>
-                  </div>
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700">Phone</label>
-                    <p className="text-sm text-gray-900">{selectedFaculty.phone}</p>
-                  </div>
-                </div>
-              </div>
-
-              {/* Teaching Load Information */}
-              <div>
-                <h3 className="text-lg font-semibold text-gray-900 mb-3">Teaching Load</h3>
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700">Current Load</label>
-                    <p className="text-sm text-gray-900">{selectedFaculty.currentSemesterLoad} units</p>
-                  </div>
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700">Maximum Load</label>
-                    <p className="text-sm text-gray-900">{selectedFaculty.maxUnits} units</p>
-                  </div>
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700">Total Subjects</label>
-                    <p className="text-sm text-gray-900">{selectedFaculty.totalSubjects} subjects</p>
+                    <label className="block text-xs font-medium text-gray-500 uppercase tracking-wider mb-1">Email</label>
+                    <p className="text-sm font-medium text-gray-900">{selectedFaculty.email}</p>
                   </div>
                 </div>
               </div>
@@ -408,19 +312,58 @@ const FacultyProfile = () => {
               {/* Specialization */}
               <div>
                 <h3 className="text-lg font-semibold text-gray-900 mb-3">Specialization</h3>
-                <p className="text-sm text-gray-900">{selectedFaculty.specialization}</p>
+                <p className="text-sm font-medium text-gray-900">{getSpecialization(selectedFaculty.specialization)}</p>
               </div>
+
+              {/* Teaching Load Information */}
+              {selectedFaculty.totalUnits !== undefined && (
+                <div>
+                  <h3 className="text-lg font-semibold text-gray-900 mb-3">Teaching Load</h3>
+                  <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+                    <div>
+                      <label className="block text-xs font-medium text-gray-500 uppercase tracking-wider mb-1">Total Units</label>
+                      <p className="text-sm font-medium text-gray-900">{selectedFaculty.totalUnits || 0} units</p>
+                    </div>
+                    <div>
+                      <label className="block text-xs font-medium text-gray-500 uppercase tracking-wider mb-1">Maximum Units</label>
+                      <p className="text-sm font-medium text-gray-900">{selectedFaculty.maxUnits || 21} units</p>
+                    </div>
+                    <div>
+                      <label className="block text-xs font-medium text-gray-500 uppercase tracking-wider mb-1">Total Subjects</label>
+                      <p className="text-sm font-medium text-gray-900">{selectedFaculty.totalSubjects || 0} subjects</p>
+                    </div>
+                    <div>
+                      <label className="block text-xs font-medium text-gray-500 uppercase tracking-wider mb-1">Hours/Week</label>
+                      <p className="text-sm font-medium text-gray-900">{selectedFaculty.currentSemesterLoad || 0} hours</p>
+                    </div>
+                  </div>
+                  <div className="mt-4">
+                    <div className="flex justify-between items-center mb-2">
+                      <span className="text-sm font-medium text-gray-700">Load Percentage</span>
+                      <span className={`text-sm font-medium ${getLoadColor(getLoadPercentage(selectedFaculty.totalUnits, selectedFaculty.maxUnits))}`}>
+                        {getLoadPercentage(selectedFaculty.totalUnits, selectedFaculty.maxUnits)}%
+                      </span>
+                    </div>
+                    <div className="w-full bg-gray-200 rounded-full h-3">
+                      <div 
+                        className={`h-3 rounded-full ${
+                          getLoadPercentage(selectedFaculty.totalUnits, selectedFaculty.maxUnits) >= 90 ? 'bg-red-500' : 
+                          getLoadPercentage(selectedFaculty.totalUnits, selectedFaculty.maxUnits) >= 75 ? 'bg-yellow-500' : 'bg-green-500'
+                        }`}
+                        style={{ width: `${Math.min(getLoadPercentage(selectedFaculty.totalUnits, selectedFaculty.maxUnits), 100)}%` }}
+                      ></div>
+                    </div>
+                  </div>
+                </div>
+              )}
             </div>
 
-            <div className="flex justify-end space-x-3 mt-6">
+            <div className="flex justify-end space-x-3 mt-6 pt-6 border-t border-gray-200">
               <button 
                 onClick={() => setShowModal(false)}
-                className="px-4 py-2 border border-gray-300 rounded-lg text-gray-700 hover:bg-gray-50 transition-colors"
+                className="px-4 py-2 border border-gray-300 rounded-lg text-gray-700 hover:bg-gray-50 transition-colors font-medium"
               >
                 Close
-              </button>
-              <button className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors">
-                Edit Profile
               </button>
             </div>
           </div>

@@ -1,8 +1,7 @@
 import { useState } from 'react';
 import { toast } from 'sonner';
-import type { GeneratedSchedule, ScheduleItem, FacultyRecommendation } from '../../../../types';
+import type { GeneratedSchedule, ScheduleItem } from '../../../../types';
 import { detectConflicts, calculateOptimizationScore } from '../utils/scheduleUtils';
-import { mockData } from '../mockData';
 
 export const useScheduleEditing = (
   selectedSchedule: GeneratedSchedule | null,
@@ -27,8 +26,10 @@ export const useScheduleEditing = (
       startTime: item.startTime,
       endTime: item.endTime,
       day: item.day,
-      room: item.room,
-      faculty: item.faculty
+      roomId: item.roomId,
+      roomName: item.roomName,
+      facultyId: item.facultyId,
+      facultyName: item.facultyName
     });
   };
 
@@ -126,68 +127,10 @@ export const useScheduleEditing = (
     return `${date.getHours().toString().padStart(2, '0')}:${date.getMinutes().toString().padStart(2, '0')}`;
   };
 
-  // Enhanced faculty recommendation algorithm
-  const getFacultyRecommendations = (subject: any, excludeFacultyId?: string): FacultyRecommendation[] => {
-    return mockData.faculty
-      .filter(faculty => faculty.id !== excludeFacultyId)
-      .map(faculty => {
-        let matchScore = 0;
-        const reasons: string[] = [];
-        
-        // Specialization matching (40% weight)
-        const subjectKeywords = [
-          subject.name.toLowerCase(),
-          subject.code.toLowerCase(),
-          ...(subject.description || '').toLowerCase().split(' ')
-        ];
-
-        const facultySpecializations = faculty.specializations.map(s => s.toLowerCase());
-        const specializationMatch = subjectKeywords.some(keyword => 
-          facultySpecializations.some(spec => spec.includes(keyword) || keyword.includes(spec))
-        );
-
-        if (specializationMatch) {
-          matchScore += 40;
-          reasons.push('Specialization match');
-        }
-
-        // Experience matching (30% weight)
-        const hasSubjectExperience = faculty.subjectExperience.some(exp => exp.subjectId === subject.id);
-        if (hasSubjectExperience) {
-          matchScore += 30;
-          reasons.push('Previous subject experience');
-        }
-
-        // Workload consideration (20% weight)
-        const currentWorkload = faculty.currentWorkload || 0;
-        if (currentWorkload < 20) {
-          matchScore += 20;
-          reasons.push('Available capacity');
-        } else if (currentWorkload < 30) {
-          matchScore += 10;
-          reasons.push('Moderate availability');
-        }
-
-        // Rating consideration (10% weight)
-        const rating = faculty.rating || 0;
-        if (rating >= 4.5) {
-          matchScore += 10;
-          reasons.push('Excellent rating');
-        } else if (rating >= 4.0) {
-          matchScore += 5;
-          reasons.push('Good rating');
-        }
-
-        return {
-          faculty,
-          matchScore,
-          reasons,
-          availability: currentWorkload < 30,
-          workload: currentWorkload
-        };
-      })
-      .sort((a, b) => b.matchScore - a.matchScore)
-      .slice(0, 5); // Return top 5 recommendations
+  // Placeholder for faculty recommendations (to be implemented with real data)
+  const getFacultyRecommendations = (_subject: any, _excludeFacultyId?: string): any[] => {
+    // TODO: Implement with real faculty data from API
+    return [];
   };
 
   return {

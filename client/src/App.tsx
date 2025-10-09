@@ -22,7 +22,6 @@ import FacultyProfile from "./pages/CampusAdmin/FacultyProfile/FacultyProfile";
 import RoomManagement from "./pages/CampusAdmin/RoomManagement/RoomManagement";
 import Settings from "./pages/CampusAdmin/Settings/Settings";
 import ScheduleGeneration from "./pages/CampusAdmin/ScheduleGeneration/ScheduleGeneration";
-import TestComponent from "./pages/CampusAdmin/ScheduleGeneration/TestComponent";
 
 
 import RegistrarDashboard from "./pages/Registrar/Dashboard/Dashboard";

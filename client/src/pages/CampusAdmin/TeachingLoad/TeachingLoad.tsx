@@ -3,6 +3,8 @@ import { Calendar, Clock, User, ChevronDown, Printer, Grid, CalendarDays } from 
 import { Calendar as BigCalendar, momentLocalizer, Views, type View } from 'react-big-calendar';
 import moment from 'moment';
 import DashboardHeader from '../../../components/dashboard/DashboardHeader';
+import api from '../../../api/axios';
+import { useToast } from '../../../hooks/useToast';
 import 'react-big-calendar/lib/css/react-big-calendar.css';
 // import './TeachingLoad.css';
 
@@ -41,6 +43,8 @@ const TeachingLoad = () => {
   const [showDropdown, setShowDropdown] = useState(false);
   const [viewMode, setViewMode] = useState<ViewMode>('grid');
   const [calendarView, setCalendarView] = useState<View>(Views.WEEK);
+  const [isLoading, setIsLoading] = useState(false);
+  const toast = useToast();
 
   const timeSlots: TimeSlot[] = [
     { time: '7:00', display: '7:00 AM', endTime: '8:00' },
@@ -148,9 +152,115 @@ const TeachingLoad = () => {
     return events;
   };
 
-  // Mock data
+  // Fetch real data from API
   useEffect(() => {
-    const mockFacultySchedules: FacultySchedule[] = [
+    fetchFacultySchedules();
+  }, []);
+
+  const fetchFacultySchedules = async () => {
+    try {
+      setIsLoading(true);
+      
+      // Fetch faculty with teaching load
+      const facultyResponse = await api.get('/user/faculty/with-load');
+      const facultyData = facultyResponse.data.filter((f: any) => f.status === 'APPROVED');
+
+      // Fetch all subject schedules
+      const schedulesResponse = await api.get('/schedules/latest');
+      const schedules = schedulesResponse.data?.scheduleItems || [];
+
+      // Group schedules by faculty
+      const facultySchedules: FacultySchedule[] = facultyData.map((faculty: any) => {
+        const facultyScheduleItems = schedules.filter(
+          (s: any) => String(s.facultyId) === String(faculty.id)
+        );
+
+        // Transform schedules into the required format
+        const schedule: any = {};
+        
+        facultyScheduleItems.forEach((item: any) => {
+          const dayMap: any = {
+            'M': 'MON',
+            'T': 'TUE',
+            'W': 'WED',
+            'Th': 'THU',
+            'F': 'FRI',
+            'S': 'SAT',
+            'Su': 'SUN',
+            'MW': ['MON', 'WED'],
+            'TTh': ['TUE', 'THU'],
+            'MWF': ['MON', 'WED', 'FRI']
+          };
+
+          // Parse day string
+          let daysArray: string[] = [];
+          if (dayMap[item.day]) {
+            daysArray = Array.isArray(dayMap[item.day]) ? dayMap[item.day] : [dayMap[item.day]];
+          } else {
+            // Try to parse complex day patterns
+            if (item.day.includes('MW')) daysArray.push('MON', 'WED');
+            else if (item.day.includes('TTh')) daysArray.push('TUE', 'THU');
+            else if (item.day.includes('M')) daysArray.push('MON');
+            if (item.day.includes('T') && !item.day.includes('Th')) daysArray.push('TUE');
+            if (item.day.includes('W')) daysArray.push('WED');
+            if (item.day.includes('Th')) daysArray.push('THU');
+            if (item.day.includes('F')) daysArray.push('FRI');
+            if (item.day.includes('S') && !item.day.includes('Su')) daysArray.push('SAT');
+            if (item.day.includes('Su')) daysArray.push('SUN');
+          }
+
+          // Convert 24h time to 12h format
+          const formatTime = (time: string) => {
+            const [hours, minutes] = time.split(':');
+            const hour = parseInt(hours);
+            const ampm = hour >= 12 ? 'PM' : 'AM';
+            const hour12 = hour % 12 || 12;
+            return `${hour12}:${minutes} ${ampm}`;
+          };
+
+          const startTime = formatTime(item.startTime);
+          const endTime = formatTime(item.endTime);
+
+          // Generate hourly slots
+          const startHour = parseInt(item.startTime.split(':')[0]);
+          const endHour = parseInt(item.endTime.split(':')[0]);
+
+          daysArray.forEach(day => {
+            if (!schedule[day]) schedule[day] = {};
+
+            for (let hour = startHour; hour < endHour; hour++) {
+              const hourKey = `${hour}:00`;
+              schedule[day][hourKey] = {
+                subject: item.subjectName || item.subject,
+                code: item.subjectCode,
+                room: item.roomName || item.room,
+                startTime,
+                endTime
+              };
+            }
+          });
+        });
+
+        return {
+          id: String(faculty.id),
+          name: `${faculty.firstname} ${faculty.middleInitial}. ${faculty.lastname}`,
+          department: faculty.department,
+          employmentType: 'Full Time',
+          totalUnits: faculty.totalUnits || 0,
+          schedule
+        };
+      });
+
+      setFacultyList(facultySchedules);
+      if (facultySchedules.length > 0) {
+        setSelectedFaculty(facultySchedules[0]);
+      }
+    } catch (error) {
+      console.error('Error fetching faculty schedules:', error);
+      toast.error('Failed to load faculty schedules');
+      
+      // Fallback to mock data
+      const mockFacultySchedules: FacultySchedule[] = [
       {
         id: '1',
         name: 'Dr. Sarah Johnson',
@@ -272,9 +382,12 @@ const TeachingLoad = () => {
       }
     ];
 
-    setFacultyList(mockFacultySchedules);
-    setSelectedFaculty(mockFacultySchedules[0]);
-  }, []);
+      setFacultyList(mockFacultySchedules);
+      setSelectedFaculty(mockFacultySchedules[0]);
+    } finally {
+      setIsLoading(false);
+    }
+  };
 
   // Simplified schedule processing with improved duration calculation
   const processScheduleForGrid = (faculty: FacultySchedule) => {

@@ -68,9 +68,12 @@ interface Schedule {
   subjectCode?: string;
   subjectName?: string;
   units?: number;
+  lec?: number;
+  lab?: number;
   startTime?: string;
   endTime?: string;
   faculty: string;
+  facultyId?: string;
   facultyName: string;
   room: string;
   time: string;
@@ -80,10 +83,8 @@ interface Schedule {
   program: string;
   yearLevel: string;
   courseCode?: string;
-  credits?: number;
-  type?: string;
   students?: string;
-  recommendations?: FacultyRecommendation[];
+  recommendedFaculty?: any[];
   roomName?: string;
 }
 
@@ -113,6 +114,7 @@ const ScheduleGeneration: React.FC = () => {
   const [programPriorities, setProgramPriorities] = useState<string[]>([]);
   const [showPrioritySettings, setShowPrioritySettings] = useState(false);
   const [instructors, setInstructors] = useState<any[]>([]);
+  const [facultyMaxUnits, setFacultyMaxUnits] = useState<number>(18);
   useEffect(() => {
     const getInstructors = async () => {
       try {
@@ -124,6 +126,21 @@ const ScheduleGeneration: React.FC = () => {
       }
     };
     getInstructors();
+  }, []);
+
+  // Fetch faculty max units from settings
+  useEffect(() => {
+    const getFacultyMaxUnits = async () => {
+      try {
+        const response = await api.get('/total-units');
+        const totalUnits = response.data.success && response.data.data ? response.data.data.totalUnits : 18;
+        setFacultyMaxUnits(totalUnits);
+      } catch (error) {
+        console.error('Error fetching faculty max units:', error);
+        setFacultyMaxUnits(18); // Default fallback
+      }
+    };
+    getFacultyMaxUnits();
   }, []);
   // Helper function to get program name from program code
   const getProgramName = (programCode: string): string => {
@@ -196,8 +213,21 @@ const ScheduleGeneration: React.FC = () => {
     try {
       // Use the unfiltered endpoint that returns all subject_schedules rows
       const response = await api.get('/schedule-generation/items');
-      // Server returns the raw array of subject_schedules, not wrapped in { data }
-      setSchedules(response.data?.data || []);
+      const rawData = response.data?.data || [];
+      
+      console.log('📥 Fetched saved schedules:', rawData);
+      
+      // Ensure lec and lab fields are properly mapped
+      const mappedSchedules = rawData.map((item: any) => ({
+        ...item,
+        lec: item.lec || 0,
+        lab: item.lab || 0,
+        units: item.units || 0,
+        facultyId: item.facultyId || item.faculty
+      }));
+      
+      console.log('📊 Mapped schedules with lec/lab:', mappedSchedules);
+      setSchedules(mappedSchedules);
     } catch (error: any) {
       if (error?.response?.status !== 404) {
         console.error('Error fetching all subject schedules:', error);
@@ -259,14 +289,14 @@ const ScheduleGeneration: React.FC = () => {
               academicYear: '2025-2026',
               program: item.program || item.programCode || 'Unknown Program',
               yearLevel: item.yearLevel || 'Unknown Year Level',
-              credits: item.subject?.credits || item.units || 3,
-              units: item.units || item.subject?.credits || 3,
-              type: item.subject?.type || item.type || 'Lecture',
+              units: item.units || 3,
+              lec: item.lec || 0,
+              lab: item.lab || 0,
               
               // Additional fields that might be present
               students: '0/50',
-              section: item.section || 'A',
               tags: item.tags || [],
+              recommendedFaculty: item.recommendedFaculty || [],
               
               // Preserve any other fields that might exist
               ...item
@@ -274,6 +304,7 @@ const ScheduleGeneration: React.FC = () => {
           });
         }
       });
+      
       setSchedules(scheduleItems);
     } else {
       // Clear schedules if no generated schedules
@@ -281,6 +312,21 @@ const ScheduleGeneration: React.FC = () => {
     }
   }, [generatedSchedules, selectedSemester, selectedProgram, selectedYearLevel]);
 
+
+// Calculate faculty loads (total units assigned per faculty)
+const facultyLoads = useMemo(() => {
+  const loads: Record<string, number> = {};
+  
+  schedules?.forEach((schedule) => {
+    const facultyId = schedule.facultyId || schedule.faculty;
+    if (facultyId && facultyId !== 'unassigned') {
+      const units = schedule.units || 0;
+      loads[facultyId] = (loads[facultyId] || 0) + units;
+    }
+  });
+  
+  return loads;
+}, [schedules]);
 
 const filteredSchedules = useMemo(() => {
   // Step 1: Filter schedules based on search term, semester, and program
@@ -544,12 +590,7 @@ const SortableItem = ({ id, children }: { id: string; children: React.ReactNode 
                           <span>Subject Name</span>
                         </div>
                       </th>
-                      <th className="px-6 py-4 text-left text-xs font-bold text-gray-700 uppercase tracking-wider">
-                        <div className="flex items-center space-x-2">
-                          <Award className="h-4 w-4 text-yellow-500" />
-                          <span> Units</span>
-                        </div>
-                      </th>
+                      
                       <th className="px-6 py-4 text-left text-xs font-bold text-gray-700 uppercase tracking-wider">
                         <div className="flex items-center space-x-2">
                           <Clock className="h-4 w-4 text-orange-500" />
@@ -576,8 +617,38 @@ const SortableItem = ({ id, children }: { id: string; children: React.ReactNode 
                       </th>
                       <th className="px-6 py-4 text-left text-xs font-bold text-gray-700 uppercase tracking-wider">
                         <div className="flex items-center space-x-2">
+                          <Users className="h-4 w-4 text-indigo-600" />
+                          <span>Faculty Load</span>
+                        </div>
+                      </th>
+                      <th className="px-6 py-4 text-left text-xs font-bold text-gray-700 uppercase tracking-wider">
+                        <div className="flex items-center space-x-2">
                           <GraduationCap className="h-4 w-4 text-purple-600" />
                           <span>Program</span>
+                        </div>
+                      </th>
+                      <th className="px-6 py-4 text-left text-xs font-bold text-gray-700 uppercase tracking-wider">
+                        <div className="flex items-center space-x-2">
+                          <Award className="h-4 w-4 text-blue-500" />
+                          <span>Lec</span>
+                        </div>
+                      </th>
+                      <th className="px-6 py-4 text-left text-xs font-bold text-gray-700 uppercase tracking-wider">
+                        <div className="flex items-center space-x-2">
+                          <Award className="h-4 w-4 text-purple-500" />
+                          <span>Lab</span>
+                        </div>
+                      </th>
+                      <th className="px-6 py-4 text-left text-xs font-bold text-gray-700 uppercase tracking-wider">
+                        <div className="flex items-center space-x-2">
+                          <Award className="h-4 w-4 text-yellow-500" />
+                          <span>Total Units</span>
+                        </div>
+                      </th>
+                      <th className="px-6 py-4 text-left text-xs font-bold text-gray-700 uppercase tracking-wider">
+                        <div className="flex items-center space-x-2">
+                          <Clock className="h-4 w-4 text-green-500" />
+                          <span>Hours/Week</span>
                         </div>
                       </th>
                       {/* <th className="px-6 py-4 text-left text-xs font-bold text-gray-700 uppercase tracking-wider">
@@ -611,17 +682,7 @@ const SortableItem = ({ id, children }: { id: string; children: React.ReactNode 
                                 <div className="text-sm font-bold text-gray-900 truncate">{subject.subjectName}</div>
                               </div>
                             </td>
-                            
-                            {/* Type */}
-                            <td className="px-6 py-5 whitespace-nowrap">
-                              <Badge 
-                                variant="outline" 
-                                className={subject.type === 'Laboratory' ? 'bg-purple-50 text-purple-700 border-purple-300' : 'bg-green-50 text-green-700 border-green-300'}
-                              >
-                                {subject.units}
-                              </Badge>
-                            </td>
-                            
+                   
                             {/* Time */}
                             <td className="px-6 py-5 whitespace-nowrap">
                               <div className="flex items-center text-sm font-semibold text-gray-900">
@@ -666,6 +727,37 @@ const SortableItem = ({ id, children }: { id: string; children: React.ReactNode 
                               </div>
                             </td>
                             
+                            {/* Faculty Load */}
+                            <td className="px-6 py-5 whitespace-nowrap">
+                              {(() => {
+                                const facultyId = subject.facultyId || subject.faculty;
+                                const assignedUnits = facultyLoads[facultyId] || 0;
+                                const isOverloaded = assignedUnits > facultyMaxUnits;
+                                
+                                return (
+                                  <div className="flex items-center space-x-2">
+                                    <Badge 
+                                      variant="outline" 
+                                      className={`font-bold text-sm px-3 py-1 ${
+                                        isOverloaded 
+                                          ? 'bg-red-50 text-red-700 border-red-300' 
+                                          : assignedUnits === facultyMaxUnits
+                                          ? 'bg-yellow-50 text-yellow-700 border-yellow-300'
+                                          : 'bg-green-50 text-green-700 border-green-300'
+                                      }`}
+                                    >
+                                      {assignedUnits}/{facultyMaxUnits}
+                                    </Badge>
+                                    {isOverloaded && (
+                                      <div title="Overloaded">
+                                        <AlertTriangle className="h-4 w-4 text-red-500" />
+                                      </div>
+                                    )}
+                                  </div>
+                                );
+                              })()}
+                            </td>
+                            
                             {/* Program */}
                             <td className="px-6 py-5 whitespace-nowrap">
                               <div className="space-y-1">
@@ -673,7 +765,38 @@ const SortableItem = ({ id, children }: { id: string; children: React.ReactNode 
                                 <div className="text-xs text-gray-500">{subject.yearLevel}</div>
                               </div>
                             </td>
-                            
+                             <td className="px-6 py-5 whitespace-nowrap">
+                              <Badge 
+                                variant="outline" 
+                                className="bg-blue-50 text-blue-700 border-blue-300"
+                              >
+                                {subject.lec || 0}
+                              </Badge>
+                            </td>
+                             <td className="px-6 py-5 whitespace-nowrap">
+                              <Badge 
+                                variant="outline" 
+                                className="bg-purple-50 text-purple-700 border-purple-300"
+                              >
+                                {subject.lab || 0}
+                              </Badge>
+                            </td>
+                             <td className="px-6 py-5 whitespace-nowrap">
+                              <Badge 
+                                variant="outline" 
+                                className="bg-yellow-50 text-yellow-700 border-yellow-300"
+                              >
+                                {subject.units || 0}
+                              </Badge>
+                            </td>
+                             <td className="px-6 py-5 whitespace-nowrap">
+                              <Badge 
+                                variant="outline" 
+                                className="bg-green-50 text-green-700 border-green-300 font-bold"
+                              >
+                                {((subject.lec || 0) * 1) + ((subject.lab || 0) * 3)} hrs
+                              </Badge>
+                            </td>
                             {/* Status */}
                             {/* <td className="px-6 py-5 whitespace-nowrap">
                               <Badge 

@@ -35,10 +35,16 @@ export interface ScheduleItem {
   day: string;
   startTime: string;
   endTime: string;
-  type: 'Lecture' | 'Laboratory';
+  type: 'Lec' | 'Lab' | 'Lec/Lab';
   units: number;
-  yearLevel: number;
-  semester: number;
+  lec: number;
+  lab: number;
+  yearLevel: string | number;
+  semester: string | number;
+  program?: string;
+  hasConflict?: boolean;
+  status?: string;
+  conflictType?: 'faculty' | 'room' | 'section' | 'none';
 }
 
 export interface GenerationStep {
@@ -53,6 +59,7 @@ export interface GenerationStep {
 }
 
 export interface ConflictDetectionResult {
+  enhancedItems: ScheduleItem[];
   conflicts: Conflict[];
   severity: 'none' | 'low' | 'medium' | 'high';
   resolvable: boolean;
@@ -141,20 +148,25 @@ export interface OptimizationConstraints {
 
 export interface GeneratedSchedule {
   id: string;
-  departmentId: string;
-  programId: string;
-  yearLevel: number;
-  semester: number;
-  subjects: ScheduledSubject[];
+  name?: string;
+  createdAt?: Date;
+  departmentId?: string;
+  programId?: string;
+  yearLevel?: number;
+  semester?: number;
+  subjects: ScheduleItem[];
   conflicts: Conflict[];
-  score: OptimizationScore;
-  generatedAt: Date;
-  constraints: OptimizationConstraints;
-  optimizationScore: OptimizationScoreDetails;
-  algorithm: string;
-  processingTime: number;
-  roomUtilization: RoomUtilization[];
-  facultyWorkload: FacultyWorkload[];
+  faculty?: string[];
+  totalSubjects?: number;
+  totalFaculty?: number;
+  optimizationScore?: number;
+  score?: OptimizationScore;
+  generatedAt?: Date;
+  constraints?: OptimizationConstraints;
+  algorithm?: string;
+  processingTime?: number;
+  roomUtilization?: RoomUtilization[];
+  facultyWorkload?: FacultyWorkload[];
 }
 
 export interface OptimizationScoreDetails {

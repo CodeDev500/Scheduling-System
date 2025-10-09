@@ -4,13 +4,21 @@ import { Button } from '../../../components/ui/button';
 import { Input } from '../../../components/ui/input';
 import { Label } from '../../../components/ui/label';
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '../../../components/ui/dialog';
-import { Users, Save, Edit, X } from 'lucide-react';
+import { Users, Save, Edit, X, Calendar, Plus, Trash2, CheckCircle } from 'lucide-react';
 import DashboardHeader from '../../../components/dashboard/DashboardHeader';
 import { toast } from 'react-toastify';
 import api from '../../../api/axios';
 
 interface FacultyUnitsSettings {
   facultyMaxUnits: number;
+}
+
+interface AcademicYear {
+  id: number;
+  year: string;
+  isActive: boolean;
+  createdAt: string;
+  updatedAt: string;
 }
 
 const Settings: React.FC = () => {
@@ -23,9 +31,17 @@ const Settings: React.FC = () => {
   const [isLoading, setIsLoading] = useState(false);
   const [showConfirmDialog, setShowConfirmDialog] = useState(false);
 
+  // Academic Year states
+  const [academicYears, setAcademicYears] = useState<AcademicYear[]>([]);
+  const [newYear, setNewYear] = useState('');
+  const [showAddDialog, setShowAddDialog] = useState(false);
+  const [showDeleteDialog, setShowDeleteDialog] = useState(false);
+  const [yearToDelete, setYearToDelete] = useState<AcademicYear | null>(null);
+
   // Load settings on component mount
   useEffect(() => {
     loadFacultySettings();
+    loadAcademicYears();
   }, []);
 
   const loadFacultySettings = async () => {
@@ -91,14 +107,72 @@ const Settings: React.FC = () => {
     });
   };
 
+  // Academic Year functions
+  const loadAcademicYears = async () => {
+    try {
+      const response = await api.get('/academic-years');
+      if (response.data.success) {
+        setAcademicYears(response.data.data);
+      }
+    } catch (error) {
+      console.error('Error loading academic years:', error);
+      toast.error('Failed to load academic years');
+    }
+  };
+
+  const handleAddYear = async () => {
+    if (!newYear.trim()) {
+      toast.error('Please enter an academic year');
+      return;
+    }
+
+    try {
+      const response = await api.post('/academic-years', { year: newYear });
+      if (response.data.success) {
+        toast.success('Academic year added successfully');
+        setNewYear('');
+        setShowAddDialog(false);
+        loadAcademicYears();
+      }
+    } catch (error: any) {
+      console.error('Error adding academic year:', error);
+      toast.error(error.response?.data?.message || 'Failed to add academic year');
+    }
+  };
+
+  const handleSetActive = async (id: number) => {
+    try {
+      const response = await api.put(`/academic-years/${id}/activate`);
+      if (response.data.success) {
+        toast.success('Active academic year updated');
+        loadAcademicYears();
+      }
+    } catch (error) {
+      console.error('Error setting active year:', error);
+      toast.error('Failed to set active academic year');
+    }
+  };
+
+  const handleDeleteYear = async () => {
+    if (!yearToDelete) return;
+
+    try {
+      const response = await api.delete(`/academic-years/${yearToDelete.id}`);
+      if (response.data.success) {
+        toast.success('Academic year deleted successfully');
+        setShowDeleteDialog(false);
+        setYearToDelete(null);
+        loadAcademicYears();
+      }
+    } catch (error: any) {
+      console.error('Error deleting academic year:', error);
+      toast.error(error.response?.data?.message || 'Failed to delete academic year');
+    }
+  };
+
   return (
     <div className="min-h-screen bg-gray-50 p-6">
       <div className="max-w-7xl mx-auto space-y-6">
-        {/* Header */}
-        <DashboardHeader 
-          title="Faculty Units Settings" 
-          subtitle="Configure maximum teaching units for faculty members"
-        />
 
         {/* Faculty Units Management */}
         <Card>
@@ -181,7 +255,154 @@ const Settings: React.FC = () => {
           </CardContent>
         </Card>
 
+        {/* Academic Year Management */}
+        <Card>
+          <CardHeader>
+            <div className="flex items-center justify-between">
+              <div className="flex items-center space-x-2">
+                <Calendar className="h-5 w-5 text-green-600" />
+                <CardTitle>Academic Year Management</CardTitle>
+              </div>
+              <Button 
+                onClick={() => setShowAddDialog(true)}
+                size="sm"
+              >
+                <Plus className="h-4 w-4 mr-2" />
+                Add Academic Year
+              </Button>
+            </div>
+            <CardDescription>
+              Manage academic years and set the currently active year for the system.
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            <div className="space-y-4">
+              {academicYears.length === 0 ? (
+                <div className="text-center py-8 text-gray-500">
+                  <Calendar className="h-12 w-12 mx-auto mb-2 text-gray-400" />
+                  <p>No academic years added yet</p>
+                  <p className="text-sm">Click "Add Academic Year" to get started</p>
+                </div>
+              ) : (
+                <div className="grid gap-3">
+                  {academicYears.map((year) => (
+                    <div 
+                      key={year.id}
+                      className={`flex items-center justify-between p-4 rounded-lg border-2 ${
+                        year.isActive 
+                          ? 'border-green-500 bg-green-50' 
+                          : 'border-gray-200 bg-white'
+                      }`}
+                    >
+                      <div className="flex items-center space-x-3">
+                        {year.isActive && (
+                          <CheckCircle className="h-5 w-5 text-green-600" />
+                        )}
+                        <div>
+                          <h4 className={`font-semibold ${
+                            year.isActive ? 'text-green-900' : 'text-gray-900'
+                          }`}>
+                            {year.year}
+                          </h4>
+                          <p className="text-xs text-gray-500">
+                            {year.isActive ? 'Currently Active' : 'Inactive'}
+                          </p>
+                        </div>
+                      </div>
+                      <div className="flex space-x-2">
+                        {!year.isActive && (
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            onClick={() => handleSetActive(year.id)}
+                          >
+                            Set Active
+                          </Button>
+                        )}
+                        <Button
+                          size="sm"
+                          variant="destructive"
+                          onClick={() => {
+                            setYearToDelete(year);
+                            setShowDeleteDialog(true);
+                          }}
+                          disabled={year.isActive}
+                        >
+                          <Trash2 className="h-4 w-4" />
+                        </Button>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          </CardContent>
+        </Card>
 
+        {/* Add Academic Year Dialog */}
+        <Dialog open={showAddDialog} onOpenChange={setShowAddDialog}>
+          <DialogContent>
+            <DialogHeader>
+              <DialogTitle>Add Academic Year</DialogTitle>
+              <DialogDescription>
+                Enter the academic year in the format: YYYY-YYYY (e.g., 2024-2025)
+              </DialogDescription>
+            </DialogHeader>
+            <div className="py-4">
+              <Label htmlFor="newYear">Academic Year</Label>
+              <Input
+                id="newYear"
+                placeholder="e.g., 2024-2025"
+                value={newYear}
+                onChange={(e) => setNewYear(e.target.value)}
+                onKeyPress={(e) => e.key === 'Enter' && handleAddYear()}
+              />
+            </div>
+            <DialogFooter>
+              <Button 
+                variant="outline" 
+                onClick={() => {
+                  setShowAddDialog(false);
+                  setNewYear('');
+                }}
+              >
+                Cancel
+              </Button>
+              <Button onClick={handleAddYear}>
+                Add Year
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
+
+        {/* Delete Confirmation Dialog */}
+        <Dialog open={showDeleteDialog} onOpenChange={setShowDeleteDialog}>
+          <DialogContent>
+            <DialogHeader>
+              <DialogTitle>Delete Academic Year</DialogTitle>
+              <DialogDescription>
+                Are you sure you want to delete the academic year "{yearToDelete?.year}"? This action cannot be undone.
+              </DialogDescription>
+            </DialogHeader>
+            <DialogFooter>
+              <Button 
+                variant="outline" 
+                onClick={() => {
+                  setShowDeleteDialog(false);
+                  setYearToDelete(null);
+                }}
+              >
+                Cancel
+              </Button>
+              <Button 
+                variant="destructive"
+                onClick={handleDeleteYear}
+              >
+                Delete
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
 
         {/* Confirmation Dialog */}
         <Dialog open={showConfirmDialog} onOpenChange={setShowConfirmDialog}>
