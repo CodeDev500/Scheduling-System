@@ -66,6 +66,11 @@ export const updateUser = async (req: Request, res: Response) => {
     const { id } = req.params;
     const updateData = req.body;
     
+    // Handle uploaded image
+    if (req.file) {
+      updateData.image = req.file.path;
+    }
+    
     const updatedUser = await UserService.updateUser(parseInt(id), updateData);
     
     res.status(200).json({ 

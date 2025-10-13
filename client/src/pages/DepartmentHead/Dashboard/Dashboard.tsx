@@ -1,8 +1,10 @@
 import React, { useEffect, useState } from 'react';
-import { Users, Calendar, BookOpen, Clock, CheckCircle, AlertCircle } from 'lucide-react';
+import { Users, Calendar, BookOpen, Clock, CheckCircle, AlertCircle, Building } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import StatCard from '../../../components/dashboard/StatCard';
 import DashboardHeader from '../../../components/dashboard/DashboardHeader';
+import { useAppSelector } from '../../../hooks/redux';
+import api from '../../../api/axios';
 
 interface DashboardStats {
   totalFaculty: number;
@@ -13,8 +15,23 @@ interface DashboardStats {
   upcomingMeetings: number;
 }
 
+interface FacultyMember {
+  id: number;
+  firstname: string;
+  lastname: string;
+  middleInitial: string;
+  department: string;
+  designation: string;
+  status: string;
+  subjects?: any[];
+  currentLoad?: number;
+}
+
 const Dashboard: React.FC = () => {
   const navigate = useNavigate();
+  const userData = useAppSelector((state) => state.auth.user);
+  const userDepartment = userData?.department;
+
   const [stats, setStats] = useState<DashboardStats>({
     totalFaculty: 0,
     totalSubjects: 0,
@@ -24,24 +41,60 @@ const Dashboard: React.FC = () => {
     upcomingMeetings: 0
   });
 
+  const [facultyMembers, setFacultyMembers] = useState<FacultyMember[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
+
+  // Fetch real data from API
   useEffect(() => {
-    // Mock data - replace with actual API calls
-    setStats({
-      totalFaculty: 18,
-      totalSubjects: 25,
-      activeSchedules: 32,
-      pendingRequests: 7,
-      completedEvaluations: 12,
-      upcomingMeetings: 3
-    });
-  }, []);
+    const fetchDashboardData = async () => {
+      try {
+        setIsLoading(true);
+
+        // Fetch faculty by department
+        const facultyResponse = await api.get(`/user/instructor/department/${userDepartment}`);
+        const facultyData = facultyResponse.data || [];
+        setFacultyMembers(facultyData);
+
+        // Fetch schedules
+        const schedulesResponse = await api.get('/schedule-generation/items');
+        const schedulesData = schedulesResponse.data?.data || [];
+
+        // Filter schedules by department
+        const departmentSchedules = schedulesData.filter(
+          (schedule: any) => schedule.program?.includes(userDepartment || '')
+        );
+
+        // Calculate stats
+        const activeFaculty = facultyData.filter((f: any) => f.status === 'Active');
+        const uniqueSubjects = new Set(departmentSchedules.map((s: any) => s.subjectCode));
+
+        setStats({
+          totalFaculty: activeFaculty.length,
+          totalSubjects: uniqueSubjects.size,
+          activeSchedules: departmentSchedules.length,
+          pendingRequests: 0, // Can be fetched from a pending requests endpoint
+          completedEvaluations: 0, // Can be fetched from evaluations endpoint
+          upcomingMeetings: 0 // Can be fetched from meetings endpoint
+        });
+
+      } catch (error) {
+        console.error('Error fetching dashboard data:', error);
+      } finally {
+        setIsLoading(false);
+      }
+    };
+
+    if (userDepartment) {
+      fetchDashboardData();
+    }
+  }, [userDepartment]);
 
   return (
     <div className="min-h-screen bg-gray-50 p-6">
       <div className="max-w-7xl mx-auto space-y-6">
         {/* Header */}
-        <DashboardHeader 
-          title="Department Head Dashboard" 
+        <DashboardHeader
+          title="Department Head Dashboard"
           subtitle="Manage department faculty, schedules, and academic activities"
         />
 
@@ -93,7 +146,7 @@ const Dashboard: React.FC = () => {
         <div className="bg-white rounded-lg shadow-sm p-6">
           <h2 className="text-xl font-semibold text-gray-800 mb-4">Quick Actions</h2>
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-            <button 
+            <button
               onClick={() => navigate('/department-head-faculty')}
               className="p-4 bg-blue-50 hover:bg-blue-100 rounded-lg text-left transition-colors"
             >
@@ -101,7 +154,7 @@ const Dashboard: React.FC = () => {
               <h3 className="font-semibold text-gray-800">Faculty Profiles</h3>
               <p className="text-sm text-gray-600">View and manage faculty information</p>
             </button>
-            <button 
+            <button
               onClick={() => navigate('/schedule-management')}
               className="p-4 bg-green-50 hover:bg-green-100 rounded-lg text-left transition-colors"
             >
@@ -109,7 +162,7 @@ const Dashboard: React.FC = () => {
               <h3 className="font-semibold text-gray-800">Schedule Management</h3>
               <p className="text-sm text-gray-600">Create and manage class schedules</p>
             </button>
-            <button 
+            <button
               onClick={() => navigate('/department-head-teaching-load')}
               className="p-4 bg-purple-50 hover:bg-purple-100 rounded-lg text-left transition-colors"
             >
@@ -127,42 +180,57 @@ const Dashboard: React.FC = () => {
 
         {/* Faculty Overview */}
         <div className="bg-white rounded-lg shadow-sm p-6">
-          <h2 className="text-xl font-semibold text-gray-800 mb-4">Faculty Overview</h2>
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-            <div className="p-4 border border-gray-200 rounded-lg">
-              <div className="flex items-center justify-between mb-2">
-                <h3 className="font-semibold text-gray-800">Dr. John Smith</h3>
-                <span className="bg-green-100 text-green-800 px-2 py-1 rounded-full text-xs">Active</span>
-              </div>
-              <p className="text-sm text-gray-600">Computer Science</p>
-              <div className="mt-2 flex items-center justify-between">
-                <span className="text-xs text-gray-500">5 subjects</span>
-                <span className="text-xs text-gray-500">18 units</span>
-              </div>
-            </div>
-            <div className="p-4 border border-gray-200 rounded-lg">
-              <div className="flex items-center justify-between mb-2">
-                <h3 className="font-semibold text-gray-800">Prof. Maria Garcia</h3>
-                <span className="bg-green-100 text-green-800 px-2 py-1 rounded-full text-xs">Active</span>
-              </div>
-              <p className="text-sm text-gray-600">Mathematics</p>
-              <div className="mt-2 flex items-center justify-between">
-                <span className="text-xs text-gray-500">4 subjects</span>
-                <span className="text-xs text-gray-500">15 units</span>
-              </div>
-            </div>
-            <div className="p-4 border border-gray-200 rounded-lg">
-              <div className="flex items-center justify-between mb-2">
-                <h3 className="font-semibold text-gray-800">Dr. Robert Johnson</h3>
-                <span className="bg-yellow-100 text-yellow-800 px-2 py-1 rounded-full text-xs">On Leave</span>
-              </div>
-              <p className="text-sm text-gray-600">Physics</p>
-              <div className="mt-2 flex items-center justify-between">
-                <span className="text-xs text-gray-500">0 subjects</span>
-                <span className="text-xs text-gray-500">0 units</span>
-              </div>
-            </div>
+          <div className="flex items-center justify-between mb-4">
+            <h2 className="text-xl font-semibold text-gray-800">Faculty Overview</h2>
+            <Building className="h-5 w-5 text-gray-500" />
           </div>
+
+          {isLoading ? (
+            <div className="text-center py-8 text-gray-500">Loading faculty data...</div>
+          ) : facultyMembers.length === 0 ? (
+            <div className="text-center py-8 text-gray-500">No faculty members found in your department</div>
+          ) : (
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+              {facultyMembers.slice(0, 6).map((faculty) => {
+                const fullName = `${faculty.firstname} ${faculty.lastname}`;
+                const subjectCount = faculty.subjects?.length || 0;
+                const currentLoad = faculty.currentLoad || 0;
+                const statusColor = faculty.status === 'Active'
+                  ? 'bg-green-100 text-green-800'
+                  : faculty.status === 'On Leave'
+                  ? 'bg-yellow-100 text-yellow-800'
+                  : 'bg-gray-100 text-gray-800';
+
+                return (
+                  <div key={faculty.id} className="p-4 border border-gray-200 rounded-lg hover:shadow-md transition-shadow">
+                    <div className="flex items-center justify-between mb-2">
+                      <h3 className="font-semibold text-gray-800 truncate">{fullName}</h3>
+                      <span className={`${statusColor} px-2 py-1 rounded-full text-xs whitespace-nowrap`}>
+                        {faculty.status}
+                      </span>
+                    </div>
+                    <p className="text-sm text-gray-600 mb-1">{faculty.designation || 'Instructor'}</p>
+                    <p className="text-xs text-gray-500 mb-2">{faculty.department}</p>
+                    <div className="mt-2 flex items-center justify-between">
+                      <span className="text-xs text-gray-500">{subjectCount} subject{subjectCount !== 1 ? 's' : ''}</span>
+                      <span className="text-xs text-gray-500">{currentLoad} units</span>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          )}
+
+          {!isLoading && facultyMembers.length > 6 && (
+            <div className="mt-4 text-center">
+              <button
+                onClick={() => navigate('/department-head-faculty')}
+                className="text-blue-600 hover:text-blue-700 text-sm font-medium"
+              >
+                View all {facultyMembers.length} faculty members →
+              </button>
+            </div>
+          )}
         </div>
 
         {/* Recent Activities & Pending Tasks */}

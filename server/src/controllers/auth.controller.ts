@@ -51,6 +51,7 @@ export const register = async (req: Request, res: Response) => {
 
     let newFilename: null | string = null;
     if (req.file) {
+      console.log('File received:', req.file);
       let filetype: string = req.file.mimetype.split("/")[1];
       newFilename = req.file.filename + "." + filetype;
 
@@ -58,7 +59,10 @@ export const register = async (req: Request, res: Response) => {
         `./uploads/${req.file.filename}`,
         `./uploads/${newFilename}`
       );
-      userRequest.image = newFilename;
+      userRequest.image = `uploads/${newFilename}`;
+      console.log('Image path set to:', userRequest.image);
+    } else {
+      console.log('No file received in request');
     }
 
     if (userRequest.password) {

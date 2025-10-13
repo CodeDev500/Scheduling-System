@@ -28,6 +28,7 @@ export interface User {
   email: string;
   designation: string;
   department: string;
+  specialization?: string[];
   role: string;
   status: string;
   password: string;

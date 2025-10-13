@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect, useRef } from "react";
 import Logo from "../../assets/images/logo1.png";
 import { IoMdNotificationsOutline } from "react-icons/io";
 import { HiMenu, HiX } from "react-icons/hi";
@@ -6,18 +6,40 @@ import userIcon from "../../assets/images/user_icon.png";
 import { Link, useLocation } from "react-router-dom";
 import Login from "../../pages/Auth/Login";
 import Register from "../../pages/Auth/Register";
+import { useAppSelector } from "../../hooks/redux";
+import NavProfile from "../NavProfile";
+import api from "../../api/axios";
 
 const Navbar = () => {
-  const userData = null;
-  const loading = false;
-  const profilePic = userIcon;
+  const userData = useAppSelector((state) => state.auth.user);
+  const loading = useAppSelector((state) => state.auth.loading);
+  const profilePic = userData?.image ? `${api.defaults.baseURL}/${userData.image}` : userIcon;
+
   const unread = 0;
-  const showNotification = false;
-  const showProfile = false;
+  const [showNotification, setShowNotification] = useState(false);
+  const [showProfile, setShowProfile] = useState(false);
   const location = useLocation();
   const [loginModal, setLoginModal] = useState(false);
   const [registerModal, setRegisterModal] = useState(false);
   const [isMenuOpen, setIsMenuOpen] = useState(false);
+  const profileRef = useRef<HTMLLIElement>(null);
+
+  // Close profile dropdown when clicking outside
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (profileRef.current && !profileRef.current.contains(event.target as Node)) {
+        setShowProfile(false);
+      }
+    };
+
+    if (showProfile) {
+      document.addEventListener("mousedown", handleClickOutside);
+    }
+
+    return () => {
+      document.removeEventListener("mousedown", handleClickOutside);
+    };
+  }, [showProfile]);
 
   const closeModal = () => {
     setLoginModal(false);
@@ -54,7 +76,7 @@ const Navbar = () => {
 
         <div className="hidden md:flex items-center justify-center flex-1 px-4">
           <ul className="flex gap-5 items-center justify-center text-white lg:text-lg text-sm">
-            {/* <li>
+            <li>
               <Link
                 to={"/home"}
                 className={`relative w-fit h-10 p-2 text-white focus:outline-none group ${
@@ -66,8 +88,8 @@ const Navbar = () => {
                 Home
                 <span className="absolute left-0 bottom-0 w-0 h-0.5 bg-white transition-all duration-300 group-hover:w-full"></span>
               </Link>
-            </li> */}
-            {/* <li>
+            </li>
+            <li>
               <Link
                 to={"/about"}
                 className={`relative w-fit h-10 p-2 text-white focus:outline-none group ${
@@ -88,7 +110,7 @@ const Navbar = () => {
                 Contact Us
                 <span className="absolute left-0 bottom-0 w-0 h-0.5 bg-white transition-all duration-300 group-hover:w-full"></span>
               </Link>
-            </li> */}
+            </li>
           </ul>
         </div>
 
@@ -115,16 +137,19 @@ const Navbar = () => {
                     </div>
                   )}
                 </li>
-                <li className="font-bold">Name</li>
-                <li>
+                <li className="font-bold">
+                  {userData?.firstname} {userData?.lastname}
+                </li>
+                <li className="relative" ref={profileRef}>
                   <img
                     src={profilePic}
                     alt="profile"
-                    className="h-10 w-10 rounded-full bg-gray-100 cursor-pointer"
+                    className="h-10 w-10 rounded-full bg-gray-100 cursor-pointer hover:ring-2 hover:ring-blue-400 transition-all"
+                    onClick={() => setShowProfile(!showProfile)}
                   />
                   {showProfile && (
-                    <div className="absolute right-5 text-sm text-gray-700">
-                      {/* <NavProfile /> */}
+                    <div className="absolute top-12 right-0 text-sm text-gray-700 z-50">
+                      <NavProfile />
                     </div>
                   )}
                 </li>
@@ -222,7 +247,25 @@ const Navbar = () => {
               </li>
             </ul>
 
-            {!loading && !userData && (
+            {loading ? (
+              <div className="p-6 text-center text-gray-600 border-t border-rose-300">
+                Loading...
+              </div>
+            ) : userData ? (
+              <div className="p-6 flex items-center gap-4 border-t border-rose-300">
+                <img
+                  src={profilePic}
+                  alt="profile"
+                  className="h-12 w-12 rounded-full bg-gray-100"
+                />
+                <div className="flex-1">
+                  <p className="font-bold text-gray-900">
+                    {userData?.firstname} {userData?.lastname}
+                  </p>
+                  <p className="text-sm text-gray-600">{userData?.email}</p>
+                </div>
+              </div>
+            ) : (
               <div className="p-6 flex flex-col gap-3 border-t border-rose-300">
                 <button
                   className="w-full px-4 h-10 bg-rose-600 hover:bg-rose-700 rounded-lg text-white font-medium transition-colors duration-200"

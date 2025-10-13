@@ -338,7 +338,7 @@ export const resolveConflict = async (req: Request, res: Response): Promise<void
 // Save latest schedule (create or overwrite for department+academicYear+semester+yearLevel)
 export const saveLatestSchedule = async (req: Request, res: Response): Promise<void> => {
   try {
-    console.log('Received save request:', req.body);
+    // console.log('Received save request:', req.body);
     // If body is an array, treat it as the schedule rows to persist directly.
     const isArrayBody = Array.isArray(req.body);
 

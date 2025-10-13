@@ -49,6 +49,8 @@ import FacultyViewTeachingLoad from "./pages/Faculty/ViewTeachingLoad/ViewTeachi
 import { FacultyPreferences } from "./components/FacultyPreferences";
 import { FacultyPreferencesProvider } from "./contexts/FacultyPreferencesContext";
 
+import UserProfile from "./pages/UserProfile/UserProfile";
+
 function App() {
   const sharedLinks: ArrayLink[] = [
     {
@@ -301,6 +303,21 @@ function App() {
             </LayoutDashboard>
           }
         />
+
+        {/* User Profile - Accessible to all authenticated users */}
+        <Route
+          element={<ProtectedRoute allowedRoles={[UserRoles[0], UserRoles[1], UserRoles[2], UserRoles[3]]} />}
+        >
+          <Route
+            path="/user-profile"
+            element={
+              <LayoutDashboard>
+                <UserProfile />
+              </LayoutDashboard>
+            }
+          />
+        </Route>
+
         <Route path="/*" element={<PageNotFound />} />
       </Routes>
       </FacultyPreferencesProvider>

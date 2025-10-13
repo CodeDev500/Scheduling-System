@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Search, Plus, Edit, Trash2, Eye, UserX, UserCheck, CheckCircle, X } from 'lucide-react';
+import { Search, Plus, Edit, Trash2, Eye, UserX, UserCheck, CheckCircle, X, User as UserIcon } from 'lucide-react';
 import DashboardHeader from '../../../components/dashboard/DashboardHeader';
 import api from '../../../api/axios';
 import { useToast } from '../../../hooks/useToast';
@@ -215,11 +215,26 @@ const ManageUser = () => {
               {filteredUsers.map((user) => (
                 <tr key={user.id} className="hover:bg-gray-50">
                   <td className="px-6 py-4 whitespace-nowrap">
-                    <div>
-                      <div className="text-sm font-medium text-gray-900">
-                        {user.firstname} {user.middleInitial}. {user.lastname}
+                    <div className="flex items-center">
+                      <div className="flex-shrink-0 h-10 w-10">
+                        {user.image ? (
+                          <img
+                            className="h-10 w-10 rounded-full object-cover"
+                            src={user.image.startsWith('http') ? user.image : `${api.defaults.baseURL}/${user.image}`}
+                            alt={`${user.firstname} ${user.lastname}`}
+                          />
+                        ) : (
+                          <div className="h-10 w-10 rounded-full bg-gray-200 flex items-center justify-center">
+                            <UserIcon className="h-6 w-6 text-gray-500" />
+                          </div>
+                        )}
                       </div>
-                      <div className="text-sm text-gray-500">{user.email}</div>
+                      <div className="ml-4">
+                        <div className="text-sm font-medium text-gray-900">
+                          {user.firstname} {user.middleInitial}. {user.lastname}
+                        </div>
+                        <div className="text-sm text-gray-500">{user.email}</div>
+                      </div>
                     </div>
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap">

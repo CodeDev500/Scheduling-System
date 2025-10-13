@@ -131,11 +131,21 @@ export const updateUser = async (
   id: number,
   data: Partial<UserRegisterInput>
 ): Promise<UserRegisterInput> => {
+  // Parse specialization if it's a string
+  let specialization = data.specialization;
+  if (typeof data.specialization === 'string') {
+    try {
+      specialization = JSON.parse(data.specialization);
+    } catch (e) {
+      specialization = data.specialization;
+    }
+  }
+
   return db.user.update({
     where: { id },
     data: {
       ...data,
-      specialization: data.specialization as any, // Type assertion for JSON field
+      specialization: specialization as any, // Type assertion for JSON field
     },
     select: {
       id: true,

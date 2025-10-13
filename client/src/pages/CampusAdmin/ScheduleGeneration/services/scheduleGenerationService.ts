@@ -243,6 +243,31 @@ export class ScheduleGenerationService {
     return start1Minutes < end2Minutes && start2Minutes < end1Minutes;
   }
 
+  // Check if instructor has 30-minute gap between classes
+  private static hasInstructorGap(
+    start1: string,
+    end1: string,
+    start2: string,
+    end2: string
+  ): boolean {
+    const end1Minutes = this.timeToMinutes(end1);
+    const start2Minutes = this.timeToMinutes(start2);
+    const end2Minutes = this.timeToMinutes(end2);
+    const start1Minutes = this.timeToMinutes(start1);
+    
+    // Check if there's at least 30 minutes gap between the classes
+    // Case 1: class1 ends, then class2 starts (need 30 min gap)
+    if (end1Minutes <= start2Minutes) {
+      return (start2Minutes - end1Minutes) >= 30;
+    }
+    // Case 2: class2 ends, then class1 starts (need 30 min gap)
+    if (end2Minutes <= start1Minutes) {
+      return (start1Minutes - end2Minutes) >= 30;
+    }
+    // Classes overlap - no gap
+    return false;
+  }
+
   private static markTimeSlotAsUsed(
     day: string,
     startTime: string,
@@ -301,8 +326,7 @@ export class ScheduleGenerationService {
     instructors: any[],
     arg2: any,
     yearLevel?: string,
-    semester?: string,
-    department?: string
+    semester?: string
   ): Promise<ScheduleItem[]> {
     this.globalTimeSlotIndex = Math.floor(Math.random() * 10);
     this.scheduledCourseCount = 0;
@@ -435,6 +459,9 @@ export class ScheduleGenerationService {
           subjectType = 'Laboratory';
         }
 
+        // Get faculty recommendations based on subject tags
+        const recommendedFaculty = this.findBestFacultyMatches(course, instructors, 5);
+
         const scheduleItem: ScheduleItem = {
           id: `${course.id}`,
           subjectId: course.id.toString(),
@@ -454,8 +481,9 @@ export class ScheduleGenerationService {
           lab: labHours,
           yearLevel: course.yearLevel || "1st Year",
           semester: semesterValue || '1st Semester',
-          type: subjectType as 'Lec' | 'Lab' | 'Lec/Lab'
-        };
+          type: subjectType as 'Lec' | 'Lab' | 'Lec/Lab',
+          recommendedFaculty: recommendedFaculty
+        } as any;
 
         // Mark each precise timeslot as used (so conflicts are detected per-block)
         timeSlots.forEach(timeSlot => {
@@ -569,11 +597,15 @@ export class ScheduleGenerationService {
     const selectedDayPattern = dayPatterns[dayPatternIndex % dayPatterns.length];
 
     // Candidate start times - generate all possible start times in 30-min increments
-    // We'll validate against actual session durations when creating slots
+    // Maximum start time is 1:30 PM (13:30)
     const allPossibleStarts: string[] = [];
-    for (let hour = 7; hour < 20; hour++) {
+    for (let hour = 7; hour <= 13; hour++) {
       for (let minute = 0; minute < 60; minute += 30) {
-        allPossibleStarts.push(`${String(hour).padStart(2, '0')}:${String(minute).padStart(2, '0')}`);
+        const timeStr = `${String(hour).padStart(2, '0')}:${String(minute).padStart(2, '0')}`;
+        // Only add times up to 1:30 PM (13:30)
+        if (hour < 13 || (hour === 13 && minute <= 30)) {
+          allPossibleStarts.push(timeStr);
+        }
       }
     }
     if (allPossibleStarts.length === 0) return [];
@@ -693,7 +725,8 @@ static findConflictFreeSchedule(
   } else if (totalWeeklyHours === 2) {
     distributionCandidates.push({ duration: 120, sessions: 1 }); // Single 2-hour session
   } else if (totalWeeklyHours === 3) {
-    distributionCandidates.push({ duration: 90, sessions: 2 }); // Two 1.5-hour sessions
+    console.log(`   📚 3-unit course detected: Scheduling 2 sessions × 1.5 hours (90 min) each`);
+    distributionCandidates.push({ duration: 90, sessions: 2 }); // Two 1.5-hour sessions (MW or TTh)
   } else {
     // For other durations, split into sessions of max 2 hours (120 min) each
     const baseDuration = 120;
@@ -802,12 +835,34 @@ static findConflictFreeSchedule(
 
             let facultyAvailable = true;
             for (const timeSlot of timeSlots) {
+              // Check for direct time overlap
               const facultyConflict = this.usedTimeSlots.some(slot =>
                 slot.day === timeSlot.day &&
                 slot.facultyId === facultyId &&
                 this.timeRangesOverlap(slot.startTime, slot.endTime, timeSlot.startTime, timeSlot.endTime)
               );
+              
               if (facultyConflict) {
+                facultyAvailable = false;
+                break;
+              }
+              
+              // Check for 30-minute gap requirement between instructor's classes
+              const facultyGapViolation = this.usedTimeSlots.some(slot => {
+                if (slot.day === timeSlot.day && slot.facultyId === facultyId) {
+                  // Only check gap if classes don't overlap (already checked above)
+                  if (!this.timeRangesOverlap(slot.startTime, slot.endTime, timeSlot.startTime, timeSlot.endTime)) {
+                    const hasGap = this.hasInstructorGap(slot.startTime, slot.endTime, timeSlot.startTime, timeSlot.endTime);
+                    if (!hasGap) {
+                      console.log(`   ⚠️ Faculty gap violation: ${faculty.firstname} ${faculty.lastname} needs 30-min gap between ${slot.startTime}-${slot.endTime} and ${timeSlot.startTime}-${timeSlot.endTime}`);
+                      return true;
+                    }
+                  }
+                }
+                return false;
+              });
+              
+              if (facultyGapViolation) {
                 facultyAvailable = false;
                 break;
               }
@@ -830,7 +885,8 @@ static findConflictFreeSchedule(
             console.log(`✅ Found conflict-free schedule for ${course.subjectCode || course.code}:`);
             console.log(`   Faculty: ${faculty.firstname} ${faculty.lastname} (ID: ${facultyId})`);
             console.log(`   Room: ${room.name} (ID: ${roomId})`);
-            console.log(`   Time: ${timeSlots.map(t => `${t.day} ${t.startTime}-${t.endTime}`).join('; ')}`);
+            console.log(`   Time: ${timeSlots.map(t => `${t.day} ${t.startTime}-${t.endTime} (${t.duration}min)`).join('; ')}`);
+            console.log(`   ✓ 30-minute instructor gap enforced`);
             console.log(`   Attempt: ${timeSlotAttempt + 1}/${maxRetries}`);
 
             this.globalTimeSlotIndex = (this.globalTimeSlotIndex + 1) % balancedOrder.length;
@@ -854,10 +910,11 @@ static findConflictFreeSchedule(
     const lunchEnd = this.timeToMinutes('13:00');
     const morningEnd = this.timeToMinutes('12:00');
     const afternoonStart = this.timeToMinutes('13:00');
-    const afternoonEnd = this.timeToMinutes('20:00');
+    const maxStartTime = this.timeToMinutes('13:30'); // Maximum class start time is 1:30 PM
+    const afternoonEnd = this.timeToMinutes('17:00'); // Latest end time (allows 1:30 PM start + 3.5 hours max)
 
     const inMorning = start >= dayStart && end <= morningEnd;
-    const inAfternoon = start >= afternoonStart && end <= afternoonEnd;
+    const inAfternoon = start >= afternoonStart && start <= maxStartTime && end <= afternoonEnd;
     const crossesLunch = start < lunchEnd && end > lunchStart;
 
     return (inMorning || inAfternoon) && !crossesLunch && end > start;
@@ -866,8 +923,9 @@ static findConflictFreeSchedule(
   static getTimeSlotOptions(sessionDurationMinutes: number = 60) {
     const options: { startTime: string; endTime: string; duration: number }[] = [];
     // Start from 7:00 AM and generate slots every 30 minutes
+    // Maximum start time is 1:30 PM (13:30)
     const startHour = 7;
-    const endHour = 20;
+    const endHour = 14; // Stop at 2:00 PM to ensure 1:30 PM is the last possible start
     
     for (let hour = startHour; hour < endHour; hour++) {
       for (let minute = 0; minute < 60; minute += 30) {
@@ -996,7 +1054,6 @@ static findConflictFreeSchedule(
       // RULE 2: 3-UNIT LECTURE VALIDATION (Critical Rule)
       // For lecture subjects with 3 units (lec=3, lab=0), enforce 3 hours/week = 1.5 hours/session
       if (lec === 3 && lab === 0) {
-        const expectedHoursPerSession = 1.5; // 90 minutes
         const expectedTotalHoursPerWeek = 3.0;
         
         if (Math.abs(totalScheduledHoursPerWeek - expectedTotalHoursPerWeek) > 0.1) {

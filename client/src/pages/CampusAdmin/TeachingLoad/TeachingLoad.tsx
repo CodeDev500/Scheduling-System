@@ -258,132 +258,6 @@ const TeachingLoad = () => {
     } catch (error) {
       console.error('Error fetching faculty schedules:', error);
       toast.error('Failed to load faculty schedules');
-      
-      // Fallback to mock data
-      const mockFacultySchedules: FacultySchedule[] = [
-      {
-        id: '1',
-        name: 'Dr. Sarah Johnson',
-        department: 'Computer Science',
-        employmentType: 'Full Time',
-        totalUnits: 6,
-        schedule: {
-          MON: {
-            '7:00': { subject: 'DATA STRUCTURES', code: 'CS 201', room: 'LAB 1', startTime: '7:00 AM', endTime: '8:00 AM' },
-            '8:00': { subject: 'DATA STRUCTURES', code: 'CS 201', room: 'LAB 1', startTime: '8:30 AM', endTime: '9:45 AM' },
-            '9:00': { subject: 'DATA STRUCTURES', code: 'CS 201', room: 'LAB 1', startTime: '7:00 AM', endTime: '8:00 AM' },
-            '11:00': { subject: 'ALGORITHMS', code: 'CS 301', room: 'ROOM 205', startTime: '11:00 AM', endTime: '1:00 PM' },
-            '12:00': { subject: 'ALGORITHMS', code: 'CS 301', room: 'ROOM 205', startTime: '11:00 AM', endTime: '1:00 PM' },
-            '13:00': { subject: 'ALGORITHMS', code: 'CS 301', room: 'ROOM 205', startTime: '11:00 AM', endTime: '1:00 PM' },
-            '15:00': { subject: 'CAPSTONE PROJECT', code: 'CS 499', room: 'LAB 3', startTime: '3:00 PM', endTime: '5:00 PM' },
-            '16:00': { subject: 'CAPSTONE PROJECT', code: 'CS 499', room: 'LAB 3', startTime: '3:00 PM', endTime: '5:00 PM' },
-            '17:00': { subject: 'CAPSTONE PROJECT', code: 'CS 499', room: 'LAB 3', startTime: '3:00 PM', endTime: '5:00 PM' },
-          },
-          TUE: {
-            '9:00': { subject: 'SOFTWARE ENGINEERING', code: 'CS 350', room: 'ROOM 301', startTime: '9:00 AM', endTime: '11:00 AM' },
-            '10:00': { subject: 'SOFTWARE ENGINEERING', code: 'CS 350', room: 'ROOM 301', startTime: '9:00 AM', endTime: '11:00 AM' },
-            '11:00': { subject: 'SOFTWARE ENGINEERING', code: 'CS 350', room: 'ROOM 301', startTime: '9:00 AM', endTime: '11:00 AM' },
-            '13:00': { subject: 'DATABASE SYSTEMS', code: 'CS 320', room: 'LAB 2', startTime: '1:00 PM', endTime: '3:00 PM' },
-            '14:00': { subject: 'DATABASE SYSTEMS', code: 'CS 320', room: 'LAB 2', startTime: '1:00 PM', endTime: '3:00 PM' },
-            '15:00': { subject: 'DATABASE SYSTEMS', code: 'CS 320', room: 'LAB 2', startTime: '1:00 PM', endTime: '3:00 PM' },
-          },
-          WED: {
-            '7:00': { subject: 'DATA STRUCTURES', code: 'CS 201', room: 'LAB 1', startTime: '7:00 AM', endTime: '9:00 AM' },
-            '8:00': { subject: 'DATA STRUCTURES', code: 'CS 201', room: 'LAB 1', startTime: '7:00 AM', endTime: '9:00 AM' },
-            '9:00': { subject: 'DATA STRUCTURES', code: 'CS 201', room: 'LAB 1', startTime: '7:00 AM', endTime: '9:00 AM' },
-            '11:00': { subject: 'ALGORITHMS', code: 'CS 301', room: 'ROOM 205', startTime: '11:00 AM', endTime: '1:00 PM' },
-            '12:00': { subject: 'ALGORITHMS', code: 'CS 301', room: 'ROOM 205', startTime: '11:00 AM', endTime: '1:00 PM' },
-            '13:00': { subject: 'ALGORITHMS', code: 'CS 301', room: 'ROOM 205', startTime: '11:00 AM', endTime: '1:00 PM' },
-            '15:00': { subject: 'CAPSTONE PROJECT', code: 'CS 499', room: 'LAB 3', startTime: '3:00 PM', endTime: '5:00 PM' },
-            '16:00': { subject: 'CAPSTONE PROJECT', code: 'CS 499', room: 'LAB 3', startTime: '3:00 PM', endTime: '5:00 PM' },
-            '17:00': { subject: 'CAPSTONE PROJECT', code: 'CS 499', room: 'LAB 3', startTime: '3:00 PM', endTime: '5:00 PM' },
-          },
-          THU: {
-            '9:00': { subject: 'SOFTWARE ENGINEERING', code: 'CS 350', room: 'ROOM 301', startTime: '9:00 AM', endTime: '11:00 AM' },
-            '10:00': { subject: 'SOFTWARE ENGINEERING', code: 'CS 350', room: 'ROOM 301', startTime: '9:00 AM', endTime: '11:00 AM' },
-            '11:00': { subject: 'SOFTWARE ENGINEERING', code: 'CS 350', room: 'ROOM 301', startTime: '9:00 AM', endTime: '11:00 AM' },
-            '13:00': { subject: 'DATABASE SYSTEMS', code: 'CS 320', room: 'LAB 2', startTime: '1:00 PM', endTime: '3:00 PM' },
-            '14:00': { subject: 'DATABASE SYSTEMS', code: 'CS 320', room: 'LAB 2', startTime: '1:00 PM', endTime: '3:00 PM' },
-            '15:00': { subject: 'DATABASE SYSTEMS', code: 'CS 320', room: 'LAB 2', startTime: '1:00 PM', endTime: '3:00 PM' },
-          },
-          FRI: {
-            '7:00': { subject: 'DATA STRUCTURES', code: 'CS 201', room: 'LAB 1', startTime: '7:00 AM', endTime: '9:00 AM' },
-            '8:00': { subject: 'DATA STRUCTURES', code: 'CS 201', room: 'LAB 1', startTime: '7:00 AM', endTime: '9:00 AM' },
-            '9:00': { subject: 'DATA STRUCTURES', code: 'CS 201', room: 'LAB 1', startTime: '7:00 AM', endTime: '9:00 AM' },
-            '11:00': { subject: 'ALGORITHMS', code: 'CS 301', room: 'ROOM 205', startTime: '11:00 AM', endTime: '1:00 PM' },
-            '12:00': { subject: 'ALGORITHMS', code: 'CS 301', room: 'ROOM 205', startTime: '11:00 AM', endTime: '1:00 PM' },
-            '13:00': { subject: 'ALGORITHMS', code: 'CS 301', room: 'ROOM 205', startTime: '11:00 AM', endTime: '1:00 PM' },
-          },
-          SAT: {},
-          SUN: {}
-        }
-      },
-      {
-        id: '2',
-        name: 'Prof. Michael Chen',
-        department: 'Mathematics',
-        employmentType: 'Full Time',
-        totalUnits: 9,
-        schedule: {
-          MON: {
-            '7:00': { subject: 'STATISTICS', code: 'MATH 150', room: 'ROOM 101', startTime: '7:00 AM', endTime: '9:00 AM' },
-            '8:00': { subject: 'STATISTICS', code: 'MATH 150', room: 'ROOM 101', startTime: '7:00 AM', endTime: '9:00 AM' },
-            '9:00': { subject: 'TRIGONOMETRY', code: 'MATH 120', room: 'ROOM 104', startTime: '9:00 AM', endTime: '10:30 AM' }, // 1.5 hour class
-            '10:00': { subject: 'TRIGONOMETRY', code: 'MATH 120', room: 'ROOM 104', startTime: '9:00 AM', endTime: '10:30 AM' },
-            '11:00': { subject: 'CALCULUS I', code: 'MATH 201', room: 'ROOM 102', startTime: '11:00 AM', endTime: '1:00 PM' },
-            '12:00': { subject: 'CALCULUS I', code: 'MATH 201', room: 'ROOM 102', startTime: '11:00 AM', endTime: '1:00 PM' },
-            '13:00': { subject: 'GEOMETRY', code: 'MATH 110', room: 'ROOM 105', startTime: '1:00 PM', endTime: '3:00 PM' },
-            '14:00': { subject: 'GEOMETRY', code: 'MATH 110', room: 'ROOM 105', startTime: '1:00 PM', endTime: '3:00 PM' },
-            '15:00': { subject: 'ALGEBRA', code: 'MATH 101', room: 'ROOM 103', startTime: '3:00 PM', endTime: '6:00 PM' }, // 3 hour class
-            '16:00': { subject: 'ALGEBRA', code: 'MATH 101', room: 'ROOM 103', startTime: '3:00 PM', endTime: '6:00 PM' },
-            '17:00': { subject: 'ALGEBRA', code: 'MATH 101', room: 'ROOM 103', startTime: '3:00 PM', endTime: '6:00 PM' },
-            '18:00': { subject: 'ALGEBRA', code: 'MATH 101', room: 'ROOM 103', startTime: '3:00 PM', endTime: '6:00 PM' },
-          },
-          TUE: {
-            '9:00': { subject: 'TRIGONOMETRY', code: 'MATH 120', room: 'ROOM 104', startTime: '9:00 AM', endTime: '11:00 AM' },
-            '10:00': { subject: 'TRIGONOMETRY', code: 'MATH 120', room: 'ROOM 104', startTime: '9:00 AM', endTime: '11:00 AM' },
-            '11:00': { subject: 'TRIGONOMETRY', code: 'MATH 120', room: 'ROOM 104', startTime: '9:00 AM', endTime: '11:00 AM' },
-            '13:00': { subject: 'GEOMETRY', code: 'MATH 110', room: 'ROOM 105', startTime: '1:00 PM', endTime: '3:00 PM' },
-            '14:00': { subject: 'GEOMETRY', code: 'MATH 110', room: 'ROOM 105', startTime: '1:00 PM', endTime: '3:00 PM' },
-            '15:00': { subject: 'GEOMETRY', code: 'MATH 110', room: 'ROOM 105', startTime: '1:00 PM', endTime: '3:00 PM' },
-          },
-          WED: {
-            '7:00': { subject: 'STATISTICS', code: 'MATH 150', room: 'ROOM 101', startTime: '7:00 AM', endTime: '9:00 AM' },
-            '8:00': { subject: 'STATISTICS', code: 'MATH 150', room: 'ROOM 101', startTime: '7:00 AM', endTime: '9:00 AM' },
-            '9:00': { subject: 'TRIGONOMETRY', code: 'MATH 120', room: 'ROOM 104', startTime: '9:00 AM', endTime: '11:00 AM' },
-            '10:00': { subject: 'TRIGONOMETRY', code: 'MATH 120', room: 'ROOM 104', startTime: '9:00 AM', endTime: '11:00 AM' },
-            '11:00': { subject: 'CALCULUS I', code: 'MATH 201', room: 'ROOM 102', startTime: '11:00 AM', endTime: '1:00 PM' },
-            '12:00': { subject: 'CALCULUS I', code: 'MATH 201', room: 'ROOM 102', startTime: '11:00 AM', endTime: '1:00 PM' },
-            '13:00': { subject: 'CALCULUS I', code: 'MATH 201', room: 'ROOM 102', startTime: '11:00 AM', endTime: '1:00 PM' },
-            '15:00': { subject: 'ALGEBRA', code: 'MATH 101', room: 'ROOM 103', startTime: '3:00 PM', endTime: '5:00 PM' },
-            '16:00': { subject: 'ALGEBRA', code: 'MATH 101', room: 'ROOM 103', startTime: '3:00 PM', endTime: '5:00 PM' },
-            '17:00': { subject: 'ALGEBRA', code: 'MATH 101', room: 'ROOM 103', startTime: '3:00 PM', endTime: '5:00 PM' },
-          },
-          THU: {
-            '9:00': { subject: 'TRIGONOMETRY', code: 'MATH 120', room: 'ROOM 104', startTime: '9:00 AM', endTime: '11:00 AM' },
-            '10:00': { subject: 'TRIGONOMETRY', code: 'MATH 120', room: 'ROOM 104', startTime: '9:00 AM', endTime: '11:00 AM' },
-            '11:00': { subject: 'TRIGONOMETRY', code: 'MATH 120', room: 'ROOM 104', startTime: '9:00 AM', endTime: '11:00 AM' },
-            '13:00': { subject: 'GEOMETRY', code: 'MATH 110', room: 'ROOM 105', startTime: '1:00 PM', endTime: '3:00 PM' },
-            '14:00': { subject: 'GEOMETRY', code: 'MATH 110', room: 'ROOM 105', startTime: '1:00 PM', endTime: '3:00 PM' },
-            '15:00': { subject: 'GEOMETRY', code: 'MATH 110', room: 'ROOM 105', startTime: '1:00 PM', endTime: '3:00 PM' },
-          },
-          FRI: {
-            '7:00': { subject: 'STATISTICS', code: 'MATH 150', room: 'ROOM 101', startTime: '7:00 AM', endTime: '9:00 AM' },
-            '8:00': { subject: 'STATISTICS', code: 'MATH 150', room: 'ROOM 101', startTime: '7:00 AM', endTime: '9:00 AM' },
-            '9:00': { subject: 'TRIGONOMETRY', code: 'MATH 120', room: 'ROOM 104', startTime: '9:00 AM', endTime: '11:00 AM' },
-            '10:00': { subject: 'TRIGONOMETRY', code: 'MATH 120', room: 'ROOM 104', startTime: '9:00 AM', endTime: '11:00 AM' },
-            '11:00': { subject: 'CALCULUS I', code: 'MATH 201', room: 'ROOM 102', startTime: '11:00 AM', endTime: '1:00 PM' },
-            '12:00': { subject: 'CALCULUS I', code: 'MATH 201', room: 'ROOM 102', startTime: '11:00 AM', endTime: '1:00 PM' },
-            '13:00': { subject: 'CALCULUS I', code: 'MATH 201', room: 'ROOM 102', startTime: '11:00 AM', endTime: '1:00 PM' },
-          },
-          SAT: {},
-          SUN: {}
-        }
-      }
-    ];
-
-      setFacultyList(mockFacultySchedules);
-      setSelectedFaculty(mockFacultySchedules[0]);
     } finally {
       setIsLoading(false);
     }
@@ -501,8 +375,8 @@ const TeachingLoad = () => {
     
     if (!cellData) {
       return (
-        <td key={`${day}-${time}`} className="p-0 border border-gray-200">
-          <div className="schedule-grid-cell"></div>
+        <td key={`${day}-${time}`} className="p-0 border border-gray-200 h-16">
+          <div className="h-16"></div>
         </td>
       );
     }
@@ -511,15 +385,10 @@ const TeachingLoad = () => {
     const baseSlotHeight = window.innerWidth <= 640 ? 48 : 64; // Same as calculateCellHeight base
     const dynamicHeight = Math.round((cellData.exactHeightDuration || cellData.exactDuration || cellData.duration) * baseSlotHeight);
     
-    // Calculate precise vertical offset based on exact start time
-    const offsetPixels = Math.round((cellData.offsetMinutes / 60) * baseSlotHeight);
-    
-
-    
     return (
       <td 
         key={`${day}-${time}`} 
-        className="p-0 border border-gray-200 relative" 
+        className="p-0 border text-nowrap border-gray-200 relative" 
         rowSpan={cellData.duration}
         // style={{ height: `${dynamicHeight}px` }}
       >
@@ -528,7 +397,7 @@ const TeachingLoad = () => {
           style={{ 
             height: `${dynamicHeight - 2}px`, // Subtract 2px for border
             minHeight: `${dynamicHeight - 2}px`,
-            top: `${offsetPixels}px`, // Apply precise vertical positioning
+            top: `0px`, // No offset needed - block is already in correct row
             backgroundColor: cellData.colorClass.replace('bg-', '').replace('-500', '') === 'blue' ? '#3b82f6' :
                             cellData.colorClass.replace('bg-', '').replace('-500', '') === 'green' ? '#10b981' :
                             cellData.colorClass.replace('bg-', '').replace('-500', '') === 'yellow' ? '#f59e0b' :
@@ -643,14 +512,20 @@ const TeachingLoad = () => {
             {viewMode === 'grid' ? (
               /* Grid View */
               <div className="overflow-x-auto">
-                <table className="min-w-full">
+                <table className="min-w-full table-fixed">
+                  <colgroup>
+                    <col className="w-20" />
+                    {days.map((day) => (
+                      <col key={day} style={{ width: `${100 / days.length}%` }} />
+                    ))}
+                  </colgroup>
                   <thead>
                     <tr className="bg-red-800 text-white">
-                      <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider w-20">
+                      <th className="px-4 text-nowrap py-3 text-left text-xs font-medium uppercase tracking-wider">
                         Time
                       </th>
                       {days.map((day) => (
-                        <th key={day} className="px-4 py-3 text-center text-xs font-medium uppercase tracking-wider">
+                        <th key={day} className="px-4 text-nowrap py-3 text-center text-xs font-medium uppercase tracking-wider">
                           {day}
                         </th>
                       ))}
@@ -660,21 +535,23 @@ const TeachingLoad = () => {
                     {(() => {
                       const processedSchedule = processScheduleForGrid(selectedFaculty);
                       return timeSlots.map((slot) => {
-                        const cells = days.map((day) => renderGridCell(day, slot.time, processedSchedule)).filter(Boolean);
+                        // Render all cells, including nulls for rowspan
+                        const cells = days.map((day) => renderGridCell(day, slot.time, processedSchedule));
                         
-                        if (cells.length === 0) return null;
+                        // Check if all cells are null (covered by rowspan)
+                        const allNull = cells.every(cell => cell === null);
+                        if (allNull) return null;
                         
                         return (
                           <tr key={slot.time} className="border-b border-gray-200">
-                            <td className="px-4 py-2 text-xs text-gray-600 bg-gray-50 font-medium">
+                            <td className="px-4 text-nowrap py-2 text-xs text-gray-600 bg-gray-50 font-medium h-16">
                               {slot.display}
                             </td>
                             {cells}
                           </tr>
                         );
                       }).filter(Boolean);
-                    })()
-                    }
+                    })()}
                   </tbody>
                 </table>
               </div>

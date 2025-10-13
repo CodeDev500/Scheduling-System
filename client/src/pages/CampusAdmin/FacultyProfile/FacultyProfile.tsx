@@ -151,8 +151,18 @@ const FacultyProfile = () => {
               {/* Faculty Header */}
               <div className="flex items-start justify-between mb-4">
                 <div className="flex items-center space-x-3">
-                  <div className="w-12 h-12 bg-blue-500 rounded-full flex items-center justify-center">
-                    <User className="w-6 h-6 text-white" />
+                  <div className="w-12 h-12 rounded-full overflow-hidden flex-shrink-0">
+                    {member.image ? (
+                      <img
+                        src={member.image.startsWith('http') ? member.image : `${api.defaults.baseURL}/${member.image}`}
+                        alt={getFullName(member)}
+                        className="w-full h-full object-cover"
+                      />
+                    ) : (
+                      <div className="w-full h-full bg-blue-500 flex items-center justify-center">
+                        <User className="w-6 h-6 text-white" />
+                      </div>
+                    )}
                   </div>
                   <div>
                     <h3 className="text-lg font-semibold text-gray-900">{getFullName(member)}</h3>

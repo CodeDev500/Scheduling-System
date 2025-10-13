@@ -90,12 +90,19 @@ const Register: React.FC<RegisterProps> = ({
           formData.append(key, JSON.stringify(value));
         } else {
           if (value instanceof File) {
+            console.log('Appending file:', key, value);
             formData.append(key, value);
           } else if (typeof value === 'string') {
             formData.append(key, value);
           }
         }
       }
+    }
+
+    // Debug: Log FormData contents
+    console.log('FormData contents:');
+    for (let pair of formData.entries()) {
+      console.log(pair[0], pair[1]);
     }
 
     try {

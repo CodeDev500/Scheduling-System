@@ -40,6 +40,7 @@ import {
 } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
 import { useToast } from '@/hooks/useToast';
+import { Eye } from 'lucide-react';
 
 // Import extracted components
 import { ScheduleHeader } from './components/ScheduleHeader';
@@ -98,6 +99,8 @@ const formatTimeRange = (startTime: string, endTime: string): string => {
 };
 
 const ScheduleGeneration: React.FC = () => {
+  const [viewScheduleItem, setViewScheduleItem] = useState<Schedule | null>(null);
+  const [showViewModal, setShowViewModal] = useState(false);
   // Redux hooks
   const dispatch = useAppDispatch();
   const { academicPrograms, isLoading: programsLoading, error: programsError } = useAppSelector((state) => state.academicProgram);
@@ -578,234 +581,143 @@ const SortableItem = ({ id, children }: { id: string; children: React.ReactNode 
                 <table className="w-full">
                   <thead className="bg-gradient-to-r from-gray-50 to-gray-100 border-b border-gray-200">
                     <tr>
+                      {/* Subject */}
                       <th className="px-6 py-4 text-left text-xs font-bold text-gray-700 uppercase tracking-wider">
                         <div className="flex items-center space-x-2">
                           <BookOpen className="h-4 w-4 text-blue-600" />
-                          <span>Subject Code</span>
+                          <span>Subject</span>
                         </div>
                       </th>
+                      {/* Schedule */}
                       <th className="px-6 py-4 text-left text-xs font-bold text-gray-700 uppercase tracking-wider">
                         <div className="flex items-center space-x-2">
-                          <BookOpen className="h-4 w-4 text-blue-600" />
-                          <span>Subject Name</span>
+                          <Clock className="h-4 w-4 text-blue-500" />
+                          <span>Schedule</span>
                         </div>
                       </th>
-                      
-                      <th className="px-6 py-4 text-left text-xs font-bold text-gray-700 uppercase tracking-wider">
-                        <div className="flex items-center space-x-2">
-                          <Clock className="h-4 w-4 text-orange-500" />
-                          <span>Time</span>
-                        </div>
-                      </th>
-                      <th className="px-6 py-4 text-left text-xs font-bold text-gray-700 uppercase tracking-wider">
-                        <div className="flex items-center space-x-2">
-                          <Grid className="h-4 w-4 text-orange-500" />
-                          <span>Day</span>
-                        </div>
-                      </th>
+                      {/* Room */}
                       <th className="px-6 py-4 text-left text-xs font-bold text-gray-700 uppercase tracking-wider">
                         <div className="flex items-center space-x-2">
                           <MapPin className="h-4 w-4 text-red-600" />
                           <span>Room</span>
                         </div>
                       </th>
+                      {/* Faculty */}
                       <th className="px-6 py-4 text-left text-xs font-bold text-gray-700 uppercase tracking-wider">
                         <div className="flex items-center space-x-2">
                           <User className="h-4 w-4 text-green-600" />
                           <span>Faculty</span>
                         </div>
                       </th>
-                      <th className="px-6 py-4 text-left text-xs font-bold text-gray-700 uppercase tracking-wider">
-                        <div className="flex items-center space-x-2">
-                          <Users className="h-4 w-4 text-indigo-600" />
-                          <span>Faculty Load</span>
-                        </div>
-                      </th>
+                      {/* Program */}
                       <th className="px-6 py-4 text-left text-xs font-bold text-gray-700 uppercase tracking-wider">
                         <div className="flex items-center space-x-2">
                           <GraduationCap className="h-4 w-4 text-purple-600" />
                           <span>Program</span>
                         </div>
                       </th>
-                      <th className="px-6 py-4 text-left text-xs font-bold text-gray-700 uppercase tracking-wider">
-                        <div className="flex items-center space-x-2">
-                          <Award className="h-4 w-4 text-blue-500" />
-                          <span>Lec</span>
-                        </div>
-                      </th>
-                      <th className="px-6 py-4 text-left text-xs font-bold text-gray-700 uppercase tracking-wider">
-                        <div className="flex items-center space-x-2">
-                          <Award className="h-4 w-4 text-purple-500" />
-                          <span>Lab</span>
-                        </div>
-                      </th>
+                      {/* Units */}
                       <th className="px-6 py-4 text-left text-xs font-bold text-gray-700 uppercase tracking-wider">
                         <div className="flex items-center space-x-2">
                           <Award className="h-4 w-4 text-yellow-500" />
-                          <span>Total Units</span>
+                          <span>Units</span>
                         </div>
                       </th>
+                      {/* Actions */}
                       <th className="px-6 py-4 text-left text-xs font-bold text-gray-700 uppercase tracking-wider">
                         <div className="flex items-center space-x-2">
-                          <Clock className="h-4 w-4 text-green-500" />
-                          <span>Hours/Week</span>
+                          <Eye className="h-4 w-4 text-blue-500" />
+                          <span>Actions</span>
                         </div>
                       </th>
-                      {/* <th className="px-6 py-4 text-left text-xs font-bold text-gray-700 uppercase tracking-wider">
-                        <div className="flex items-center space-x-2">
-                          <AlertTriangle className="h-4 w-4 text-red-500" />
-                          <span>Status</span>
-                        </div>
-                      </th> */}
                     </tr>
                   </thead>
                   <tbody className="bg-white divide-y divide-gray-100">
                     {filteredSchedules.map((subject, index) => {
                       return (
                         <React.Fragment key={subject.id}>
-                          <tr className={`hover:bg-gradient-to-r hover:from-blue-50 hover:to-indigo-50 transition-all duration-200 cursor-pointer ${
+                          <tr className={`hover:bg-gradient-to-r hover:from-blue-50 hover:to-indigo-50 transition-all duration-200 ${
                             index % 2 === 0 ? 'bg-gray-50/30' : 'bg-white'
-                          }`}                      
-                          >
-                            {/* Subject Code */}
-                            <td className="px-6 py-5 whitespace-nowrap">
-                              <div className="flex items-center space-x-3">
-                                <div>
-                                  <div className="text-sm font-bold text-gray-900">{subject?.subjectCode || 'N/A'}</div>
-                                </div>
+                          }`}>
+                            {/* Subject */}
+                            <td className="px-6 py-5">
+                              <div>
+                                <div className="text-sm font-bold text-gray-900">{subject?.subjectCode || 'N/A'}</div>
+                                <div className="text-xs text-gray-500 truncate max-w-xs">{subject.subjectName}</div>
                               </div>
                             </td>
                             
-                            {/* Subject Name */}
+                            {/* Schedule */}
                             <td className="px-6 py-5 whitespace-nowrap">
                               <div className="space-y-1">
-                                <div className="text-sm font-bold text-gray-900 truncate">{subject.subjectName}</div>
+                                <Badge variant="outline" className="text-xs px-2 py-1 bg-orange-50 text-orange-700 border-orange-200">
+                                  {subject.day || 'N/A'}
+                                </Badge>
+                                <div className="text-xs text-gray-600">
+                                  {formatTimeRange(subject.startTime || 'N/A', subject.endTime || 'N/A')}
+                                </div>
                               </div>
-                            </td>
-                   
-                            {/* Time */}
-                            <td className="px-6 py-5 whitespace-nowrap">
-                              <div className="flex items-center text-sm font-semibold text-gray-900">
-                                <Clock className="w-4 h-4 text-orange-500 mr-2" />
-                                {formatTimeRange(subject.startTime || 'N/A', subject.endTime || 'N/A')}
-                              </div>
-                            </td>
-                            
-                            {/* Day */}
-                            <td className="px-6 py-5 whitespace-nowrap">
-                              <Badge variant="outline" className="text-xs px-2 py-1 bg-orange-50 text-orange-700 border-orange-200">
-                                {subject.day || 'N/A'}
-                              </Badge>
                             </td>
                             
                             {/* Room */}
                             <td className="px-6 py-5 whitespace-nowrap">
-                              <div className="flex items-center space-x-2">
-                                <div className="flex-shrink-0">
-                                  <div className="h-8 w-8 rounded-lg bg-gradient-to-br from-red-400 to-red-600 flex items-center justify-center">
-                                    <MapPin className="h-4 w-4 text-white" />
-                                  </div>
-                                </div>
-                                <div>
-                                  <div className="text-sm font-semibold text-gray-900">{subject.roomName || 'N/A'}</div>
-                                </div>
-                              </div>
+                              <div className="text-sm font-semibold text-gray-900">{subject.roomName || 'N/A'}</div>
                             </td>
                             
                             {/* Faculty */}
                             <td className="px-6 py-5 whitespace-nowrap">
-                              <div className="flex items-center space-x-3">
-                                <div className="flex-shrink-0">
-                                  <div className="h-10 w-10 rounded-full bg-gradient-to-br from-green-400 to-green-600 flex items-center justify-center">
-                                    <User className="h-5 w-5 text-white" />
-                                  </div>
-                                </div>
-                                <div>
-                                  <div className="text-sm font-semibold text-gray-900">{subject.facultyName}</div>
-                                  {/* <div className="text-xs text-gray-500">ID: {subject.facultyId}</div> */}
+                              <div>
+                                <div className="text-sm font-semibold text-gray-900">{subject.facultyName}</div>
+                                <div className="text-xs text-gray-500">
+                                  {(() => {
+                                    const facultyId = subject.facultyId || subject.faculty;
+                                    const assignedUnits = facultyLoads[facultyId] || 0;
+                                    const isOverloaded = assignedUnits > facultyMaxUnits;
+                                    return (
+                                      <span className={isOverloaded ? 'text-red-600 font-medium' : ''}>
+                                        {assignedUnits}/{facultyMaxUnits} units
+                                      </span>
+                                    );
+                                  })()}
                                 </div>
                               </div>
-                            </td>
-                            
-                            {/* Faculty Load */}
-                            <td className="px-6 py-5 whitespace-nowrap">
-                              {(() => {
-                                const facultyId = subject.facultyId || subject.faculty;
-                                const assignedUnits = facultyLoads[facultyId] || 0;
-                                const isOverloaded = assignedUnits > facultyMaxUnits;
-                                
-                                return (
-                                  <div className="flex items-center space-x-2">
-                                    <Badge 
-                                      variant="outline" 
-                                      className={`font-bold text-sm px-3 py-1 ${
-                                        isOverloaded 
-                                          ? 'bg-red-50 text-red-700 border-red-300' 
-                                          : assignedUnits === facultyMaxUnits
-                                          ? 'bg-yellow-50 text-yellow-700 border-yellow-300'
-                                          : 'bg-green-50 text-green-700 border-green-300'
-                                      }`}
-                                    >
-                                      {assignedUnits}/{facultyMaxUnits}
-                                    </Badge>
-                                    {isOverloaded && (
-                                      <div title="Overloaded">
-                                        <AlertTriangle className="h-4 w-4 text-red-500" />
-                                      </div>
-                                    )}
-                                  </div>
-                                );
-                              })()}
                             </td>
                             
                             {/* Program */}
                             <td className="px-6 py-5 whitespace-nowrap">
-                              <div className="space-y-1">
+                              <div>
                                 <div className="text-sm font-semibold text-gray-900">{subject.program}</div>
                                 <div className="text-xs text-gray-500">{subject.yearLevel}</div>
                               </div>
                             </td>
-                             <td className="px-6 py-5 whitespace-nowrap">
-                              <Badge 
-                                variant="outline" 
-                                className="bg-blue-50 text-blue-700 border-blue-300"
-                              >
-                                {subject.lec || 0}
-                              </Badge>
+                            
+                            {/* Units */}
+                            <td className="px-6 py-5 whitespace-nowrap">
+                              <div className="space-y-1">
+                                <Badge variant="outline" className="bg-yellow-50 text-yellow-700 border-yellow-300">
+                                  {subject.units || 0} units
+                                </Badge>
+                                <div className="text-xs text-gray-500">
+                                  Lec: {subject.lec || 0} | Lab: {subject.lab || 0}
+                                </div>
+                              </div>
                             </td>
-                             <td className="px-6 py-5 whitespace-nowrap">
-                              <Badge 
-                                variant="outline" 
-                                className="bg-purple-50 text-purple-700 border-purple-300"
+                            
+                            {/* Actions */}
+                            <td className="px-6 py-5 whitespace-nowrap">
+                              <Button
+                                variant="outline"
+                                size="sm"
+                                onClick={() => {
+                                  setViewScheduleItem(subject);
+                                  setShowViewModal(true);
+                                }}
+                                className="flex items-center gap-2 hover:bg-blue-50"
                               >
-                                {subject.lab || 0}
-                              </Badge>
+                                <Eye className="h-4 w-4" />
+                                View
+                              </Button>
                             </td>
-                             <td className="px-6 py-5 whitespace-nowrap">
-                              <Badge 
-                                variant="outline" 
-                                className="bg-yellow-50 text-yellow-700 border-yellow-300"
-                              >
-                                {subject.units || 0}
-                              </Badge>
-                            </td>
-                             <td className="px-6 py-5 whitespace-nowrap">
-                              <Badge 
-                                variant="outline" 
-                                className="bg-green-50 text-green-700 border-green-300 font-bold"
-                              >
-                                {((subject.lec || 0) * 1) + ((subject.lab || 0) * 3)} hrs
-                              </Badge>
-                            </td>
-                            {/* Status */}
-                            {/* <td className="px-6 py-5 whitespace-nowrap">
-                              <Badge 
-                                variant="outline" 
-                                className={subject.hasConflict ? 'bg-red-50 text-red-700 border-red-300' : 'bg-green-50 text-green-700 border-green-300'}
-                              >
-                                {subject.status || (subject.hasConflict ? 'Conflict' : 'OK')}
-                              </Badge>
-                            </td> */}
                           </tr>
                         </React.Fragment>
                       );
@@ -979,6 +891,177 @@ const SortableItem = ({ id, children }: { id: string; children: React.ReactNode 
                     <p className="text-sm">No suitable faculty found for this subject.</p>
                   </div>
                 )}
+              </div>
+            </DialogContent>
+          </Dialog>
+        )}
+
+        {/* View Schedule Details Modal */}
+        {showViewModal && viewScheduleItem && (
+          <Dialog open={showViewModal} onOpenChange={setShowViewModal}>
+            <DialogContent className="max-w-3xl max-h-[90vh] overflow-y-auto">
+              <DialogHeader>
+                <DialogTitle className="flex items-center gap-3">
+                  <div className="p-2 bg-blue-100 rounded-lg">
+                    <BookOpen className="h-6 w-6 text-blue-600" />
+                  </div>
+                  <div>
+                    <span className="text-xl font-bold">Schedule Details</span>
+                    <p className="text-sm text-gray-500 font-normal">{viewScheduleItem.subjectCode} - {viewScheduleItem.subjectName}</p>
+                  </div>
+                </DialogTitle>
+              </DialogHeader>
+
+              <div className="space-y-6 mt-4">
+                {/* Subject Information */}
+                <div className="bg-gradient-to-r from-blue-50 to-indigo-50 rounded-lg p-4 border border-blue-200">
+                  <h3 className="text-sm font-semibold text-blue-900 mb-3 flex items-center gap-2">
+                    <BookOpen className="h-4 w-4" />
+                    Subject Information
+                  </h3>
+                  <div className="grid grid-cols-2 gap-4">
+                    <div>
+                      <p className="text-xs text-blue-700 font-medium">Subject Code</p>
+                      <p className="text-sm font-semibold text-blue-900">{viewScheduleItem.subjectCode}</p>
+                    </div>
+                    <div>
+                      <p className="text-xs text-blue-700 font-medium">Subject Name</p>
+                      <p className="text-sm font-semibold text-blue-900">{viewScheduleItem.subjectName}</p>
+                    </div>
+                    <div>
+                      <p className="text-xs text-blue-700 font-medium">Program</p>
+                      <p className="text-sm font-semibold text-blue-900">{viewScheduleItem.program}</p>
+                    </div>
+                    <div>
+                      <p className="text-xs text-blue-700 font-medium">Year Level</p>
+                      <p className="text-sm font-semibold text-blue-900">{viewScheduleItem.yearLevel}</p>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Schedule Information */}
+                <div className="bg-gradient-to-r from-green-50 to-emerald-50 rounded-lg p-4 border border-green-200">
+                  <h3 className="text-sm font-semibold text-green-900 mb-3 flex items-center gap-2">
+                    <Clock className="h-4 w-4" />
+                    Schedule Information
+                  </h3>
+                  <div className="grid grid-cols-2 gap-4">
+                    <div>
+                      <p className="text-xs text-green-700 font-medium">Day</p>
+                      <Badge variant="outline" className="mt-1 bg-green-100 text-green-800 border-green-300">
+                        {viewScheduleItem.day}
+                      </Badge>
+                    </div>
+                    <div>
+                      <p className="text-xs text-green-700 font-medium">Time</p>
+                      <p className="text-sm font-semibold text-green-900">
+                        {formatTimeRange(viewScheduleItem.startTime || 'N/A', viewScheduleItem.endTime || 'N/A')}
+                      </p>
+                    </div>
+                    <div>
+                      <p className="text-xs text-green-700 font-medium">Room</p>
+                      <p className="text-sm font-semibold text-green-900">{viewScheduleItem.roomName || 'N/A'}</p>
+                    </div>
+                    <div>
+                      <p className="text-xs text-green-700 font-medium">Semester</p>
+                      <p className="text-sm font-semibold text-green-900">{viewScheduleItem.semester}</p>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Faculty Information */}
+                <div className="bg-gradient-to-r from-purple-50 to-pink-50 rounded-lg p-4 border border-purple-200">
+                  <h3 className="text-sm font-semibold text-purple-900 mb-3 flex items-center gap-2">
+                    <User className="h-4 w-4" />
+                    Faculty Information
+                  </h3>
+                  <div className="grid grid-cols-2 gap-4">
+                    <div>
+                      <p className="text-xs text-purple-700 font-medium">Faculty Name</p>
+                      <p className="text-sm font-semibold text-purple-900">{viewScheduleItem.facultyName}</p>
+                    </div>
+                    <div>
+                      <p className="text-xs text-purple-700 font-medium">Faculty Load</p>
+                      <Badge 
+                        variant="outline" 
+                        className={`mt-1 font-bold ${
+                          (facultyLoads[viewScheduleItem.facultyId || viewScheduleItem.faculty] || 0) > facultyMaxUnits
+                            ? 'bg-red-100 text-red-800 border-red-300' 
+                            : 'bg-green-100 text-green-800 border-green-300'
+                        }`}
+                      >
+                        {facultyLoads[viewScheduleItem.facultyId || viewScheduleItem.faculty] || 0}/{facultyMaxUnits} units
+                      </Badge>
+                    </div>
+                  </div>
+
+                  {/* Faculty Recommendations */}
+                  {viewScheduleItem.recommendedFaculty && viewScheduleItem.recommendedFaculty.length > 0 && (
+                    <div className="mt-4 pt-4 border-t border-purple-200">
+                      <p className="text-xs text-purple-700 font-medium mb-2">Recommended Faculty (Based on Specialization Match)</p>
+                      <div className="space-y-2">
+                        {viewScheduleItem.recommendedFaculty.slice(0, 3).map((faculty: any, index: number) => (
+                          <div key={index} className="flex items-center justify-between bg-white rounded-lg p-3 border border-purple-100">
+                            <div className="flex items-center gap-3">
+                              <div className="w-8 h-8 bg-purple-100 rounded-full flex items-center justify-center">
+                                <User className="h-4 w-4 text-purple-600" />
+                              </div>
+                              <div>
+                                <p className="text-sm font-semibold text-gray-900">
+                                  {faculty.firstname} {faculty.lastname}
+                                </p>
+                                <p className="text-xs text-gray-500">{faculty.email}</p>
+                              </div>
+                            </div>
+                            <Badge variant="secondary" className="bg-green-100 text-green-800">
+                              {Math.round(faculty.matchScore || 0)}% Match
+                            </Badge>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+                </div>
+
+                {/* Units & Load Information */}
+                <div className="bg-gradient-to-r from-yellow-50 to-orange-50 rounded-lg p-4 border border-yellow-200">
+                  <h3 className="text-sm font-semibold text-yellow-900 mb-3 flex items-center gap-2">
+                    <Award className="h-4 w-4" />
+                    Units & Load Information
+                  </h3>
+                  <div className="grid grid-cols-4 gap-4">
+                    <div>
+                      <p className="text-xs text-yellow-700 font-medium">Lecture</p>
+                      <Badge variant="outline" className="mt-1 bg-blue-100 text-blue-800 border-blue-300">
+                        {viewScheduleItem.lec || 0} units
+                      </Badge>
+                    </div>
+                    <div>
+                      <p className="text-xs text-yellow-700 font-medium">Laboratory</p>
+                      <Badge variant="outline" className="mt-1 bg-purple-100 text-purple-800 border-purple-300">
+                        {viewScheduleItem.lab || 0} units
+                      </Badge>
+                    </div>
+                    <div>
+                      <p className="text-xs text-yellow-700 font-medium">Total Units</p>
+                      <Badge variant="outline" className="mt-1 bg-yellow-100 text-yellow-800 border-yellow-300">
+                        {viewScheduleItem.units || 0} units
+                      </Badge>
+                    </div>
+                    <div>
+                      <p className="text-xs text-yellow-700 font-medium">Hours/Week</p>
+                      <Badge variant="outline" className="mt-1 bg-green-100 text-green-800 border-green-300 font-bold">
+                        {((viewScheduleItem.lec || 0) * 1) + ((viewScheduleItem.lab || 0) * 3)} hrs
+                      </Badge>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              <div className="flex justify-end gap-3 mt-6 pt-4 border-t">
+                <Button variant="outline" onClick={() => setShowViewModal(false)}>
+                  Close
+                </Button>
               </div>
             </DialogContent>
           </Dialog>

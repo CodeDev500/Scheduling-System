@@ -2,6 +2,8 @@ import express from "express";
 import * as UserController from "../controllers/user.controller";
 
 const router = express.Router();
+const multer = require("multer");
+const upload = multer({ dest: "./uploads" });
 
 // Get all users
 router.get("/", UserController.getAllUsers);
@@ -21,8 +23,8 @@ router.get("/faculty/department/:department", UserController.getFacultyByDepartm
 // Get instructors
 router.get("/instructor", UserController.getInstructor);
 
-// Update user (including status)
-router.put("/:id", UserController.updateUser);
+// Update user (including status and image)
+router.put("/:id", upload.single("image"), UserController.updateUser);
 
 // Delete user
 router.delete("/:id", UserController.deleteUser);

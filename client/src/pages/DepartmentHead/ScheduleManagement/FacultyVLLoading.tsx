@@ -140,7 +140,7 @@ const FacultyVLLoading: React.FC = () => {
   const [facultySubjectAssignments, setFacultySubjectAssignments] = useState<FacultySubjectAssignment[]>([]);
   const [availableSubjects, setAvailableSubjects] = useState<Subject[]>([]);
   const [isLoadingFacultySubjects, setIsLoadingFacultySubjects] = useState(false);
-
+  const [addSubjectModalOpen, setAddSubjectModalOpen] = useState<boolean>(false);
   const [selectedSubjectToAdd, setSelectedSubjectToAdd] = useState<Subject | null>(null);
   
   // Use local faculty state that can be updated immediately
@@ -1153,60 +1153,53 @@ const FacultyVLLoading: React.FC = () => {
                </CardTitle>
              </CardHeader>
             <CardContent className="p-0">
-              <div className="overflow-x-auto">
-                <div className="flex min-w-[800px]">
-                  {/* Time Column */}
-                  <div className="flex flex-col min-w-[100px] border-r border-gray-300">
-                    {/* Time Header */}
-                    <div className="h-[44px] font-bold text-center bg-gradient-to-r from-blue-600 to-purple-600 text-white border-b border-gray-300 text-sm flex items-center justify-center">
-                      TIME
-                    </div>
-                    {/* Time Slots */}
-                    {timeSlots.map(timeSlot => (
-                      <div key={timeSlot} className="h-[60px] text-xs text-center bg-gradient-to-b from-blue-600 to-purple-600 text-white border-b border-gray-300 flex items-center justify-center font-semibold">
-                        {timeSlot}
-                      </div>
-                    ))}
-                  </div>
-                  
-                  {/* Days Grid */}
-                  <div className="flex-1">
-                    {/* Days Header */}
-                    <div className="grid grid-cols-7 border-b border-gray-300">
+              <div className="overflow-x-auto relative">
+                <table className="min-w-full border-collapse">
+                  <thead>
+                    <tr className="bg-red-800 text-white">
+                      <th className="px-4 py-3 text-center text-xs font-medium uppercase tracking-wider w-20 border-r border-red-700">
+                        TIME
+                      </th>
                       {days.map(day => (
-                        <div key={day} className="h-[44px] font-bold text-center bg-gradient-to-r from-blue-600 to-purple-600 text-white border-r border-blue-700 last:border-r-0 text-sm flex items-center justify-center">
+                        <th key={day} className="px-4 py-3 text-center text-xs font-medium uppercase tracking-wider border-r border-red-700 last:border-r-0">
                           {day.substring(0, 3).toUpperCase()}
-                        </div>
+                        </th>
                       ))}
-                    </div>
-                    
-                    {/* Schedule Grid */}
-                    <div className="relative">
-                      {/* Background grid for time slots */}
-                      {timeSlots.map(timeSlot => (
-                        <div key={timeSlot} className="grid grid-cols-7">
-                          {days.map(day => {
-                            const slot = calendarSlots.find(s => s.time === timeSlot && s.day === day);
-                            const hasSchedule = slot?.schedule;
-                            
-                            return (
-                              <div 
-                                key={`${day}-${timeSlot}`} 
-                                className={`h-[60px] text-xs border-r border-b border-gray-200 transition-colors duration-200 ${
-                                  selectedFaculty && !hasSchedule 
-                                    ? 'cursor-pointer hover:bg-blue-50' 
-                                    : 'hover:bg-gray-50'
-                                }`}
-                                onDragOver={handleDragOver}
-                                onDrop={(e) => handleDrop(e, slot!)}
-                              />
-                            );
-                          })}
-                        </div>
-                      ))}
-                      
-                      {/* Schedule blocks positioned absolutely */}
-                      {calendarSlots.map((slot, index) => {
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {timeSlots.map(timeSlot => (
+                      <tr key={timeSlot} className="border-b border-gray-200">
+                        <td className="px-4 py-2 text-xs text-gray-600 bg-gray-50 font-medium text-center border-r border-gray-300">
+                          {timeSlot}
+                        </td>
+                        {days.map(day => {
+                          const slot = calendarSlots.find(s => s.time === timeSlot && s.day === day);
+                          const hasSchedule = slot?.schedule;
+                          
+                          return (
+                            <td 
+                              key={`${day}-${timeSlot}`} 
+                              className={`p-0 border-r border-gray-200 relative h-16 ${
+                                selectedFaculty && !hasSchedule 
+                                  ? 'cursor-pointer hover:bg-blue-50' 
+                                  : 'hover:bg-gray-50'
+                              }`}
+                              onDragOver={handleDragOver}
+                              onDrop={(e) => handleDrop(e, slot!)}
+                            >
+                              <div className="h-16 w-full"></div>
+                            </td>
+                          );
+                        })}
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+                
+                {/* Schedule blocks positioned absolutely over the table */}
+                <div className="absolute top-0 left-0 w-full h-full pointer-events-none" style={{ paddingTop: '44px', paddingLeft: '80px' }}>
+                  {calendarSlots.map((slot, index) => {
                         if (!slot.schedule || !slot.subject) return null;
                         
                         // Convert time to minutes for calculation
@@ -1230,7 +1223,7 @@ const FacultyVLLoading: React.FC = () => {
                         if (dayIndex < 0 || startHour < 7 || startHour > 20) return null;
                         
                         // Calculate precise positioning
-                        const cellHeight = 60; // Height of each time slot cell
+                        const cellHeight = 64; // Height of each time slot cell (h-16 = 64px)
                         const gridStartTime = 7 * 60; // 7 AM in minutes
                         const pixelsPerMinute = cellHeight / 60;
                         
@@ -1238,15 +1231,20 @@ const FacultyVLLoading: React.FC = () => {
                         const durationMinutes = endTimeMinutes - startTimeMinutes;
                         const blockHeight = durationMinutes * pixelsPerMinute;
                         
+                        // Calculate column width percentage (equal columns)
+                        const columnWidth = 100 / 7;
+                        const leftPosition = dayIndex * columnWidth;
+                        
                         return (
                           <div
                             key={`${slot.schedule.id}-${slot.day}-${index}`}
-                            className="absolute bg-gradient-to-br from-blue-50 to-indigo-100 text-slate-700 rounded-md shadow-lg z-10 border border-blue-200"
+                            className="absolute bg-gradient-to-br from-blue-500 to-indigo-600 text-white rounded-md shadow-lg z-10 border border-blue-300 pointer-events-auto"
                             style={{
                               top: `${topPosition}px`,
-                              left: `${(dayIndex * (100 / 7))}%`,
-                              width: `${(100 / 7)}%`,
-                              height: `${blockHeight}px`
+                              left: `${leftPosition}%`,
+                              width: `${columnWidth}%`,
+                              height: `${blockHeight}px`,
+                              padding: '4px'
                             }}
                           >
                             <div className={`p-2 h-full flex flex-col justify-center relative ${
@@ -1282,8 +1280,6 @@ const FacultyVLLoading: React.FC = () => {
                           </div>
                         );
                       })}
-                    </div>
-                  </div>
                 </div>
               </div>
             </CardContent>

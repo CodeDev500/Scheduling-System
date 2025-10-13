@@ -18,7 +18,7 @@ const NavDashboard: React.FC<NavDashboardProps> = ({ handleBurger }) => {
   const [unread, setUnread] = useState(2);
   const [showProfile, setShowProfile] = useState(false);
   
-  const profilePic = userData?.image ? `${api.defaults.baseURL}/uploads/${userData.image}` : userIcon;
+  const profilePic = userData?.image ? `${api.defaults.baseURL}/${userData.image}` : userIcon;
 
   const pageTitles: { [key: string]: string } = {
     "/dashboard": "Dashboard",
