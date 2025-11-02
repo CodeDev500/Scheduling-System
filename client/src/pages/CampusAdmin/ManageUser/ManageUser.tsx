@@ -7,7 +7,8 @@ import InputField from '../../../components/input_field/InputField';
 import SelectField from '../../../components/input_field/SelectField';
 import MultiSelectField from '../../../components/input_field/MultiSelectField';
 import Button from '../../../components/buttons/Button';
-import { designationList, program, specializationOptions } from '../../../constants/constants';
+import { designationList, program } from '../../../constants/constants';
+import { useSpecializations } from '../../../hooks/useSpecializations';
 
 interface User {
   id: number;
@@ -26,6 +27,7 @@ interface User {
 }
 
 const ManageUser = () => {
+  const { specializations } = useSpecializations(true);
   const [users, setUsers] = useState<User[]>([]);
   const [searchTerm, setSearchTerm] = useState('');
   const [showAddModal, setShowAddModal] = useState(false);
@@ -478,7 +480,7 @@ const ManageUser = () => {
                     value={selectedUser.specialization ? (Array.isArray(selectedUser.specialization) ? selectedUser.specialization : []) : []}
                     onChange={(name, value) => setSelectedUser({...selectedUser, specialization: value})}
                     placeholder="Select areas of specialization..."
-                    options={specializationOptions.map((spec) => ({
+                    options={specializations.map((spec) => ({
                       value: spec,
                       label: spec,
                     }))}

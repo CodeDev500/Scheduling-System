@@ -55,8 +55,9 @@ const Login: React.FC<LoginProps> = ({
       }, 500);
     } catch (err) {
       toast.error(err as string);
-      setLoading(false);
       console.error("Login failed:", err);
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -71,7 +72,7 @@ const Login: React.FC<LoginProps> = ({
             aria-hidden={!isOpen}
             tabIndex={-1}
           >
-            <div className="relative p-4 w-full max-w-md">
+            <div className="relative p-4 w-full max-w-lg">
               <div className="relative bg-white rounded-lg shadow ">
                 {/* Header */}
                 <div className="flex items-center justify-between p-4 md:p-5 border-b rounded-t border-gray-200 ">

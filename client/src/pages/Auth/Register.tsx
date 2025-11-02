@@ -7,8 +7,8 @@ import {
   designationList,
   UserStatuses,
   program,
-  specializationOptions,
 } from "../../constants/constants";
+import { useSpecializations } from "../../hooks/useSpecializations";
 import { register, clearRegisterError } from "../../services/authSlice";
 import { useAppDispatch, useAppSelector } from "../../hooks/redux";
 import Profile from "../../components/profile_image/Profile";
@@ -27,6 +27,7 @@ const Register: React.FC<RegisterProps> = ({
   toggleLoginModal,
 }) => {
   const toast = useToast();
+  const { specializations } = useSpecializations(true);
   const [imagePreview, setImagePreview] = useState<string>("");
   const [showOTPModal, setShowOTPModal] = useState(false);
   const [loading, setLoading] = useState(false);
@@ -44,17 +45,15 @@ const Register: React.FC<RegisterProps> = ({
     confirmPassword: "",
     role: "",
     status: UserStatuses[0],
+    // New faculty fields
+    previousSubjects: [] as string[],
+    yearsOfExperience: 0,
+    preferredTimeSlots: [] as string[],
+    availableDays: [] as string[],
   });
 
   const dispatch = useAppDispatch();
   const error = useAppSelector((state) => state.auth.registerError);
-
-  useEffect(() => {
-    return () => {
-      dispatch(clearRegisterError());
-      if (imagePreview) URL.revokeObjectURL(imagePreview);
-    };
-  }, [dispatch, imagePreview]);
 
   const handleChange = (
     e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>
@@ -79,59 +78,64 @@ const Register: React.FC<RegisterProps> = ({
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    
+    // Clear any previous errors
+    if (error) {
+      dispatch(clearRegisterError());
+    }
 
     setLoading(true);
     const formData = new FormData();
     for (const key in form) {
       const value = form[key as keyof typeof form];
       if (value !== null) {
-        if (key === 'specialization' && Array.isArray(value)) {
+        if (Array.isArray(value)) {
           // Handle array fields by converting to JSON string
           formData.append(key, JSON.stringify(value));
-        } else {
-          if (value instanceof File) {
-            console.log('Appending file:', key, value);
-            formData.append(key, value);
-          } else if (typeof value === 'string') {
-            formData.append(key, value);
-          }
+        } else if (value instanceof File) {
+          formData.append(key, value);
+        } else if (typeof value === 'string') {
+          formData.append(key, value);
+        } else if (typeof value === 'number') {
+          formData.append(key, value.toString());
         }
       }
     }
 
-    // Debug: Log FormData contents
-    console.log('FormData contents:');
-    for (let pair of formData.entries()) {
-      console.log(pair[0], pair[1]);
-    }
-
     try {
-      await dispatch(register(formData)).unwrap();
-      toast.success(`OTP sent to ${form.email}`);
+      const res = await dispatch(register(formData)).unwrap();
+      toast.success(res.message || "OTP sent to your email!");
       setShowOTPModal(true);
+      // Clear any remaining errors on success
+      dispatch(clearRegisterError());
     } catch (err) {
-      setLoading(false);
       toast.error(err as string);
       console.error("Registration failed:", err);
+      // Don't reset form - keep user's data for correction
+    } finally {
+      setLoading(false);
     }
   };
 
-  if (!isOpen) return null;
-
   return (
     <>
+      {/* OTP Modal - Shows on top of register modal */}
       {showOTPModal ? (
         <VerifyOTP
           closeOTP={() => {
-            closeModal();
             setShowOTPModal(false);
+            closeModal();
           }}
           email={form.email}
-          closeModal={closeModal}
+          closeModal={() => {
+            setShowOTPModal(false);
+            closeModal();
+          }}
         />
-      ) : (
+        )
+      : isOpen ? (
         <div className="fixed inset-0 z-50 overflow-y-auto flex justify-center items-center bg-black/40">
-          <div className="absolute top-2 p-4 w-full max-w-xl">
+          <div className="absolute top-2 p-4 w-full max-w-2xl">
             <div className="relative bg-white rounded-lg shadow">
               {/* Header */}
               <div className="flex items-center justify-between p-4 md:p-5 border-b rounded-t border-gray-200">
@@ -262,10 +266,114 @@ const Register: React.FC<RegisterProps> = ({
                     onChange={handleMultiSelectChange}
                     error={error?.specialization?.[0] || ""}
                     placeholder="Select your areas of specialization..."
-                    options={specializationOptions.map((spec) => ({
+                    options={specializations.length > 0 ? specializations.map((spec) => ({
                       value: spec,
                       label: spec,
-                    }))}
+                    })) : []}
+                  />
+
+                  {/* Faculty Availability Fields - Always show */}
+                  <div className="w-full m-0 flex sm:flex-row flex-col items-center justify-center sm:gap-2">
+                    <div className="w-full">
+                      <InputField
+                        label="Years of Experience"
+                        id="yearsOfExperience"
+                        name="yearsOfExperience"
+                        type="number"
+                        value={form.yearsOfExperience}
+                        onChange={(e) => setForm(prev => ({ ...prev, yearsOfExperience: parseInt(e.target.value) || 0 }))}
+                        placeholder="0"
+                        error={error?.yearsOfExperience?.[0] || ""}
+                      />
+                    </div>
+                  </div>
+
+                  <div className="space-y-2">
+                    <label className="block text-sm font-medium text-gray-700">
+                      Preferred Time Range (7:00 AM - 7:00 PM)
+                    </label>
+                    <div className="flex gap-2 items-center">
+                      <div className="flex-1">
+                        <label className="block text-xs text-gray-500 mb-1">Start Time</label>
+                        <input
+                          type="time"
+                          min="07:00"
+                          max="19:00"
+                          className="w-full px-3 text-gray-700 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                          onChange={(e) => {
+                            const timeSlots = form.preferredTimeSlots.filter(slot => !slot.includes('start:'));
+                            setForm(prev => ({ 
+                              ...prev, 
+                              preferredTimeSlots: [...timeSlots, `start:${e.target.value}`]
+                            }));
+                          }}
+                        />
+                      </div>
+                      <span className="text-gray-500 mt-6">to</span>
+                      <div className="flex-1">
+                        <label className="block text-xs text-gray-500 mb-1">End Time</label>
+                        <input
+                          type="time"
+                          min="07:00"
+                          max="19:00"
+                          className="w-full px-3 text-gray-700 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                          onChange={(e) => {
+                            const timeSlots = form.preferredTimeSlots.filter(slot => !slot.includes('end:'));
+                            setForm(prev => ({ 
+                              ...prev, 
+                              preferredTimeSlots: [...timeSlots, `end:${e.target.value}`]
+                            }));
+                          }}
+                        />
+                      </div>
+                    </div>
+                    <p className="text-xs text-gray-500 mt-1">
+                      Set your preferred teaching hours (e.g., 8:00 AM to 5:00 PM)
+                    </p>
+                    {error?.preferredTimeSlots?.[0] && (
+                      <p className="text-xs text-red-500 mt-1">{error.preferredTimeSlots[0]}</p>
+                    )}
+                  </div>
+
+                  <MultiSelectField
+                    label="Available Days"
+                    id="availableDays"
+                    name="availableDays"
+                    value={form.availableDays}
+                    onChange={handleMultiSelectChange}
+                    error={error?.availableDays?.[0] || ""}
+                    placeholder="Select days you are available to teach..."
+                    options={[
+                      { value: "Monday", label: "Monday" },
+                      { value: "Tuesday", label: "Tuesday" },
+                      { value: "Wednesday", label: "Wednesday" },
+                      { value: "Thursday", label: "Thursday" },
+                      { value: "Friday", label: "Friday" },
+                      { value: "Saturday", label: "Saturday" },
+                      { value: "Sunday", label: "Sunday" },
+                    ]}
+                  />
+
+                  <MultiSelectField
+                    label="Previous Subjects Taught"
+                    id="previousSubjects"
+                    name="previousSubjects"
+                    value={form.previousSubjects}
+                    onChange={handleMultiSelectChange}
+                    error={error?.previousSubjects?.[0] || ""}
+                    placeholder="Select subjects you have previously taught..."
+                    options={[
+                      { value: "Programming", label: "Programming" },
+                      { value: "Database Systems", label: "Database Systems" },
+                      { value: "Web Development", label: "Web Development" },
+                      { value: "Data Structures", label: "Data Structures" },
+                      { value: "Algorithms", label: "Algorithms" },
+                      { value: "Computer Networks", label: "Computer Networks" },
+                      { value: "Operating Systems", label: "Operating Systems" },
+                      { value: "Software Engineering", label: "Software Engineering" },
+                      { value: "Mathematics", label: "Mathematics" },
+                      { value: "Statistics", label: "Statistics" },
+                    ]}
                   />
 
                   <InputField
@@ -296,7 +404,7 @@ const Register: React.FC<RegisterProps> = ({
                     className="w-full"
                     isLoading={loading}
                     disabled={loading}
-                    onClick={handleSubmit}
+                    // onClick={handleSubmit}
                   />
 
                   <div className="text-sm font-medium text-gray-500 text-center">
@@ -314,7 +422,7 @@ const Register: React.FC<RegisterProps> = ({
             </div>
           </div>
         </div>
-      )}
+      ) : null}
     </>
   );
 };

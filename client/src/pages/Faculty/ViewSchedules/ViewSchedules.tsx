@@ -1,6 +1,9 @@
 import React, { useState, useEffect } from "react";
 import { Search, Filter, Calendar, Clock, MapPin, User, Download, Eye, ChevronLeft, ChevronRight } from "lucide-react";
 import DashboardHeader from "../../../components/dashboard/DashboardHeader";
+import { useAppSelector } from "../../../hooks/redux";
+import api from "../../../api/axios";
+import { useToast } from "../../../hooks/useToast";
 
 interface Schedule {
   id: string;
@@ -23,120 +26,72 @@ interface Schedule {
 const ViewSchedules: React.FC = () => {
   const [schedules, setSchedules] = useState<Schedule[]>([]);
   const [searchTerm, setSearchTerm] = useState("");
+  const [filterCurriculumYear, setFilterCurriculumYear] = useState("all");
   const [filterSemester, setFilterSemester] = useState("all");
   const [filterDay, setFilterDay] = useState("all");
   const [filterStatus, setFilterStatus] = useState("all");
   const [viewMode, setViewMode] = useState<'list' | 'calendar'>('list');
   const [currentWeek, setCurrentWeek] = useState(new Date());
+  const [isLoading, setIsLoading] = useState(false);
+  const [curriculumYears, setCurriculumYears] = useState<string[]>([]);
+  
+  const user = useAppSelector((state) => state.auth.user);
+  const toast = useToast();
 
-  // Mock data for faculty schedules
+  // Fetch faculty schedules from API
   useEffect(() => {
-    const mockSchedules: Schedule[] = [
-      {
-        id: "1",
-        subject: "Data Structures and Algorithms",
-        code: "CS201",
-        room: "Room 301",
-        startTime: "08:00",
-        endTime: "10:00",
-        day: "Monday",
-        semester: "1st Semester",
-        academicYear: "2024-2025",
-        program: "Computer Science",
-        yearLevel: "2nd Year",
-        section: "A",
-        status: "Active",
-        students: 35,
-        maxStudents: 40
-      },
-      {
-        id: "2",
-        subject: "Database Management Systems",
-        code: "CS301",
-        room: "Room 205",
-        startTime: "10:30",
-        endTime: "12:30",
-        day: "Monday",
-        semester: "1st Semester",
-        academicYear: "2024-2025",
-        program: "Computer Science",
-        yearLevel: "3rd Year",
-        section: "B",
-        status: "Active",
-        students: 28,
-        maxStudents: 35
-      },
-      {
-        id: "3",
-        subject: "Web Development",
-        code: "CS202",
-        room: "Lab 101",
-        startTime: "14:00",
-        endTime: "17:00",
-        day: "Tuesday",
-        semester: "1st Semester",
-        academicYear: "2024-2025",
-        program: "Computer Science",
-        yearLevel: "2nd Year",
-        section: "A",
-        status: "Active",
-        students: 32,
-        maxStudents: 40
-      },
-      {
-        id: "4",
-        subject: "Software Engineering",
-        code: "CS401",
-        room: "Room 302",
-        startTime: "08:00",
-        endTime: "11:00",
-        day: "Wednesday",
-        semester: "1st Semester",
-        academicYear: "2024-2025",
-        program: "Computer Science",
-        yearLevel: "4th Year",
-        section: "A",
-        status: "Active",
-        students: 25,
-        maxStudents: 30
-      },
-      {
-        id: "5",
-        subject: "Computer Networks",
-        code: "CS302",
-        room: "Room 203",
-        startTime: "13:00",
-        endTime: "16:00",
-        day: "Thursday",
-        semester: "1st Semester",
-        academicYear: "2024-2025",
-        program: "Computer Science",
-        yearLevel: "3rd Year",
-        section: "A",
-        status: "Active",
-        students: 30,
-        maxStudents: 35
-      },
-      {
-        id: "6",
-        subject: "Programming Fundamentals",
-        code: "CS101",
-        room: "Lab 102",
-        startTime: "09:00",
-        endTime: "12:00",
-        day: "Friday",
-        semester: "1st Semester",
-        academicYear: "2024-2025",
-        program: "Computer Science",
-        yearLevel: "1st Year",
-        section: "B",
-        status: "Active",
-        students: 38,
-        maxStudents: 40
+    const fetchSchedules = async () => {
+      if (!user?.id) return;
+      
+      setIsLoading(true);
+      try {
+        // Get faculty with teaching load
+        const response = await api.get(`/user/faculty/${user.id}`);
+        const facultyData = response.data;
+
+        // Fetch all schedules
+        const schedulesResponse = await api.get('/schedules/latest');
+        const allSchedules = schedulesResponse.data?.scheduleItems || [];
+
+        // Filter schedules for this faculty only
+        const facultySchedules = allSchedules.filter(
+          (schedule: any) => String(schedule.facultyId) === String(user.id)
+        );
+        
+        // Transform to match Schedule interface
+        const transformedSchedules = facultySchedules.map((schedule: any) => ({
+          id: schedule.id.toString(),
+          subject: schedule.subjectName || schedule.subject,
+          code: schedule.subjectCode,
+          room: schedule.roomName || schedule.room,
+          startTime: schedule.startTime,
+          endTime: schedule.endTime,
+          day: schedule.day,
+          semester: schedule.semester,
+          academicYear: schedule.academicYear,
+          program: schedule.program,
+          yearLevel: schedule.yearLevel,
+          section: schedule.section || 'A',
+          status: 'Active' as const,
+          students: schedule.enrolledStudents || 0,
+          maxStudents: schedule.maxStudents || 30
+        }));
+        
+        setSchedules(transformedSchedules);
+        
+        // Extract unique curriculum years
+        const years = Array.from(new Set(transformedSchedules.map((s: Schedule) => s.academicYear))).filter((y): y is string => !!y);
+        setCurriculumYears(years.sort().reverse());
+      } catch (error) {
+        console.error('Error fetching schedules:', error);
+        toast.error('Failed to load schedules');
+      } finally {
+        setIsLoading(false);
       }
-    ];
-    setSchedules(mockSchedules);
-  }, []);
+    };
+    
+    fetchSchedules();
+  }, [user?.id, toast]);
 
   // Filter schedules based on search and filters
   const filteredSchedules = schedules.filter(schedule => {
@@ -146,11 +101,12 @@ const ViewSchedules: React.FC = () => {
       schedule.room.toLowerCase().includes(searchTerm.toLowerCase()) ||
       schedule.section.toLowerCase().includes(searchTerm.toLowerCase());
     
+    const matchesCurriculumYear = filterCurriculumYear === "all" || schedule.academicYear === filterCurriculumYear;
     const matchesSemester = filterSemester === "all" || schedule.semester === filterSemester;
     const matchesDay = filterDay === "all" || schedule.day === filterDay;
     const matchesStatus = filterStatus === "all" || schedule.status === filterStatus;
     
-    return matchesSearch && matchesSemester && matchesDay && matchesStatus;
+    return matchesSearch && matchesCurriculumYear && matchesSemester && matchesDay && matchesStatus;
   });
 
   // Get current week dates
@@ -204,10 +160,9 @@ const ViewSchedules: React.FC = () => {
         title="My Schedules" 
         subtitle="View and manage your teaching schedules"
       />
-
       {/* Filters and Search */}
-      <div className="bg-white rounded-lg shadow-sm p-6 mb-6">
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-6 gap-4">
+      <div className="bg-white rounded-lg shadow mb-6 p-6">
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-7 gap-4">
           {/* Search */}
           <div className="lg:col-span-2">
             <div className="relative">
@@ -215,17 +170,29 @@ const ViewSchedules: React.FC = () => {
               <input
                 type="text"
                 placeholder="Search by subject, code, or room..."
-                className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-red-800 focus:border-transparent"
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
               />
             </div>
           </div>
-
+          {/* Curriculum Year Filter */}
+          <div>
+            <select
+              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-red-800 focus:border-transparent"
+              value={filterCurriculumYear}
+              onChange={(e) => setFilterCurriculumYear(e.target.value)}
+            >
+              <option value="all">All Years</option>
+              {curriculumYears.map(year => (
+                <option key={year} value={year}>{year}</option>
+              ))}
+            </select>
+          </div>
           {/* Semester Filter */}
           <div>
             <select
-              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-red-800 focus:border-transparent"
               value={filterSemester}
               onChange={(e) => setFilterSemester(e.target.value)}
             >
@@ -235,11 +202,10 @@ const ViewSchedules: React.FC = () => {
               <option value="Summer">Summer</option>
             </select>
           </div>
-
           {/* Day Filter */}
           <div>
             <select
-              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-red-800 focus:border-transparent"
               value={filterDay}
               onChange={(e) => setFilterDay(e.target.value)}
             >
@@ -253,11 +219,10 @@ const ViewSchedules: React.FC = () => {
               <option value="Sunday">Sunday</option>
             </select>
           </div>
-
           {/* Status Filter */}
           <div>
             <select
-              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-red-800 focus:border-transparent"
               value={filterStatus}
               onChange={(e) => setFilterStatus(e.target.value)}
             >
@@ -267,47 +232,36 @@ const ViewSchedules: React.FC = () => {
               <option value="Cancelled">Cancelled</option>
             </select>
           </div>
-
           {/* View Mode Toggle */}
           <div className="flex rounded-lg border border-gray-300 overflow-hidden">
             <button
               onClick={() => setViewMode('list')}
-              className={`flex-1 px-3 py-2 text-sm font-medium ${
-                viewMode === 'list'
-                  ? 'bg-blue-500 text-white'
-                  : 'bg-white text-gray-700 hover:bg-gray-50'
-              }`}
+              className={`flex-1 px-3 py-2 text-sm font-medium ${viewMode === 'list' ? 'bg-red-800 text-white' : 'bg-white text-gray-700 hover:bg-gray-50'}`}
             >
               List
             </button>
             <button
               onClick={() => setViewMode('calendar')}
-              className={`flex-1 px-3 py-2 text-sm font-medium ${
-                viewMode === 'calendar'
-                  ? 'bg-blue-500 text-white'
-                  : 'bg-white text-gray-700 hover:bg-gray-50'
-              }`}
+              className={`flex-1 px-3 py-2 text-sm font-medium ${viewMode === 'calendar' ? 'bg-red-800 text-white' : 'bg-white text-gray-700 hover:bg-gray-50'}`}
             >
               Calendar
             </button>
           </div>
         </div>
       </div>
-
       {/* Content */}
       {viewMode === 'list' ? (
         /* List View */
-        <div className="bg-white rounded-lg shadow-sm overflow-hidden">
+        <div className="bg-white rounded-lg shadow overflow-hidden">
           <div className="p-6 border-b border-gray-200">
             <div className="flex justify-between items-center">
               <h3 className="text-lg font-semibold text-gray-800">Schedule List</h3>
-              <button className="flex items-center px-4 py-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600 transition-colors">
+              <button className="flex items-center px-4 py-2 bg-red-800 text-white rounded-lg hover:bg-red-900 transition-colors">
                 <Download className="w-4 h-4 mr-2" />
                 Export
               </button>
             </div>
           </div>
-          
           <div className="overflow-x-auto">
             <table className="w-full">
               <thead className="bg-gray-50 border-b border-gray-200">
@@ -362,7 +316,7 @@ const ViewSchedules: React.FC = () => {
                       </span>
                     </td>
                     <td className="px-6 py-4">
-                      <button className="text-blue-600 hover:text-blue-800 text-sm font-medium">
+                      <button className="text-red-800 hover:text-red-900 text-sm font-medium">
                         <Eye className="w-4 h-4" />
                       </button>
                     </td>
@@ -371,22 +325,26 @@ const ViewSchedules: React.FC = () => {
               </tbody>
             </table>
           </div>
-
-          {filteredSchedules.length === 0 && (
+          {isLoading ? (
+            <div className="text-center py-12">
+              <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-red-800 mx-auto"></div>
+              <p className="mt-4 text-sm text-gray-500">Loading schedules...</p>
+            </div>
+          ) : filteredSchedules.length === 0 ? (
             <div className="text-center py-12">
               <Calendar className="mx-auto h-12 w-12 text-gray-400" />
               <h3 className="mt-2 text-sm font-medium text-gray-900">No schedules found</h3>
               <p className="mt-1 text-sm text-gray-500">
-                {searchTerm || filterSemester !== 'all' || filterDay !== 'all' || filterStatus !== 'all'
+                {searchTerm || filterCurriculumYear !== 'all' || filterSemester !== 'all' || filterDay !== 'all' || filterStatus !== 'all'
                   ? 'Try adjusting your search or filters.'
                   : 'No schedules available.'}
               </p>
             </div>
-          )}
+          ) : null}
         </div>
       ) : (
         /* Calendar View */
-        <div className="bg-white rounded-lg shadow-sm overflow-hidden">
+        <div className="bg-white rounded-lg shadow overflow-hidden">
           <div className="p-6 border-b border-gray-200">
             <div className="flex justify-between items-center">
               <h3 className="text-lg font-semibold text-gray-800">Weekly Schedule</h3>
@@ -408,52 +366,54 @@ const ViewSchedules: React.FC = () => {
                     <ChevronRight className="w-5 h-5" />
                   </button>
                 </div>
-                <button className="flex items-center px-4 py-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600 transition-colors">
+                <button className="flex items-center px-4 py-2 bg-red-800 text-white rounded-lg hover:bg-red-900 transition-colors">
                   <Download className="w-4 h-4 mr-2" />
                   Export
                 </button>
               </div>
             </div>
           </div>
-          
           <div className="overflow-x-auto">
-            <table className="w-full">
-              <thead className="bg-gray-50">
-                <tr>
-                  <th className="px-4 py-3 text-left text-sm font-semibold text-gray-700 w-20">Time</th>
+            <table className="min-w-full table-fixed">
+              <colgroup>
+                <col className="w-20" />
+                {dayNames.map((day) => (
+                  <col key={day} style={{ width: `${100 / dayNames.length}%` }} />
+                ))}
+              </colgroup>
+              <thead>
+                <tr className="bg-red-800 text-white">
+                  <th className="px-4 text-nowrap py-3 text-left text-xs font-medium uppercase tracking-wider">
+                    Time
+                  </th>
                   {dayNames.map((day) => (
-                    <th key={day} className="px-4 py-3 text-center text-sm font-semibold text-gray-700">
-                      <div>{day}</div>
-                      <div className="text-xs text-gray-500 font-normal">
-                        {weekDates[dayNames.indexOf(day)]?.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
-                      </div>
+                    <th key={day} className="px-4 text-nowrap py-3 text-center text-xs font-medium uppercase tracking-wider">
+                      {day}
                     </th>
                   ))}
                 </tr>
               </thead>
-              <tbody className="divide-y divide-gray-200">
+              <tbody>
                 {timeSlots.map((time) => (
-                  <tr key={time}>
-                    <td className="px-4 py-3 text-sm font-medium text-gray-700 bg-gray-50">
+                  <tr key={time} className="border-b border-gray-200">
+                    <td className="px-4 text-nowrap py-2 text-xs text-gray-600 bg-gray-50 font-medium h-16">
                       {time}
                     </td>
                     {dayNames.map((day) => {
                       const schedule = getScheduleForDayAndTime(day, time);
                       return (
-                        <td key={`${day}-${time}`} className="px-2 py-3 border-l border-gray-200">
+                        <td key={`${day}-${time}`} className="p-0 border text-nowrap border-gray-200 relative h-16">
                           {schedule && (
-                            <div className="bg-blue-100 border border-blue-200 rounded-lg p-2 text-xs">
-                              <div className="font-semibold text-blue-900 truncate">
-                                {schedule.code}
+                            <div
+                              className="schedule-subject-card text-white text-xs absolute left-0 right-0 top-0 h-16 flex flex-col justify-center items-center rounded"
+                              style={{ backgroundColor: '#991b1b' }}
+                            >
+                              <div className="font-medium text-center">
+                                {schedule.code} - {schedule.subject}
                               </div>
-                              <div className="text-blue-700 truncate">
-                                {schedule.subject}
-                              </div>
-                              <div className="text-blue-600 mt-1">
-                                {schedule.room}
-                              </div>
-                              <div className="text-blue-600">
-                                {schedule.yearLevel}-{schedule.section}
+                              <div className="opacity-75 text-center">{schedule.room}</div>
+                              <div className="opacity-60 mt-1 text-center text-xs">
+                                {schedule.startTime} - {schedule.endTime}
                               </div>
                             </div>
                           )}

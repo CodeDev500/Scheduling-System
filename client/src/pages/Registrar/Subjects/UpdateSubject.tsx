@@ -5,16 +5,18 @@ import { useAppDispatch } from "../../../hooks/redux";
 import { updateSubject } from "../../../services/subjectSlice";
 import { useToast } from "../../../hooks/useToast";
 import MultiSelectField from "../../../components/input_field/MultiSelectField";
-import { specializationOptions } from "../../../constants/constants";
+import { useSpecializations } from "../../../hooks/useSpecializations";
 
 interface UpdateSubjectProps {
   subject: SubjectTypes | null;
   onClose: () => void;
+  onSubjectUpdated: () => void;
 }
 
-const UpdateSubject: FC<UpdateSubjectProps> = ({ subject, onClose }) => {
+const UpdateSubject: FC<UpdateSubjectProps> = ({ subject, onClose, onSubjectUpdated }) => {
   const dispatch = useAppDispatch();
   const toast = useToast();
+  const { specializations } = useSpecializations(true);
 
   const [formData, setFormData] = useState({
     subjectCode: "",
@@ -196,7 +198,7 @@ const UpdateSubject: FC<UpdateSubjectProps> = ({ subject, onClose }) => {
             value={formData.tags || []}
             onChange={handleMultiSelectChange}
             placeholder="Select tags for this subject..."
-            options={specializationOptions.map((spec) => ({
+            options={specializations.map((spec) => ({
               value: spec,
               label: spec,
             }))}

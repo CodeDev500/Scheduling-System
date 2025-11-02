@@ -13,14 +13,17 @@ import {
   X,
   Lock,
   Eye,
-  EyeOff
+  EyeOff,
+  Clock,
+  BookOpen
 } from 'lucide-react';
 import api from '../../api/axios';
 import { useToast } from '../../hooks/useToast';
 import { fetchUser } from '../../services/authSlice';
 import SelectField from '../../components/input_field/SelectField';
 import MultiSelectField from '../../components/input_field/MultiSelectField';
-import { designationList, program, specializationOptions } from '../../constants/constants';
+import { designationList, program } from '../../constants/constants';
+import { useSpecializations } from '../../hooks/useSpecializations';
 
 // Define User type to avoid conflict with Lucide icon
 interface User {
@@ -37,11 +40,16 @@ interface User {
   image?: string;
   createdAt?: Date;
   updatedAt?: Date;
+  yearsOfExperience?: number;
+  previousSubjects?: string[];
+  availableDays?: string[];
+  preferredTimeSlots?: string[];
 }
 
 const UserProfile: React.FC = () => {
   const dispatch = useAppDispatch();
   const toast = useToast();
+  const { specializations } = useSpecializations(true);
   const userData = useAppSelector((state) => state.auth.user);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [user, setUser] = useState<User | null>(null);
@@ -58,7 +66,11 @@ const UserProfile: React.FC = () => {
     email: userData?.email || '',
     designation: userData?.designation || '',
     department: userData?.department || '',
-    specialization: userData?.specialization || []
+    specialization: userData?.specialization || [],
+    yearsOfExperience: userData?.yearsOfExperience || 0,
+    previousSubjects: userData?.previousSubjects || [],
+    availableDays: userData?.availableDays || [],
+    preferredTimeSlots: userData?.preferredTimeSlots || []
   });
 
   // Password change modal state
@@ -91,7 +103,11 @@ const UserProfile: React.FC = () => {
           email: response.data.email || '',
           designation: response.data.designation || '',
           department: response.data.department || '',
-          specialization: response.data.specialization || []
+          specialization: response.data.specialization || [],
+          yearsOfExperience: response.data.yearsOfExperience || 0,
+          previousSubjects: response.data.previousSubjects || [],
+          availableDays: response.data.availableDays || [],
+          preferredTimeSlots: response.data.preferredTimeSlots || []
         });
       } catch (error) {
         console.error('Error fetching user:', error);
@@ -117,7 +133,11 @@ const UserProfile: React.FC = () => {
         email: user.email || '',
         designation: user.designation || '',
         department: user.department || '',
-        specialization: user.specialization || []
+        specialization: user.specialization || [],
+        yearsOfExperience: user.yearsOfExperience || 0,
+        previousSubjects: user.previousSubjects || [],
+        availableDays: user.availableDays || [],
+        preferredTimeSlots: user.preferredTimeSlots || []
       });
     }
   };
@@ -201,7 +221,11 @@ const UserProfile: React.FC = () => {
         email: freshUserData.email || '',
         designation: freshUserData.designation || '',
         department: freshUserData.department || '',
-        specialization: freshUserData.specialization || []
+        specialization: freshUserData.specialization || [],
+        yearsOfExperience: freshUserData.yearsOfExperience || 0,
+        previousSubjects: freshUserData.previousSubjects || [],
+        availableDays: freshUserData.availableDays || [],
+        preferredTimeSlots: freshUserData.preferredTimeSlots || []
       });
     } catch (error: any) {
       console.error('Error updating profile:', error);
@@ -453,7 +477,7 @@ const UserProfile: React.FC = () => {
             </div>
 
             {/* Information Grid */}
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mt-8">
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 mt-8">
               {/* Personal Information */}
               <div className="space-y-6">
                 <h3 className="text-lg font-semibold text-gray-900 border-b pb-2">Personal Information</h3>
@@ -603,7 +627,7 @@ const UserProfile: React.FC = () => {
                         value={editedData.specialization}
                         onChange={handleMultiSelectChange}
                         placeholder="Select your areas of specialization..."
-                        options={specializationOptions.map((spec) => ({
+                        options={specializations.map((spec) => ({
                           value: spec,
                           label: spec,
                         }))}
@@ -630,6 +654,201 @@ const UserProfile: React.FC = () => {
                       </>
                     )}
                   </div>
+
+                  {/* Years of Experience */}
+                  {user.role === 'FACULTY' && (
+                    <div>
+                      <label className="flex items-center text-sm font-medium text-gray-700 mb-2">
+                        <Briefcase className="w-4 h-4 mr-2 text-gray-500" />
+                        Years of Experience
+                      </label>
+                      {isEditing ? (
+                        <input
+                          type="number"
+                          name="yearsOfExperience"
+                          value={editedData.yearsOfExperience || 0}
+                          onChange={handleInputChange}
+                          min="0"
+                          className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-red-500 focus:border-transparent transition-all"
+                        />
+                      ) : (
+                        <p className="text-gray-900 bg-gray-50 px-4 py-2 rounded-lg">{user.yearsOfExperience || 0} years</p>
+                      )}
+                    </div>
+                  )}
+
+                  {/* Preferred Time Slots */}
+                  {user.role === 'FACULTY' && (
+                    <div>
+                      <label className="flex items-center text-sm font-medium text-gray-700 mb-2">
+                        <Clock className="w-4 h-4 mr-2 text-gray-500" />
+                        Preferred Time Slots (7:00 AM - 7:00 PM)
+                      </label>
+                      {isEditing ? (
+                        <div className="flex gap-2 items-center">
+                          <div className="flex-1">
+                            <label className="block text-xs text-gray-500 mb-1">Start Time</label>
+                            <input
+                              type="time"
+                              min="07:00"
+                              max="19:00"
+                              value={(() => {
+                                const slots = editedData.preferredTimeSlots || [];
+                                const startSlot = slots.find((s: string) => s.startsWith('start:'));
+                                return startSlot ? startSlot.replace('start:', '') : '07:00';
+                              })()}
+                              onChange={(e) => {
+                                const timeSlots = (editedData.preferredTimeSlots || []).filter((slot: string) => !slot.includes('start:'));
+                                setEditedData(prev => ({ 
+                                  ...prev, 
+                                  preferredTimeSlots: [...timeSlots, `start:${e.target.value}`]
+                                }));
+                              }}
+                              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-red-500 focus:border-transparent"
+                            />
+                          </div>
+                          <span className="text-gray-500 mt-6">to</span>
+                          <div className="flex-1">
+                            <label className="block text-xs text-gray-500 mb-1">End Time</label>
+                            <input
+                              type="time"
+                              min="07:00"
+                              max="19:00"
+                              value={(() => {
+                                const slots = editedData.preferredTimeSlots || [];
+                                const endSlot = slots.find((s: string) => s.startsWith('end:'));
+                                return endSlot ? endSlot.replace('end:', '') : '19:00';
+                              })()}
+                              onChange={(e) => {
+                                const timeSlots = (editedData.preferredTimeSlots || []).filter((slot: string) => !slot.includes('end:'));
+                                setEditedData(prev => ({ 
+                                  ...prev, 
+                                  preferredTimeSlots: [...timeSlots, `end:${e.target.value}`]
+                                }));
+                              }}
+                              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-red-500 focus:border-transparent"
+                            />
+                          </div>
+                        </div>
+                      ) : (
+                        <div className="bg-gray-50 px-4 py-2 rounded-lg">
+                          {(() => {
+                            const slots = user.preferredTimeSlots || [];
+                            if (Array.isArray(slots) && slots.length > 0) {
+                              let start = '07:00', end = '19:00';
+                              slots.forEach((slot: string) => {
+                                if (slot.startsWith('start:')) start = slot.replace('start:', '');
+                                if (slot.startsWith('end:')) end = slot.replace('end:', '');
+                              });
+                              return (
+                                <span className="inline-flex items-center px-3 py-1 rounded-md text-sm font-medium bg-purple-100 text-purple-800">
+                                  {start} - {end}
+                                </span>
+                              );
+                            }
+                            return <p className="text-gray-900">Not specified</p>;
+                          })()}
+                        </div>
+                      )}
+                    </div>
+                  )}
+
+                  {/* Available Days */}
+                  {user.role === 'FACULTY' && (
+                    <div>
+                      {isEditing ? (
+                        <MultiSelectField
+                          label="Available Days"
+                          id="availableDays"
+                          name="availableDays"
+                          value={editedData.availableDays || []}
+                          onChange={handleMultiSelectChange}
+                          placeholder="Select days you are available to teach..."
+                          options={[
+                            { value: "Monday", label: "Monday" },
+                            { value: "Tuesday", label: "Tuesday" },
+                            { value: "Wednesday", label: "Wednesday" },
+                            { value: "Thursday", label: "Thursday" },
+                            { value: "Friday", label: "Friday" },
+                            { value: "Saturday", label: "Saturday" },
+                            { value: "Sunday", label: "Sunday" },
+                          ]}
+                        />
+                      ) : (
+                        <>
+                          <label className="flex items-center text-sm font-medium text-gray-700 mb-2">
+                            <Calendar className="w-4 h-4 mr-2 text-gray-500" />
+                            Available Days
+                          </label>
+                          <div className="bg-gray-50 px-4 py-2 rounded-lg">
+                            {user.availableDays && user.availableDays.length > 0 ? (
+                              <div className="flex flex-wrap gap-2">
+                                {user.availableDays.map((day, index) => (
+                                  <span key={index} className="inline-flex items-center px-2 py-1 rounded-md text-xs font-medium bg-green-100 text-green-800">
+                                    {day}
+                                  </span>
+                                ))}
+                              </div>
+                            ) : (
+                              <p className="text-gray-900">Not specified</p>
+                            )}
+                          </div>
+                        </>
+                      )}
+                    </div>
+                  )}
+
+                  {/* Previous Subjects */}
+                  {user.role === 'FACULTY' && (
+                    <div>
+                      {isEditing ? (
+                        <MultiSelectField
+                          label="Previous Subjects Taught"
+                          id="previousSubjects"
+                          name="previousSubjects"
+                          value={editedData.previousSubjects || []}
+                          onChange={handleMultiSelectChange}
+                          placeholder="Select subjects you have previously taught..."
+                          options={[
+                            { value: "Programming", label: "Programming" },
+                            { value: "Database Systems", label: "Database Systems" },
+                            { value: "Web Development", label: "Web Development" },
+                            { value: "Data Structures", label: "Data Structures" },
+                            { value: "Algorithms", label: "Algorithms" },
+                            { value: "Computer Networks", label: "Computer Networks" },
+                            { value: "Operating Systems", label: "Operating Systems" },
+                            { value: "Software Engineering", label: "Software Engineering" },
+                            { value: "Mathematics", label: "Mathematics" },
+                            { value: "Physics", label: "Physics" },
+                            { value: "English", label: "English" },
+                            { value: "Artificial Intelligence", label: "Artificial Intelligence" },
+                            { value: "Machine Learning", label: "Machine Learning" },
+                            { value: "Mobile Development", label: "Mobile Development" },
+                          ]}
+                        />
+                      ) : (
+                        <>
+                          <label className="flex items-center text-sm font-medium text-gray-700 mb-2">
+                            <BookOpen className="w-4 h-4 mr-2 text-gray-500" />
+                            Previous Subjects Taught
+                          </label>
+                          <div className="bg-gray-50 px-4 py-2 rounded-lg">
+                            {user.previousSubjects && user.previousSubjects.length > 0 ? (
+                              <div className="flex flex-wrap gap-2">
+                                {user.previousSubjects.map((subject, index) => (
+                                  <span key={index} className="inline-flex items-center px-2 py-1 rounded-md text-xs font-medium bg-blue-100 text-blue-800">
+                                    {subject}
+                                  </span>
+                                ))}
+                              </div>
+                            ) : (
+                              <p className="text-gray-900">Not specified</p>
+                            )}
+                          </div>
+                        </>
+                      )}
+                    </div>
+                  )}
 
                   {/* Role */}
                   <div>
@@ -689,8 +908,8 @@ const UserProfile: React.FC = () => {
 
         {/* Change Password Modal */}
         {showPasswordModal && (
-          <div className="fixed inset-0 bg-gray-900 bg-opacity-50 backdrop-blur-sm flex items-center justify-center p-4 z-50">
-            <div className="bg-white rounded-2xl shadow-2xl max-w-md w-full p-6">
+          <div className="fixed inset-0 bg-black/50 flex items-center justify-center p-4 z-[9999]">
+            <div className="bg-white rounded-2xl shadow-2xl max-w-md w-full p-6 relative z-[10000]">
               <div className="flex items-center justify-between mb-6">
                 <h3 className="text-2xl font-bold text-gray-900 flex items-center">
                   <Lock className="w-6 h-6 mr-2 text-red-800" />

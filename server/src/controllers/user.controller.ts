@@ -110,23 +110,25 @@ export const deleteUser = async (req: Request, res: Response) => {
 // Get faculty with teaching load
 export const getFacultyWithLoad = async (req: Request, res: Response) => {
   try {
+    const { curriculumYear, semester } = req.params;
     const faculty = await UserService.listUsers();
-    const filteredFaculty = faculty.filter(user => user.role === 'FACULTY');
 
     // Get teaching load for each faculty from subject_schedules
     const { db } = await import('../utils/db.server');
     
     // Get max units from TotalUnits table
     const totalUnitsSettings = await db.totalUnits.findFirst();
-    const maxUnits = totalUnitsSettings?.totalUnits || 21;
+    const maxUnits = totalUnitsSettings?.totalUnits;
     
     const facultyWithLoad = await Promise.all(
-      filteredFaculty.map(async (facultyMember) => {
+      faculty.map(async (facultyMember) => {
         // Get all schedules for this faculty
         const schedules = await db.subjectSchedule.findMany({
           where: {
             facultyId: String(facultyMember.id),
             isActive: true,
+            academicYear: String(curriculumYear),
+            semester: String(semester),
           },
         });
 
@@ -155,3 +157,15 @@ export const getFacultyWithLoad = async (req: Request, res: Response) => {
     res.status(500).json({ message: "Internal server error" });
   }
 };
+
+export const getFacultyLoadById = async (req: Request, res: Response) => {
+  try {
+    const { id, curriculumYear, semester } = req.params;
+    // const faculty = await UserService.getFacultyById(parseInt(id));
+    // res.status(200).json(faculty);
+  } catch (error: any) {
+    console.error('Error fetching faculty by ID:', error);
+    res.status(500).json({ message: "Internal server error" });
+  }
+};
+

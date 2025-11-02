@@ -4,7 +4,7 @@ import { Button } from '../../../components/ui/button';
 import { Input } from '../../../components/ui/input';
 import { Label } from '../../../components/ui/label';
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '../../../components/ui/dialog';
-import { Users, Save, Edit, X, Calendar, Plus, Trash2, CheckCircle } from 'lucide-react';
+import { Users, Save, Edit, X, Calendar, Plus, Trash2, CheckCircle, BookOpen, Tag } from 'lucide-react';
 import DashboardHeader from '../../../components/dashboard/DashboardHeader';
 import { toast } from 'react-toastify';
 import api from '../../../api/axios';
@@ -16,6 +16,16 @@ interface FacultyUnitsSettings {
 interface AcademicYear {
   id: number;
   year: string;
+  isActive: boolean;
+  createdAt: string;
+  updatedAt: string;
+}
+
+interface Specialization {
+  id: number;
+  name: string;
+  description?: string;
+  department?: string;
   isActive: boolean;
   createdAt: string;
   updatedAt: string;
@@ -38,10 +48,21 @@ const Settings: React.FC = () => {
   const [showDeleteDialog, setShowDeleteDialog] = useState(false);
   const [yearToDelete, setYearToDelete] = useState<AcademicYear | null>(null);
 
+  // Specialization states
+  const [specializations, setSpecializations] = useState<Specialization[]>([]);
+  const [showAddSpecDialog, setShowAddSpecDialog] = useState(false);
+  const [showEditSpecDialog, setShowEditSpecDialog] = useState(false);
+  const [showDeleteSpecDialog, setShowDeleteSpecDialog] = useState(false);
+  const [specToDelete, setSpecToDelete] = useState<Specialization | null>(null);
+  const [specToEdit, setSpecToEdit] = useState<Specialization | null>(null);
+  const [newSpecialization, setNewSpecialization] = useState({ name: '' });
+  const [editSpecialization, setEditSpecialization] = useState({ name: '' });
+
   // Load settings on component mount
   useEffect(() => {
     loadFacultySettings();
     loadAcademicYears();
+    loadSpecializations();
   }, []);
 
   const loadFacultySettings = async () => {
@@ -170,6 +191,90 @@ const Settings: React.FC = () => {
     }
   };
 
+  // Specialization functions
+  const loadSpecializations = async () => {
+    try {
+      const response = await api.get('/specializations');
+      if (response.data.success) {
+        setSpecializations(response.data.data);
+      }
+    } catch (error) {
+      console.error('Error loading specializations:', error);
+      toast.error('Failed to load specializations');
+    }
+  };
+
+  const handleAddSpecialization = async () => {
+    if (!newSpecialization.name.trim()) {
+      toast.error('Please enter a specialization name');
+      return;
+    }
+
+    try {
+      const response = await api.post('/specializations', { name: newSpecialization.name });
+      if (response.data.success) {
+        toast.success('Specialization added successfully');
+        setNewSpecialization({ name: '' });
+        setShowAddSpecDialog(false);
+        loadSpecializations();
+      }
+    } catch (error: any) {
+      console.error('Error adding specialization:', error);
+      toast.error(error.response?.data?.message || 'Failed to add specialization');
+    }
+  };
+
+  const handleEditSpecialization = async () => {
+    if (!specToEdit || !editSpecialization.name.trim()) {
+      toast.error('Please enter a specialization name');
+      return;
+    }
+
+    try {
+      const response = await api.put(`/specializations/${specToEdit.id}`, { name: editSpecialization.name });
+      if (response.data.success) {
+        toast.success('Specialization updated successfully');
+        setShowEditSpecDialog(false);
+        setSpecToEdit(null);
+        setEditSpecialization({ name: '' });
+        loadSpecializations();
+      }
+    } catch (error: any) {
+      console.error('Error updating specialization:', error);
+      toast.error(error.response?.data?.message || 'Failed to update specialization');
+    }
+  };
+
+  const handleToggleSpecialization = async (id: number) => {
+    try {
+      const response = await api.patch(`/specializations/${id}/toggle`);
+      if (response.data.success) {
+        toast.success(response.data.message);
+        loadSpecializations();
+      }
+    } catch (error) {
+      console.error('Error toggling specialization:', error);
+      toast.error('Failed to toggle specialization status');
+    }
+  };
+
+  const handleDeleteSpecialization = async () => {
+    if (!specToDelete) return;
+
+    try {
+      const response = await api.delete(`/specializations/${specToDelete.id}`);
+      if (response.data.success) {
+        toast.success('Specialization deleted successfully');
+        setShowDeleteSpecDialog(false);
+        setSpecToDelete(null);
+        loadSpecializations();
+      }
+    } catch (error: any) {
+      console.error('Error deleting specialization:', error);
+      toast.error(error.response?.data?.message || 'Failed to delete specialization');
+    }
+  };
+
   return (
     <div className="min-h-screen bg-gray-50 p-6">
       <div className="max-w-7xl mx-auto space-y-6">
@@ -258,7 +363,7 @@ const Settings: React.FC = () => {
         {/* Academic Year Management */}
         <Card>
           <CardHeader>
-            <div className="flex items-center justify-between">
+            <div className="flex items-center justify-between ">
               <div className="flex items-center space-x-2">
                 <Calendar className="h-5 w-5 text-green-600" />
                 <CardTitle>Academic Year Management</CardTitle>
@@ -348,7 +453,7 @@ const Settings: React.FC = () => {
                 Enter the academic year in the format: YYYY-YYYY (e.g., 2024-2025)
               </DialogDescription>
             </DialogHeader>
-            <div className="py-4">
+            <div className="p-4">
               <Label htmlFor="newYear">Academic Year</Label>
               <Input
                 id="newYear"
@@ -397,6 +502,186 @@ const Settings: React.FC = () => {
               <Button 
                 variant="destructive"
                 onClick={handleDeleteYear}
+              >
+                Delete
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
+
+        {/* Specialization Management */}
+        <Card>
+          <CardHeader>
+            <div className="flex items-center justify-between">
+              <div className="flex items-center space-x-2">
+                <BookOpen className="h-5 w-5 text-purple-600" />
+                <CardTitle>Specialization Management</CardTitle>
+              </div>
+              <Button 
+                onClick={() => setShowAddSpecDialog(true)}
+                size="sm"
+              >
+                <Plus className="h-4 w-4 mr-2" />
+                Add Specialization
+              </Button>
+            </div>
+            <CardDescription>
+              Manage faculty specializations. These will be available when registering faculty or adding subjects.
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            <div className="space-y-4">
+              {specializations.length === 0 ? (
+                <div className="text-center py-8 text-gray-500">
+                  <Tag className="h-12 w-12 mx-auto mb-2 text-gray-400" />
+                  <p>No specializations added yet</p>
+                  <p className="text-sm">Click "Add Specialization" to get started</p>
+                </div>
+              ) : (
+                <div className="flex flex-wrap gap-2">
+                  {specializations.map((spec) => (
+                    <div 
+                      key={spec.id}
+                      className={`group relative inline-flex items-center gap-2 px-4 py-2 rounded-full border-2 transition-all duration-200 ${
+                        spec.isActive 
+                          ? 'border-purple-200 bg-purple-50 hover:border-purple-300 hover:bg-purple-100' 
+                          : 'border-gray-200 bg-gray-100 hover:border-gray-300 opacity-60'
+                      }`}
+                    >
+                      <Tag className={`h-4 w-4 ${spec.isActive ? 'text-purple-600' : 'text-gray-400'}`} />
+                      <span className={`text-sm font-medium ${
+                        spec.isActive ? 'text-purple-900' : 'text-gray-500'
+                      }`}>
+                        {spec.name}
+                      </span>
+                      
+                      {/* Hover Actions */}
+                      <div className="absolute -top-2 -right-2 hidden group-hover:flex gap-1 bg-white rounded-lg shadow-lg border border-gray-200 p-1">
+                        <button
+                          onClick={() => {
+                            setSpecToEdit(spec);
+                            setEditSpecialization({ name: spec.name });
+                            setShowEditSpecDialog(true);
+                          }}
+                          className="p-1.5 hover:bg-blue-50 rounded text-blue-600 transition-colors"
+                          title="Edit"
+                        >
+                          <Edit className="h-3.5 w-3.5" />
+                        </button>
+                        <button
+                          onClick={() => {
+                            setSpecToDelete(spec);
+                            setShowDeleteSpecDialog(true);
+                          }}
+                          className="p-1.5 hover:bg-red-50 rounded text-red-600 transition-colors"
+                          title="Delete"
+                        >
+                          <Trash2 className="h-3.5 w-3.5" />
+                        </button>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          </CardContent>
+        </Card>
+
+        {/* Add Specialization Dialog */}
+        <Dialog open={showAddSpecDialog} onOpenChange={setShowAddSpecDialog}>
+          <DialogContent>
+            <DialogHeader>
+              <DialogTitle>Add Specialization</DialogTitle>
+              <DialogDescription>
+                Add a new specialization that faculty can select during registration or when adding subjects.
+              </DialogDescription>
+            </DialogHeader>
+            <div className="p-4">
+              <Label htmlFor="specName">Specialization Name *</Label>
+              <Input
+                id="specName"
+                placeholder="e.g., Web Development"
+                value={newSpecialization.name}
+                onChange={(e) => setNewSpecialization({ name: e.target.value })}
+                onKeyPress={(e) => e.key === 'Enter' && handleAddSpecialization()}
+              />
+            </div>
+            <DialogFooter>
+              <Button 
+                variant="outline" 
+                onClick={() => {
+                  setShowAddSpecDialog(false);
+                  setNewSpecialization({ name: '' });
+                }}
+              >
+                Cancel
+              </Button>
+              <Button onClick={handleAddSpecialization}>
+                Add Specialization
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
+
+        {/* Edit Specialization Dialog */}
+        <Dialog open={showEditSpecDialog} onOpenChange={setShowEditSpecDialog}>
+          <DialogContent>
+            <DialogHeader>
+              <DialogTitle>Edit Specialization</DialogTitle>
+              <DialogDescription>
+                Update the specialization name.
+              </DialogDescription>
+            </DialogHeader>
+            <div className="p-4">
+              <Label htmlFor="editSpecName">Specialization Name *</Label>
+              <Input
+                id="editSpecName"
+                placeholder="e.g., Web Development"
+                value={editSpecialization.name}
+                onChange={(e) => setEditSpecialization({ name: e.target.value })}
+                onKeyPress={(e) => e.key === 'Enter' && handleEditSpecialization()}
+              />
+            </div>
+            <DialogFooter>
+              <Button 
+                variant="outline" 
+                onClick={() => {
+                  setShowEditSpecDialog(false);
+                  setSpecToEdit(null);
+                  setEditSpecialization({ name: '' });
+                }}
+              >
+                Cancel
+              </Button>
+              <Button onClick={handleEditSpecialization}>
+                Update Specialization
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
+
+        {/* Delete Specialization Dialog */}
+        <Dialog open={showDeleteSpecDialog} onOpenChange={setShowDeleteSpecDialog}>
+          <DialogContent>
+            <DialogHeader>
+              <DialogTitle>Delete Specialization</DialogTitle>
+              <DialogDescription>
+                Are you sure you want to delete "{specToDelete?.name}"? This action cannot be undone.
+              </DialogDescription>
+            </DialogHeader>
+            <DialogFooter>
+              <Button 
+                variant="outline" 
+                onClick={() => {
+                  setShowDeleteSpecDialog(false);
+                  setSpecToDelete(null);
+                }}
+              >
+                Cancel
+              </Button>
+              <Button 
+                variant="destructive"
+                onClick={handleDeleteSpecialization}
               >
                 Delete
               </Button>

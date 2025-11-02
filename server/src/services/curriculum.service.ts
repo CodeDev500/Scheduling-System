@@ -189,10 +189,16 @@ export const getCurriculumCoursesByProgramandLevel = async (
       id: course.id,
       code: course.subjectCode ?? "",
       name: course.subjectDescription ?? "",
+      subjectCode: course.subjectCode ?? "",
+      subjectDescription: course.subjectDescription ?? "",
       lec: course.lec ?? 0,
       lab: course.lab ?? 0,
       units: course.units ?? 0,
       hours: course.hours ?? 0,
+      curriculumYear: course.curriculumYear ?? null,
+      programCode: course.programCode ?? null,
+      yearLevel: course.yearLevel ?? null,
+      period: course.period ?? null,
       // Note: tags are no longer available since subject relationship was removed
       // Subject information is now stored directly in curriculum_courses table
       offerings: course.courseOfferings,

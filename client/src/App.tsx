@@ -220,7 +220,7 @@ function App() {
     {
       title: "View Schedules",
       path: "/faculty-schedules",
-      component: <FacultyViewSchedules />
+      component: <TeachingLoad />
     },
     {
       title: "View Teaching Load",

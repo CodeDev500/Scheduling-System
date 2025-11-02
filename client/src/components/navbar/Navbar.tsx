@@ -12,7 +12,6 @@ import api from "../../api/axios";
 
 const Navbar = () => {
   const userData = useAppSelector((state) => state.auth.user);
-  const loading = useAppSelector((state) => state.auth.loading);
   const profilePic = userData?.image ? `${api.defaults.baseURL}/${userData.image}` : userIcon;
 
   const unread = 0;
@@ -42,6 +41,7 @@ const Navbar = () => {
   }, [showProfile]);
 
   const closeModal = () => {
+    console.log("closeModal");
     setLoginModal(false);
     setRegisterModal(false);
   };
@@ -56,6 +56,10 @@ const Navbar = () => {
   };
 
   const isActiveLink = (path: string) => location.pathname === path;
+
+  useEffect(() => {
+    console.log(registerModal)
+  }, [registerModal])
 
   return (
     <div className="h-16 w-full flex items-center bg-primary">
@@ -116,9 +120,7 @@ const Navbar = () => {
 
         <div className="hidden md:flex items-center">
           <ul className="flex md:gap-5 gap-3 items-center text-white lg:text-lg text-sm">
-            {loading ? (
-              <li>Loading...</li>
-            ) : userData ? (
+            {userData ? (
               <>
                 <li>
                   <div className="relative">
@@ -247,11 +249,7 @@ const Navbar = () => {
               </li>
             </ul>
 
-            {loading ? (
-              <div className="p-6 text-center text-gray-600 border-t border-rose-300">
-                Loading...
-              </div>
-            ) : userData ? (
+            {userData ? (
               <div className="p-6 flex items-center gap-4 border-t border-rose-300">
                 <img
                   src={profilePic}

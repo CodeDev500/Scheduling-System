@@ -187,6 +187,20 @@ export const CurriculumSlice = createSlice({
       .addCase(fetchCurriculumCoursesWithFilters.rejected, (state, action) => {
         state.isLoading = false;
         state.error = action.payload as string;
+      })
+      .addCase(createCurriculum.pending, (state) => {
+        state.isLoading = true;
+        state.error = null;
+      })
+      .addCase(createCurriculum.fulfilled, (state, action) => {
+        state.isLoading = false;
+        // The payload should contain the created/updated curriculum data
+        // Since we're saving multiple subjects, we don't add to state here
+        // The fetchCurriculumByProgramAndYear will reload the data
+      })
+      .addCase(createCurriculum.rejected, (state, action) => {
+        state.isLoading = false;
+        state.error = action.payload as string;
       });
   },
 });

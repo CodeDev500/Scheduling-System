@@ -21,7 +21,7 @@ import { verifyToken } from '../middlewares/verifyToken';
 const router = Router();
 
 // Apply authentication middleware to all routes
-router.use(verifyToken);
+// router.use(verifyToken);
 
 // GET /api/specializations - Get all specializations with optional filters
 router.get('/', validate(getSpecializationsQuerySchema), getAllSpecializations);

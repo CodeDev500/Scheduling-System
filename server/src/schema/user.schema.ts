@@ -34,6 +34,26 @@ export const registerUserSchema = z
       .min(8, { message: "Password must be at least 8 characters" }),
     role: z.enum(UserRoles),
     status: z.enum(UserStatuses),
+    // New fields for faculty recommendation
+    previousSubjects: z
+      .array(z.string().trim())
+      .optional()
+      .nullable(),
+    yearsOfExperience: z
+      .number()
+      .int()
+      .min(0)
+      .max(50)
+      .optional()
+      .nullable(),
+    preferredTimeSlots: z
+      .array(z.string().trim())
+      .optional()
+      .nullable(),
+    availableDays: z
+      .array(z.string().trim())
+      .optional()
+      .nullable(),
   })
   .refine((data) => data.password === data.confirmPassword, {
     message: "Passwords do not match",
@@ -58,4 +78,8 @@ export type UserRegisterInput = Omit<
 > & {
   specialization?: string[] | null;
   confirmPassword?: string;
+  previousSubjects?: string[] | null;
+  yearsOfExperience?: number | null;
+  preferredTimeSlots?: string[] | null;
+  availableDays?: string[] | null;
 };

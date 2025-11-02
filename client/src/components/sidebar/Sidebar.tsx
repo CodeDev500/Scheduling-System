@@ -147,16 +147,17 @@ const Sidebar = ({ sidebar, handleBurger }: SidebarProps) => {
         path: "/faculty-dashboard",
         src: <MdSpaceDashboard />,
       },
-      {
+       {
         title: "View Schedules",
-        path: "/faculty-schedules",
-        src: <AiOutlineCalendar />,
-      },
-      {
-        title: "View Teaching Load",
         path: "/faculty-teaching-load",
         src: <TbReportAnalytics />,
       },
+      {
+        title: "View Teaching Load",
+        path: "/faculty-schedules",
+        src: <AiOutlineCalendar />,
+      },
+     
     ];
 
     if (user) {

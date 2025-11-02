@@ -8,6 +8,7 @@ import {
   Save,
   Search,
   GraduationCap,
+  Calendar,
 } from "lucide-react";
 import { useAppDispatch, useAppSelector } from "../../../hooks/redux";
 import { searchSubject, fetchSubjects } from "../../../services/subjectSlice";
@@ -16,6 +17,7 @@ import {
   fetchCurriculumByProgramAndYear,
 } from "../../../services/curriculumSlice";
 import { useToast } from "../../../hooks/useToast";
+import api from "../../../api/axios";
 
 type Subject = {
   id: number;
@@ -73,11 +75,38 @@ const ManageProspectus = () => {
     id: number;
     field: "code" | "name";
   } | null>(null);
+  const [academicYears, setAcademicYears] = useState<any[]>([]);
+  const [currentCurriculumYear, setCurrentCurriculumYear] = useState<string>("");
+
 
   useEffect(() => {
     dispatch(fetchSubjects());
     dispatch(searchSubject(""));
+ 
+    const loadAcademicYears = async () => {
+    try {
+      const response = await api.get('/academic-years');
+      console.log(response.data)
+      if (response.data.success) {
+        setAcademicYears(response.data.data);
+        // Set the active academic year as default
+        const activeYear = response.data.data.find((year: any) => year.isActive);
+        if (activeYear) {
+          setCurrentCurriculumYear(activeYear.year);
+        }
+      }
+    } catch (error) {
+      console.error('Error loading academic years:', error);
+      toast.error('Failed to load academic years');
+    }
+  };
 
+
+    loadAcademicYears();
+  }, [dispatch, programCode, yearLevel]);
+
+  // Fetch curriculum when curriculum year changes
+  useEffect(() => {
     if (programCode && yearLevel) {
       dispatch(
         fetchCurriculumByProgramAndYear({
@@ -88,7 +117,10 @@ const ManageProspectus = () => {
     }
   }, [dispatch, programCode, yearLevel]);
 
+
   useEffect(() => {
+    console.log('📚 Loading curriculum data...', { curriculums, currentCurriculumYear });
+    
     if (curriculums && typeof curriculums === "object") {
       const loadedSubjects: Record<Semester, Subject[]> = {
         "1st Semester": [],
@@ -98,19 +130,31 @@ const ManageProspectus = () => {
 
       Object.entries(curriculums).forEach(([semester, subjectArray]) => {
         if (Array.isArray(subjectArray) && subjectArray.length > 0) {
-          loadedSubjects[semester as Semester] = subjectArray.map(
-            (subj: any) => ({
-              id: subj.id || Date.now() + Math.random(),
-              code: subj.code || "",
-              name: subj.name || "",
-              lec: subj.lec || 0,
-              lab: subj.lab || 0,
-              units: subj.units || 0,
-              programCode: programCode,
-              yearLevel: yearLevel,
-              curriculumId: subj.id,
-              isExisting: true,
-            })
+          // Filter subjects by curriculum year if selected
+          const filteredSubjects = currentCurriculumYear
+            ? subjectArray.filter((subj: any) => subj.curriculumYear === currentCurriculumYear)
+            : subjectArray;
+
+          console.log(`📖 ${semester}: Found ${filteredSubjects.length} subjects for year ${currentCurriculumYear}`);
+
+          loadedSubjects[semester as Semester] = filteredSubjects.map(
+            (subj: any) => {
+              const mappedSubject = {
+                id: subj.id || Date.now() + Math.random(),
+                code: subj.subjectCode || subj.code || "",
+                name: subj.subjectDescription || subj.name || "",
+                lec: subj.lec || 0,
+                lab: subj.lab || 0,
+                units: subj.units || 0,
+                programCode: programCode,
+                yearLevel: yearLevel,
+                curriculumId: subj.id,
+                curriculumYear: subj.curriculumYear,
+                isExisting: true,
+              };
+              console.log('  ✓ Loaded:', mappedSubject.code, mappedSubject.name);
+              return mappedSubject;
+            }
           );
         }
       });
@@ -122,9 +166,14 @@ const ManageProspectus = () => {
         }
       });
 
+      console.log('✅ Final loaded subjects:', loadedSubjects);
       setSubjects(loadedSubjects);
+    } else if (currentCurriculumYear) {
+      // If no curriculums loaded but curriculum year is selected, show empty subjects
+      console.log('⚠️ No curriculum data, showing empty subjects');
+      setSubjects(initialSubjects);
     }
-  }, [curriculums, programCode, yearLevel]);
+  }, [curriculums, programCode, yearLevel, currentCurriculumYear]);
 
   const handleAddSubject = (semester: Semester) => {
     const newSubject: Subject = createEmptySubject();
@@ -134,20 +183,48 @@ const ManageProspectus = () => {
     }));
   };
 
-  const handleDeleteSubject = (semester: Semester, id: number) => {
-    setSubjects((prev) => {
-      const updatedSemester = prev[semester].filter((subj) => subj.id !== id);
-
-      // Only ensure at least one empty subject if this is the last subject
-      if (updatedSemester.length === 0) {
-        updatedSemester.push(createEmptySubject());
+  const handleDeleteSubject = async (semester: Semester, id: number) => {
+    // Find the subject to check if it's an existing one
+    const subjectToDelete = subjects[semester].find((subj) => subj.id === id);
+    
+    if (subjectToDelete?.isExisting && subjectToDelete?.curriculumId) {
+      // If it's an existing subject, delete from database
+      try {
+        const response = await api.delete(`/curriculum/subject/${subjectToDelete.curriculumId}`);
+        console.log('Delete response:', response.data);
+        toast.success("Subject deleted successfully from database");
+        
+        // Reload curriculum data to reflect changes
+        if (programCode && yearLevel) {
+          dispatch(
+            fetchCurriculumByProgramAndYear({
+              programCode,
+              yearLevel: yearLevel.replace(/%20/g, " "),
+            })
+          );
+        }
+      } catch (error) {
+        console.error("Error deleting subject:", error);
+        toast.error("Failed to delete subject from database");
+        return; // Don't remove from UI if database delete failed
       }
+    } else {
+      // For new (unsaved) subjects, just remove from UI
+      setSubjects((prev) => {
+        const updatedSemester = prev[semester].filter((subj) => subj.id !== id);
 
-      return {
-        ...prev,
-        [semester]: updatedSemester,
-      };
-    });
+        // Only ensure at least one empty subject if this is the last subject
+        if (updatedSemester.length === 0) {
+          updatedSemester.push(createEmptySubject());
+        }
+
+        return {
+          ...prev,
+          [semester]: updatedSemester,
+        };
+      });
+      toast.success("Subject removed");
+    }
   };
 
   const checkDuplicateSubject = (semester: Semester, subjectCode: string, currentSubjectId: number): boolean => {
@@ -186,6 +263,19 @@ const ManageProspectus = () => {
     }));
   };
 
+  const handleSubjectCodeBlur = (semester: Semester, id: number, code: string) => {
+    if (code.trim() && checkDuplicateSubject(semester, code, id)) {
+      toast.error(`Subject ${code} already exists in ${semester}`);
+      // Clear the duplicate code
+      setSubjects((prev) => ({
+        ...prev,
+        [semester]: prev[semester].map((subject) =>
+          subject.id === id ? { ...subject, code: "", name: "" } : subject
+        ),
+      }));
+    }
+  };
+
   const filteredSubjects = subjectList.filter(
     (s) =>
       s.subjectCode?.toLowerCase().includes(searchQuery.toLowerCase()) ||
@@ -193,6 +283,24 @@ const ManageProspectus = () => {
   );
 
   const handleSave = () => {
+    // Validate that at least one subject has content
+    const hasValidSubjects = Object.values(subjects).some((semesterSubjects) =>
+      semesterSubjects.some(
+        (subject) => subject.code.trim() !== "" && subject.name.trim() !== ""
+      )
+    );
+
+    if (!hasValidSubjects) {
+      toast.error("Please add at least one subject before saving");
+      return;
+    }
+
+    if (!currentCurriculumYear) {
+      toast.error("Please select a curriculum year");
+      return;
+    }
+
+    // Prepare data with curriculum year
     const data = {
       subjects: Object.entries(subjects).flatMap(([semester, subjectArray]) =>
         subjectArray
@@ -212,6 +320,7 @@ const ManageProspectus = () => {
             programCode: subject.programCode,
             yearLevel: subject.yearLevel,
             period: semester,
+            curriculumYear: currentCurriculumYear,
             room: subject.room ?? null,
             instructor: subject.instructor ?? null,
             schedule: subject.schedule ?? null,
@@ -219,10 +328,11 @@ const ManageProspectus = () => {
       ),
     };
 
-    dispatch(createCurriculum(data))
+    // Save directly without modal
+    dispatch(createCurriculum(data as any))
       .unwrap()
       .then(() => {
-        toast.success("Curriculum saved successfully");
+        toast.success(`Curriculum saved successfully for ${currentCurriculumYear}`);
         // Reload the curriculum data to reflect the changes
         if (programCode && yearLevel) {
           dispatch(
@@ -285,25 +395,46 @@ const ManageProspectus = () => {
       </div>
     );
   }
-
-  console.log(subjects);
-
   return (
     <div className="min-h-screen bg-gradient-to-br from-gray-50 to-gray-100 p-6">
       <div className="max-w-7xl mx-auto space-y-8">
         {/* Header Section */}
         <div className="bg-white rounded-2xl shadow-lg p-8 border border-gray-200">
-          <div className="flex items-center gap-4 mb-4">
-            <div className="p-3 bg-primary/10 rounded-xl">
-              <GraduationCap className="w-8 h-8 text-primary" />
+          <div className="flex items-center justify-between mb-4">
+            <div className="flex items-center gap-4">
+              <div className="p-3 bg-primary/10 rounded-xl">
+                <GraduationCap className="w-8 h-8 text-primary" />
+              </div>
+              <div>
+                <h1 className="text-3xl font-bold text-gray-800">
+                  {programDescription(programCode ?? "", academicPrograms ?? [])}
+                </h1>
+                <p className="text-lg text-gray-600 font-medium">
+                  {yearLevel?.replace(/%20/g, " ")} Curriculum Management
+                </p>
+              </div>
             </div>
-            <div>
-              <h1 className="text-3xl font-bold text-gray-800">
-                {programDescription(programCode ?? "", academicPrograms ?? [])}
-              </h1>
-              <p className="text-lg text-gray-600 font-medium">
-                {yearLevel?.replace(/%20/g, " ")} Curriculum Management
-              </p>
+            
+            {/* Curriculum Filter */}
+            <div className="flex flex-col items-end gap-2">
+              <label className="text-sm font-medium text-gray-700 flex items-center gap-2">
+                <Calendar className="w-4 h-4 text-primary" />
+                Curriculum Year
+              </label>
+              <select
+                value={currentCurriculumYear}
+                onChange={(e) => setCurrentCurriculumYear(e.target.value)}
+                className="px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary/20 focus:border-primary transition-all min-w-[200px] font-semibold"
+              >
+                {academicYears.map((year) => (
+                  <option key={year.id} value={year.year}>
+                    {year.year} {year.isActive && "✓ Active"}
+                  </option>
+                ))}
+              </select>
+              <span className="text-xs text-green-600 font-medium">
+                Saving to: {currentCurriculumYear}
+              </span>
             </div>
           </div>
           <div className="h-1 bg-gradient-to-r from-primary to-primary_hover rounded-full"></div>
@@ -401,9 +532,10 @@ const ManageProspectus = () => {
                                   field: "code",
                                 });
                               }}
-                              onBlur={() =>
-                                setTimeout(() => setActiveRow(null), 200)
-                              }
+                              onBlur={() => {
+                                setTimeout(() => setActiveRow(null), 200);
+                                handleSubjectCodeBlur(semester, subject.id, subject.code);
+                              }}
                               className="w-full p-3 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-primary/20 focus:border-primary transition-all duration-200"
                               placeholder="e.g., CS101"
                             />
@@ -422,7 +554,7 @@ const ManageProspectus = () => {
                                       <div
                                         key={subj.id}
                                         onClick={() => {
-                                          if (checkDuplicateSubject(semester, subj.subjectCode, subject.id)) {
+                                          if (checkDuplicateSubject(semester, subj.subjectCode || '', subject.id)) {
                                             toast.error(`Subject ${subj.subjectCode} already exists in ${semester}`);
                                             return;
                                           }
@@ -433,11 +565,11 @@ const ManageProspectus = () => {
                                                 s.id === subject.id
                                                   ? {
                                                       ...s,
-                                                      code: subj.subjectCode,
-                                                      name: subj.subjectDescription,
-                                                      lec: subj.lec,
-                                                      lab: subj.lab,
-                                                      units: subj.lec + subj.lab,
+                                                      code: subj.subjectCode || '',
+                                                      name: subj.subjectDescription || '',
+                                                      lec: subj.lec || 0,
+                                                      lab: subj.lab || 0,
+                                                      units: (subj.lec || 0) + (subj.lab || 0),
                                                     }
                                                   : s
                                             ),
@@ -503,7 +635,7 @@ const ManageProspectus = () => {
                                       <div
                                         key={subj.id}
                                         onClick={() => {
-                                          if (checkDuplicateSubject(semester, subj.subjectCode, subject.id)) {
+                                          if (checkDuplicateSubject(semester, subj.subjectCode || '', subject.id)) {
                                             toast.error(`Subject ${subj.subjectCode} already exists in ${semester}`);
                                             return;
                                           }
@@ -514,11 +646,11 @@ const ManageProspectus = () => {
                                                 s.id === subject.id
                                                   ? {
                                                       ...s,
-                                                      code: subj.subjectCode,
-                                                      name: subj.subjectDescription,
-                                                      lec: subj.lec,
-                                                      lab: subj.lab,
-                                                      units: subj.lec + subj.lab,
+                                                      code: subj.subjectCode || '',
+                                                      name: subj.subjectDescription || '',
+                                                      lec: subj.lec || 0,
+                                                      lab: subj.lab || 0,
+                                                      units: (subj.lec || 0) + (subj.lab || 0),
                                                     }
                                                   : s
                                             ),
@@ -607,7 +739,7 @@ const ManageProspectus = () => {
                         {/* Actions */}
                         <td className="p-4 text-center">
                           <div className="flex gap-2 justify-center">
-                            {subjects[semester].length > 1 && (
+                            {(subjects[semester].length > 1 || subject.isExisting) && (
                               <button
                                 onClick={() =>
                                   handleDeleteSubject(semester, subject.id)

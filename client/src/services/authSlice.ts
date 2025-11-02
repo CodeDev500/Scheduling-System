@@ -152,9 +152,9 @@ const authSlice = createSlice({
         state.loading = true;
         state.error = null;
       })
-      .addCase(register.fulfilled, (state, action) => {
+      .addCase(register.fulfilled, (state) => {
         state.loading = false;
-        state.user = action.payload.user || null;
+        // Don't set user here - wait for OTP verification
         state.registerError = null;
       })
       .addCase(register.rejected, (state, action) => {

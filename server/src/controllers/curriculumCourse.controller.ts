@@ -14,43 +14,67 @@ export const createCurriculum = async (
   }
 
   try {
-    // First, get existing curriculum for this program and year level
-    const { programCode, yearLevel } = subjects[0] || {};
+    // First, get existing curriculum for this program, year level, and curriculum year
+    const { programCode, yearLevel, curriculumYear } = subjects[0] || {};
     
     if (!programCode || !yearLevel) {
       res.status(400).json({ error: "Program code and year level are required" });
       return;
     }
 
-    // Delete all existing curriculum courses for this program and year level
-    await db.curriculumCourse.deleteMany({
-      where: {
-        programCode,
-        yearLevel,
-      },
-    });
+    if (!curriculumYear) {
+      res.status(400).json({ error: "Curriculum year is required" });
+      return;
+    }
 
-    // Create new curriculum courses
-    const createdSubjects = await db.curriculumCourse.createMany({
-      data: subjects.map((subject: any) => ({
-        curriculumYear: subject.curriculumYear || null,
-        programCode: subject.programCode || null,
-        programName: subject.programName || null,
-        subjectCode: subject.subjectCode || null,
-        subjectDescription: subject.subjectDescription || null,
-        lec: subject.lec ?? 0,
-        lab: subject.lab ?? 0,
-        units: subject.units ?? 0,
-        hours: subject.hours ?? null,
-        period: subject.period || null,
-        yearLevel: subject.yearLevel || null,
-      })),
-      skipDuplicates: false,
-    });
+    // Use upsert logic: update existing, create new
+    const results = [];
+    
+    for (const subject of subjects) {
+      if (subject.id) {
+        // Update existing subject
+        const updated = await db.curriculumCourse.update({
+          where: { id: subject.id },
+          data: {
+            curriculumYear: subject.curriculumYear || null,
+            programCode: subject.programCode || null,
+            programName: subject.programName || null,
+            subjectCode: subject.subjectCode || null,
+            subjectDescription: subject.subjectDescription || null,
+            lec: subject.lec ?? 0,
+            lab: subject.lab ?? 0,
+            units: subject.units ?? 0,
+            hours: subject.hours ?? null,
+            period: subject.period || null,
+            yearLevel: subject.yearLevel || null,
+          },
+        });
+        results.push(updated);
+      } else {
+        // Create new subject
+        const created = await db.curriculumCourse.create({
+          data: {
+            curriculumYear: subject.curriculumYear || null,
+            programCode: subject.programCode || null,
+            programName: subject.programName || null,
+            subjectCode: subject.subjectCode || null,
+            subjectDescription: subject.subjectDescription || null,
+            lec: subject.lec ?? 0,
+            lab: subject.lab ?? 0,
+            units: subject.units ?? 0,
+            hours: subject.hours ?? null,
+            period: subject.period || null,
+            yearLevel: subject.yearLevel || null,
+          },
+        });
+        results.push(created);
+      }
+    }
 
     res.status(200).json({
       message: "Curriculum saved successfully",
-      createdCount: createdSubjects.count,
+      savedCount: results.length,
+      subjects: results,
     });
   } catch (error) {
     console.error("Error saving curriculum:", error);

@@ -52,7 +52,7 @@ const Curriculum: FC<CurriculumProps> = ({ academicProgram }) => {
           </tr>
         </thead>
         <tbody className="bg-white">
-          {academicProgram.map((sched, idx) => (
+          {academicProgram?.map((sched, idx) => (
             <tr
               key={idx}
               onClick={() => navigate(`/course/${sched.programCode}`)}

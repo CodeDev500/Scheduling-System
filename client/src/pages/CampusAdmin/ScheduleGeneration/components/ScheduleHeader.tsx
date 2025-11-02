@@ -11,7 +11,7 @@ import {
 
 interface ScheduleHeaderProps {
   isGenerating: boolean;
-  onGenerateSchedule: () => void;
+  onOpenGenerateModal: () => void;
   onExportSchedule: (format: 'pdf' | 'excel' | 'csv') => void;
   onSaveSchedule?: () => void;
   canSave?: boolean;
@@ -19,7 +19,7 @@ interface ScheduleHeaderProps {
 
 export const ScheduleHeader: React.FC<ScheduleHeaderProps> = ({
   isGenerating,
-  onGenerateSchedule,
+  onOpenGenerateModal,
   onExportSchedule,
   onSaveSchedule,
   canSave = true
@@ -32,7 +32,7 @@ export const ScheduleHeader: React.FC<ScheduleHeaderProps> = ({
             <h1 className="text-3xl font-bold text-gray-900 mb-2">Schedule Generation</h1>
           </div>
           <div className="flex items-center space-x-4">
-            <Select onValueChange={(value) => onExportSchedule(value as 'pdf' | 'excel' | 'csv')}>
+            {/* <Select onValueChange={(value) => onExportSchedule(value as 'pdf' | 'excel' | 'csv')}>
               <SelectTrigger className="w-40">
                 <SelectValue placeholder="Export as..." />
               </SelectTrigger>
@@ -49,14 +49,21 @@ export const ScheduleHeader: React.FC<ScheduleHeaderProps> = ({
                     <span>Excel</span>
                   </div>
                 </SelectItem>
-                <SelectItem value="csv">
-                  <div className="flex items-center space-x-2">
-                    <FileImage className="h-4 w-4 text-blue-500" />
-                    <span>CSV</span>
-                  </div>
-                </SelectItem>
+               
               </SelectContent>
-            </Select>
+            </Select> */}
+            {/* <Select value={curriculumYear} onValueChange={onCurriculumYearChange}>
+              <SelectTrigger className="w-48">
+                <SelectValue placeholder="Select Curriculum Year" />
+              </SelectTrigger>
+              <SelectContent>
+                {academicYears.map(year => (
+                  <SelectItem key={year.id} value={year.year}>
+                    {year.year}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select> */}
             <Button 
               onClick={onSaveSchedule}
               disabled={!canSave || isGenerating}
@@ -67,7 +74,7 @@ export const ScheduleHeader: React.FC<ScheduleHeaderProps> = ({
               Save Schedule
             </Button>
             <Button 
-              onClick={onGenerateSchedule}
+              onClick={onOpenGenerateModal}
               disabled={isGenerating}
               size="lg"
               className="bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white shadow-lg hover:shadow-xl transition-all duration-300 px-6 py-3"

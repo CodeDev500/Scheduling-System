@@ -4,15 +4,17 @@ import { createSubject } from "../../../services/subjectSlice";
 import { useToast } from "../../../hooks/useToast";
 import { type SubjectTypes } from "../../../types/types";
 import MultiSelectField from "../../../components/input_field/MultiSelectField";
-import { specializationOptions } from "../../../constants/constants";
+import { useSpecializations } from "../../../hooks/useSpecializations";
 
 interface AddSubjectProps {
   onClose: () => void;
+  onSubjectAdded: () => void;
 }
 
-const AddSubject: React.FC<AddSubjectProps> = ({ onClose }) => {
+const AddSubject: React.FC<AddSubjectProps> = ({ onClose, onSubjectAdded }) => {
   const dispatch = useAppDispatch();
   const toast = useToast();
+  const { specializations } = useSpecializations(true);
 
   const [formData, setFormData] = useState<Omit<SubjectTypes, "id">>({
     subjectCode: "",
@@ -22,9 +24,21 @@ const AddSubject: React.FC<AddSubjectProps> = ({ onClose }) => {
     units: 0,
     tags: [],
   });
+
+  const [errors, setErrors] = useState({
+    subjectCode: "",
+    subjectDescription: "",
+    units: "",
+  });
   
   const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const { name, value } = e.target;
+    
+    // Clear error for this field when user starts typing
+    if (errors[name as keyof typeof errors]) {
+      setErrors((prev) => ({ ...prev, [name]: "" }));
+    }
+    
     setFormData((prev) => {
       const updatedData = {
         ...prev,
@@ -39,6 +53,11 @@ const AddSubject: React.FC<AddSubjectProps> = ({ onClose }) => {
         const lecUnits = name === "lec" ? (parseInt(value) || 0) : prev.lec;
         const labUnits = name === "lab" ? (parseInt(value) || 0) : prev.lab;
         updatedData.units = lecUnits + labUnits;
+        
+        // Clear units error if total is now valid
+        if (lecUnits + labUnits > 0) {
+          setErrors((prev) => ({ ...prev, units: "" }));
+        }
       }
       
       return updatedData;
@@ -52,7 +71,44 @@ const AddSubject: React.FC<AddSubjectProps> = ({ onClose }) => {
     }));
   };
 
+  const validateForm = (): boolean => {
+    const newErrors = {
+      subjectCode: "",
+      subjectDescription: "",
+      units: "",
+    };
+
+    let isValid = true;
+
+    // Validate subject code
+    if (!formData.subjectCode.trim()) {
+      newErrors.subjectCode = "Subject code is required";
+      isValid = false;
+    }
+
+    // Validate subject description
+    if (!formData.subjectDescription.trim()) {
+      newErrors.subjectDescription = "Subject description is required";
+      isValid = false;
+    }
+
+    // Validate units (must be greater than 0)
+    if (formData.units <= 0) {
+      newErrors.units = "Total units must be greater than 0";
+      isValid = false;
+    }
+
+    setErrors(newErrors);
+    return isValid;
+  };
+
   const handleSubmit = () => {
+    // Validate form before submission
+    if (!validateForm()) {
+      toast.error("Please fill in all required fields");
+      return;
+    }
+
     // Prepare form data for submission
     const submitData = {
       ...formData,
@@ -63,6 +119,7 @@ const AddSubject: React.FC<AddSubjectProps> = ({ onClose }) => {
       .unwrap()
       .then(() => {
         toast.success("Subject added successfully");
+        onSubjectAdded();
         onClose();
       })
       .catch((error) => {
@@ -78,24 +135,44 @@ const AddSubject: React.FC<AddSubjectProps> = ({ onClose }) => {
 
         <div className="grid gap-3">
           <div>
-            <label className="text-sm text-gray-600">Subject Code</label>
+            <label className="text-sm text-gray-600">
+              Subject Code <span className="text-red-500">*</span>
+            </label>
             <input
               type="text"
               name="subjectCode"
               value={formData.subjectCode}
               onChange={handleChange}
-              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+              className={`w-full px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 ${
+                errors.subjectCode
+                  ? "border-red-500 focus:ring-red-500"
+                  : "border-gray-300 focus:ring-blue-500"
+              }`}
+              placeholder="e.g., CS101"
             />
+            {errors.subjectCode && (
+              <p className="text-xs text-red-500 mt-1">{errors.subjectCode}</p>
+            )}
           </div>
           <div>
-            <label className="text-sm text-gray-600">Subject Description</label>
+            <label className="text-sm text-gray-600">
+              Subject Description <span className="text-red-500">*</span>
+            </label>
             <input
               type="text"
               name="subjectDescription"
               value={formData.subjectDescription}
               onChange={handleChange}
-              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+              className={`w-full px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 ${
+                errors.subjectDescription
+                  ? "border-red-500 focus:ring-red-500"
+                  : "border-gray-300 focus:ring-blue-500"
+              }`}
+              placeholder="e.g., Introduction to Programming"
             />
+            {errors.subjectDescription && (
+              <p className="text-xs text-red-500 mt-1">{errors.subjectDescription}</p>
+            )}
           </div>
           <div className="grid grid-cols-3 gap-2">
             <div>
@@ -103,6 +180,7 @@ const AddSubject: React.FC<AddSubjectProps> = ({ onClose }) => {
               <input
                 type="number"
                 name="lec"
+                min="0"
                 value={formData.lec}
                 onChange={handleChange}
                 className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
@@ -113,22 +191,30 @@ const AddSubject: React.FC<AddSubjectProps> = ({ onClose }) => {
               <input
                 type="number"
                 name="lab"
+                min="0"
                 value={formData.lab}
                 onChange={handleChange}
                 className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
               />
             </div>
             <div>
-              <label className="text-sm text-gray-600">Total Units</label>
+              <label className="text-sm text-gray-600">
+                Total Units <span className="text-red-500">*</span>
+              </label>
               <input
                 type="number"
                 name="units"
                 value={formData.units}
                 readOnly
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg bg-gray-100 text-gray-700 cursor-not-allowed"
+                className={`w-full px-3 py-2 border rounded-lg bg-gray-100 text-gray-700 cursor-not-allowed ${
+                  errors.units ? "border-red-500" : "border-gray-300"
+                }`}
               />
             </div>
           </div>
+          {errors.units && (
+            <p className="text-xs text-red-500 -mt-2">{errors.units}</p>
+          )}
           
           <MultiSelectField
             label="Tags"
@@ -137,7 +223,7 @@ const AddSubject: React.FC<AddSubjectProps> = ({ onClose }) => {
             value={formData.tags || []}
             onChange={handleMultiSelectChange}
             placeholder="Select tags for this subject..."
-            options={specializationOptions.map((spec) => ({
+            options={specializations.map((spec) => ({
               value: spec,
               label: spec,
             }))}

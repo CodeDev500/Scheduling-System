@@ -11,9 +11,10 @@ export const createSpecializationSchema = z.object({
       .optional()
       .nullable(),
     department: z.string()
-      .min(1, 'Department is required')
       .max(100, 'Department must be less than 100 characters')
       .trim()
+      .optional()
+      .nullable()
   })
 });
 
@@ -32,10 +33,10 @@ export const updateSpecializationSchema = z.object({
       .optional()
       .nullable(),
     department: z.string()
-      .min(1, 'Department is required')
       .max(100, 'Department must be less than 100 characters')
       .trim()
-      .optional(),
+      .optional()
+      .nullable(),
     isActive: z.boolean().optional()
   }).refine(data => Object.keys(data).length > 0, {
     message: 'At least one field must be provided for update'

@@ -10,19 +10,77 @@ import { sendOTPController } from "./otp.controller";
 
 export const register = async (req: Request, res: Response) => {
   try {
-    // Clean up field names by trimming spaces and handle specialization parsing
+    // Clean up field names by trimming spaces and handle field parsing
     const cleanedBody: any = {};
+    
+    // Helper function to collect array items from FormData
+    const collectArrayItems = (prefix: string): string[] => {
+      const items: string[] = [];
+      for (const [key, value] of Object.entries(req.body)) {
+        if (key.startsWith(prefix) && key.includes('[') && key.includes(']')) {
+          items.push(value as string);
+        }
+      }
+      return items;
+    };
+    
     for (const [key, value] of Object.entries(req.body)) {
       const cleanKey = key.trim();
+      
+      // Skip array notation keys as they'll be handled separately
+      if (cleanKey.includes('[') && cleanKey.includes(']')) {
+        continue;
+      }
+      
       if (cleanKey === 'specialization' && typeof value === 'string') {
         try {
           cleanedBody[cleanKey] = JSON.parse(value as string);
         } catch (error) {
-          console.error('Failed to parse specialization:', error);
-          cleanedBody[cleanKey] = value;
+          // Try to collect from array notation
+          const arrayItems = collectArrayItems('specialization');
+          cleanedBody[cleanKey] = arrayItems.length > 0 ? arrayItems : [value];
+        }
+      } else if (cleanKey === 'yearsOfExperience' && typeof value === 'string') {
+        // Parse yearsOfExperience from string to number
+        const parsed = parseInt(value, 10);
+        cleanedBody[cleanKey] = isNaN(parsed) ? 0 : parsed;
+      } else if (cleanKey === 'previousSubjects' && typeof value === 'string') {
+        try {
+          cleanedBody[cleanKey] = JSON.parse(value as string);
+        } catch (error) {
+          // Try to collect from array notation
+          const arrayItems = collectArrayItems('previousSubjects');
+          cleanedBody[cleanKey] = arrayItems.length > 0 ? arrayItems : [value];
+        }
+      } else if (cleanKey === 'preferredTimeSlots' && typeof value === 'string') {
+        try {
+          cleanedBody[cleanKey] = JSON.parse(value as string);
+        } catch (error) {
+          // Try to collect from array notation
+          const arrayItems = collectArrayItems('preferredTimeSlots');
+          cleanedBody[cleanKey] = arrayItems.length > 0 ? arrayItems : [value];
+        }
+      } else if (cleanKey === 'availableDays' && typeof value === 'string') {
+        try {
+          cleanedBody[cleanKey] = JSON.parse(value as string);
+        } catch (error) {
+          // Try to collect from array notation
+          const arrayItems = collectArrayItems('availableDays');
+          cleanedBody[cleanKey] = arrayItems.length > 0 ? arrayItems : [value];
         }
       } else {
         cleanedBody[cleanKey] = value;
+      }
+    }
+    
+    // Handle array notation fields
+    const arrayFields = ['specialization', 'previousSubjects', 'preferredTimeSlots', 'availableDays'];
+    for (const field of arrayFields) {
+      if (!cleanedBody[field]) {
+        const arrayItems = collectArrayItems(field);
+        if (arrayItems.length > 0) {
+          cleanedBody[field] = arrayItems;
+        }
       }
     }
     
@@ -74,6 +132,7 @@ export const register = async (req: Request, res: Response) => {
     if (userRequest.status === statusList.PENDING) {
       await sendOTPController(userRequest.email);
       res.status(200).json({
+        status: "success",
         message: `Verification OTP sent to ${userRequest.email}`,
       });
       return;

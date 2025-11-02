@@ -22,6 +22,11 @@ model User {
   createdAt                 DateTime                   @default(now())
   updatedAt                 DateTime                   @updatedAt
   specialization            Json?
+  // New fields for enhanced faculty recommendation
+  previousSubjects          Json?                      // Array of subject codes they've taught
+  yearsOfExperience         Int?                       // Years of teaching experience
+  preferredTimeSlots        Json?                      // Array of preferred time slots ["morning", "afternoon"]
+  availableDays           Json?                      // Array of available days ["Monday", "Friday"]
   facultySubjectAssignments FacultySubjectAssignment[]
   roomSchedules             RoomSchedules[]
   units_loads               Units_Loads[]

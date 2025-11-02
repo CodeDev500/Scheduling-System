@@ -4,21 +4,7 @@ import * as ScheduleGenerationController from '../controllers/scheduleGeneration
 
 const router = Router();
 
-// Apply authentication middleware to all routes
-// router.use(verifyToken);
-
-// Constraint management routes
-router.get('/constraints/:department', ScheduleGenerationController.getConstraints);
-router.post('/constraints', ScheduleGenerationController.createConstraint);
-
-// Preference management routes
-router.get('/preferences/:department', ScheduleGenerationController.getPreferences);
-router.put('/preferences/:department', ScheduleGenerationController.updatePreferences);
-
-// Schedule generation routes
-router.post('/generate', ScheduleGenerationController.generateSchedule);
-router.get('/history/:department', ScheduleGenerationController.getGenerationHistory);
-router.get('/generation/:id', ScheduleGenerationController.getGeneration);
+router.get('/generate', ScheduleGenerationController.generateSchedule);
 router.put('/generation/:id', ScheduleGenerationController.updateScheduleData);
 
 // Save and retrieve latest saved schedules

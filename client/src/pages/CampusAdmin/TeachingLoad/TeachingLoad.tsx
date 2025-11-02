@@ -6,6 +6,10 @@ import DashboardHeader from '../../../components/dashboard/DashboardHeader';
 import api from '../../../api/axios';
 import { useToast } from '../../../hooks/useToast';
 import 'react-big-calendar/lib/css/react-big-calendar.css';
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
+import { Button } from '@/components/ui/button';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { useAppSelector } from '../../../hooks/redux';
 // import './TeachingLoad.css';
 
 const localizer = momentLocalizer(moment);
@@ -44,7 +48,12 @@ const TeachingLoad = () => {
   const [viewMode, setViewMode] = useState<ViewMode>('grid');
   const [calendarView, setCalendarView] = useState<View>(Views.WEEK);
   const [isLoading, setIsLoading] = useState(false);
+  const [curriculumYear, setCurriculumYear] = useState('');
+  const [semester, setSemester] = useState('');
   const toast = useToast();
+    const [academicYears, setAcademicYears] = useState<any[]>([]);
+    const userData = useAppSelector((state) => state.auth.user);
+    const id = userData?.id;
 
   const timeSlots: TimeSlot[] = [
     { time: '7:00', display: '7:00 AM', endTime: '8:00' },
@@ -62,6 +71,22 @@ const TeachingLoad = () => {
     { time: '19:00', display: '7:00 PM', endTime: '20:00' },
     { time: '20:00', display: '8:00 PM', endTime: '21:00' },
   ];
+
+  useEffect(() => {
+    
+  const fetchAcademicYears = async () => {
+    try {
+      const response = await api.get('/academic-years');
+      if (response.data.success) {
+        setAcademicYears(response.data.data);
+      }
+    } catch (error) {
+      console.error('Error fetching academic years:', error);
+    } 
+  };
+  fetchAcademicYears();
+
+  } , [])
 
   // Dynamic color mapping based on time range
   const getTimeRangeColor = (startTime: string) => {
@@ -154,15 +179,12 @@ const TeachingLoad = () => {
 
   // Fetch real data from API
   useEffect(() => {
-    fetchFacultySchedules();
-  }, []);
-
-  const fetchFacultySchedules = async () => {
+      const fetchFacultySchedules = async () => {
     try {
       setIsLoading(true);
       
       // Fetch faculty with teaching load
-      const facultyResponse = await api.get('/user/faculty/with-load');
+      const facultyResponse = await api.get(`/user/faculty/with-load`);
       const facultyData = facultyResponse.data.filter((f: any) => f.status === 'APPROVED');
 
       // Fetch all subject schedules
@@ -172,7 +194,7 @@ const TeachingLoad = () => {
       // Group schedules by faculty
       const facultySchedules: FacultySchedule[] = facultyData.map((faculty: any) => {
         const facultyScheduleItems = schedules.filter(
-          (s: any) => String(s.facultyId) === String(faculty.id)
+          (s: any) => String(s.facultyId) === String(userData?.id) && s.academicYear === String(curriculumYear) && s.semester === String(semester)
         );
 
         // Transform schedules into the required format
@@ -262,6 +284,10 @@ const TeachingLoad = () => {
       setIsLoading(false);
     }
   };
+
+    fetchFacultySchedules();
+  }, [curriculumYear, semester]);
+
 
   // Simplified schedule processing with improved duration calculation
   const processScheduleForGrid = (faculty: FacultySchedule) => {
@@ -385,6 +411,10 @@ const TeachingLoad = () => {
     const baseSlotHeight = window.innerWidth <= 640 ? 48 : 64; // Same as calculateCellHeight base
     const dynamicHeight = Math.round((cellData.exactHeightDuration || cellData.exactDuration || cellData.duration) * baseSlotHeight);
     
+    // Calculate the top offset based on the offsetPercentage
+    const baseSlotHeightForOffset = window.innerWidth <= 640 ? 48 : 64;
+    const topOffset = (cellData.offsetPercentage / 100) * baseSlotHeightForOffset;
+    
     return (
       <td 
         key={`${day}-${time}`} 
@@ -393,11 +423,11 @@ const TeachingLoad = () => {
         // style={{ height: `${dynamicHeight}px` }}
       >
         <div 
-          className={`schedule-subject-card text-white text-xs`}
+          className={`schedule-subject-card text-white text-xs absolute left-0 right-0`}
           style={{ 
             height: `${dynamicHeight - 2}px`, // Subtract 2px for border
             minHeight: `${dynamicHeight - 2}px`,
-            top: `0px`, // No offset needed - block is already in correct row
+            top: `${topOffset}px`, // Position based on exact start time within the hour
             backgroundColor: cellData.colorClass.replace('bg-', '').replace('-500', '') === 'blue' ? '#3b82f6' :
                             cellData.colorClass.replace('bg-', '').replace('-500', '') === 'green' ? '#10b981' :
                             cellData.colorClass.replace('bg-', '').replace('-500', '') === 'yellow' ? '#f59e0b' :
@@ -460,13 +490,14 @@ const TeachingLoad = () => {
         </div>
 
         {/* Faculty Selection */}
-        <div className="bg-white rounded-lg shadow mb-6 p-6">
-          <div className="flex items-center space-x-4">
+        <div className="bg-white rounded-lg shadow mb-2 ">
+
+          {/* <div className="flex items-center space-x-4">
             <Calendar className="h-5 w-5 text-gray-600" />
             <span className="text-sm font-medium text-gray-700">Faculty Loading ({selectedFaculty?.employmentType})</span>
-          </div>
+          </div> */}
           
-          <div className="mt-4 relative">
+          {/* <div className="mt-4 relative">
             <button
               onClick={() => setShowDropdown(!showDropdown)}
               className="flex items-center justify-between w-full max-w-md px-4 py-2 text-left bg-white border border-gray-300 rounded-md shadow-sm hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-blue-500"
@@ -497,13 +528,65 @@ const TeachingLoad = () => {
                 ))}
               </div>
             )}
-          </div>
+          </div> */}
           
-          {selectedFaculty && (
+          {/* {selectedFaculty && (
             <div className="mt-4 text-sm text-gray-600">
               Total No. of Units Loaded: {selectedFaculty.totalUnits}
             </div>
-          )}
+          )} */}
+                  <div className="space-y-6 p-4 flex gap-4">
+          {/* Curriculum Year Selection */}
+          <div className="space-y-2">
+            <label className="text-sm font-medium text-gray-700">
+              Curriculum Year <span className="text-red-500">*</span>
+            </label>
+            <Select 
+              value={curriculumYear} 
+              onValueChange={setCurriculumYear}
+            >
+              <SelectTrigger className="w-full">
+                <SelectValue placeholder= "Select curriculum year"/>
+              </SelectTrigger>
+              <SelectContent className='bg-white'>
+                {academicYears.map((year) => (
+                  <SelectItem key={year.id} value={year.year}>
+                    {year.year}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+
+          {/* Semester Selection */}
+          <div className="space-y-2">
+            <label className="text-sm font-medium text-gray-700">
+              Semester <span className="text-red-500">*</span>
+            </label>
+            <Select 
+              value={semester} 
+              onValueChange={setSemester}
+            >
+              <SelectTrigger className="w-full">
+                <SelectValue placeholder="Select semester" />
+              </SelectTrigger>
+              <SelectContent className='bg-white'>
+                <SelectItem value="1st Semester">1st Semester</SelectItem>
+                <SelectItem value="2nd Semester">2nd Semester</SelectItem>
+                <SelectItem value="Summer">Summer</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+
+          {/* Info Message */}
+          {/* <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
+            <p className="text-sm text-blue-800">
+              <strong>Note:</strong> The system will generate schedules only for courses within the maximum unit limit. 
+              Overload courses must be assigned by the Program Head.
+            </p>
+          </div> */}
+        </div>
+
         </div>
 
         {/* Schedule Views */}

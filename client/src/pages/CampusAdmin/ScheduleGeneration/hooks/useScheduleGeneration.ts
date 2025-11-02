@@ -1,16 +1,10 @@
 import { useState, useRef } from 'react';
 import { toast } from 'sonner';
 import type { GeneratedSchedule } from '../../../../types';
-import type { ScheduleItem, GenerationStep, OptimizationConstraints } from '../../../../types';
-import { detectConflicts, createSchedule } from '../utils/scheduleUtils';
-import { ScheduleGenerationService } from '../services/scheduleGenerationService';
-import { useAppSelector } from '../../../../hooks/redux';
+import type { ScheduleItem, OptimizationConstraints } from '../../../../types';
+import api from '@/api/axios';
 
-export const useScheduleGeneration = (instructors: any[] = []) => {
-  // Redux selectors to get curriculum data
-  const curriculumData = useAppSelector((state) => state.curriculum.curriculums);
-  // Use passed instructors instead of Redux faculty data
-  const facultyData = instructors;
+export const useScheduleGeneration = (instructors: any[] = [], curriculumYear: string = '') => {
 
   // Form state
   const [selectedDepartment, setSelectedDepartment] = useState('');
@@ -50,181 +44,95 @@ export const useScheduleGeneration = (instructors: any[] = []) => {
   // Ref for scrolling to results
   const resultsRef = useRef<HTMLDivElement>(null);
 
-  // Mock schedule generation function
-  const handleGenerateSchedule = async () => {
-    console.log('Starting auto-generation for all programs...');
+  // Fetch schedule from server
+  const handleGenerateSchedule = async (year?: string, semester?: string) => {
+    const yearToUse = year || curriculumYear;
+    const semesterToUse = semester || selectedSemester;
+    
+    // Validate curriculum year and semester are selected
+    if (!yearToUse) {
+      toast.error('Please select a curriculum year before generating schedule');
+      return;
+    }
+    
+    if (!semesterToUse) {
+      toast.error('Please select a semester before generating schedule');
+      return;
+    }
+
+    console.log('Starting schedule generation from server...');
+    console.log('Curriculum Year:', yearToUse);
+    console.log('Semester:', semesterToUse);
     console.log('Target Students:', targetStudents);
     console.log('Optimization Constraints:', optimizationConstraints);
 
-    // Check if curriculum data is available
-    if (!curriculumData || curriculumData.length === 0) {
-      toast.error('No curriculum data available. Please ensure curriculum data is loaded.');
-      return;
-    }
-
-    // Check if faculty data is available
-    if (!facultyData || facultyData.length === 0) {
-      toast.error('No faculty data available. Please ensure faculty data is loaded.');
-      return;
-    }
-
-    // Define all available programs, year levels, and semesters for auto-generation
-    const programs = ['BSCS', 'BSIT', 'BSIS', 'BSED', 'BSCRIM', 'BSSW'];
-    const yearLevels = ['1st Year', '2nd Year', '3rd Year', '4th Year'];
-    // Include Summer term in auto-generation
-    const semesters = ['1st Semester', '2nd Semester', 'Summer'];
-
-    // Helper: normalize period field to consistently match strings or numeric codes
-    const normalizePeriod = (period: any): string => {
-      if (typeof period === 'number') {
-        return period === 1 ? '1st Semester' : period === 2 ? '2nd Semester' : period === 3 ? 'Summer' : String(period);
-      }
-      const s = String(period).trim().toLowerCase();
-      if (s.includes('summer')) return 'Summer';
-      if (s.includes('1') || s.includes('first')) return '1st Semester';
-      if (s.includes('2') || s.includes('second')) return '2nd Semester';
-      return period;
-    };
-    
     setIsGenerating(true);
     setGenerationProgress(0);
     setCompletedSteps([]);
-    setCurrentStep('Initializing schedule generation...');
-    setEstimatedTime('30-45 seconds');
-    
-    // Small delay to ensure UI updates before starting heavy processing
-    await new Promise(resolve => setTimeout(resolve, 100));
-    
-    const steps: GenerationStep[] = [
-      { name: 'evaluating', message: 'Loading curriculum data...', duration: 2000 },
-      { name: 'optimizing', message: 'Matching faculty with course specializations...', duration: 3000 },
-      { name: 'finalizing', message: 'Generating optimized schedule...', duration: 1500 }
-    ];
-
-    let progress = 0;
+    setCurrentStep('Fetching schedule from server...');
+    setEstimatedTime('5-10 seconds');
 
     try {
-      for (let i = 0; i < steps.length; i++) {
-        const step = steps[i];
-        setCurrentStep(step.message);
-        
-        // Simulate progress for this step
-        const stepProgress = 100 / steps.length;
-        const startProgress = progress;
-        
-        for (let j = 0; j <= 10; j++) {
-          await new Promise(resolve => setTimeout(resolve, step.duration / 10));
-          setGenerationProgress(startProgress + (stepProgress * j / 10));
-        }
-        
-        progress += stepProgress;
-        setCompletedSteps(prev => [...prev, step.name]);
-      }
+      // Call server API to generate schedule
+      setCurrentStep('Requesting schedule generation...');
+      setGenerationProgress(20);
 
-      // Generate schedules for all program/year/semester combinations
-      console.log('Using curriculum data:', curriculumData);
-      console.log('Using faculty data:', facultyData);
-      
-      let totalCombinations = 0;
-      let processedCombinations = 0;
-      const allScheduleItems: any[] = [];
-      
-      // Count total combinations for progress tracking
-      for (const program of programs) {
-        for (const yearLevel of yearLevels) {
-          for (const semester of semesters) {
-            // Check if curriculum data exists for this combination
-            const hasData = curriculumData.some(course => 
-              course.programCode === program && 
-              course.yearLevel === yearLevel && 
-              normalizePeriod(course.period) === semester
-            );
-            if (hasData) {
-              totalCombinations++;
-            }
-          }
+      const response = await api.get('/schedules/generation/generate', {
+        params: {
+          curriculumYear: yearToUse,
+          semester: semesterToUse
         }
-      }
-      
-      console.log(`Found ${totalCombinations} valid program/year/semester combinations`);
-      
-      // Generate schedules for each valid combination
-      for (const program of programs) {
-        for (const yearLevel of yearLevels) {
-          for (const semester of semesters) {
-            // Check if curriculum data exists for this combination
-            const hasData = curriculumData.some(course => 
-              course.programCode === program && 
-              course.yearLevel === yearLevel && 
-              normalizePeriod(course.period) === semester
-            );
-            
-            if (hasData) {
-              setCurrentStep(`Generating schedule for ${program} ${yearLevel} ${semester}...`);
-              
-              console.log(`Calling generateScheduleDataFromCurriculum for ${program} ${yearLevel} ${semester}`);
-              const scheduleItems = await ScheduleGenerationService.generateScheduleDataFromCurriculum(
-                curriculumData,
-                facultyData,
-                program,
-                yearLevel,
-                semester,
-                selectedDepartment
-              );
-              
-              console.log(`Service returned ${scheduleItems.length} schedule items:`, scheduleItems);
-              
-              // Add program/year/semester info to each schedule item
-              const enhancedScheduleItems = scheduleItems.map(item => ({
-                ...item,
-                program,
-                yearLevel,
-                semester
-              }));
-              
-              console.log(`Enhanced schedule items:`, enhancedScheduleItems);
-              
-              allScheduleItems.push(...enhancedScheduleItems);
-              
-              processedCombinations++;
-              const progressPercent = (processedCombinations / totalCombinations) * 100;
-              setGenerationProgress(progressPercent);
-              
-              console.log(`Generated ${scheduleItems.length} items for ${program} ${yearLevel} ${semester}`);
-            }
-          }
-        }
-      }
-      
-      // Apply conflict detection to all schedule items
-      const { enhancedItems, conflicts } = detectConflicts(allScheduleItems);
-      // Create new schedule
-      const newSchedule = createSchedule(enhancedItems, conflicts, generatedSchedules.length);
-
-
-      
-      setGeneratedSchedules(prev => {
-        const updated = [...prev, newSchedule];
-        console.log('Updated generatedSchedules:', updated);
-        return updated;
       });
-      
-      setSelectedSchedule(newSchedule);
-      setIsGenerating(false);
-      setGenerationProgress(100);
-      setCurrentStep('Schedule generated successfully!');
-    
-      
-      if (conflicts.length > 0) {
-        toast.warning(`Schedule generated with ${conflicts.length} conflicts detected`);
+
+      setGenerationProgress(60);
+      setCurrentStep('Processing server response...');
+
+      if (response.data.success && response.data.data) {
+        const serverSchedules = response.data.data;
+        console.log('Received schedules from server:', serverSchedules);
+
+        setGenerationProgress(80);
+        setCurrentStep('Finalizing schedule...');
+
+        // Set the generated schedules from server
+        setGeneratedSchedules(serverSchedules);
+        setSelectedSchedule(serverSchedules[0] || null);
+        
+        setIsGenerating(false);
+        setGenerationProgress(100);
+        setCurrentStep('Schedule generated successfully!');
+        setCompletedSteps(['evaluating', 'optimizing', 'finalizing']);
+
+        const totalConflicts = serverSchedules.reduce((sum: number, schedule: any) => 
+          sum + (schedule.conflicts?.length || 0), 0
+        );
+
+        // Check for overload warning from server
+        if (response.data.warning) {
+          const warning = response.data.warning;
+          toast.warning(warning.message, {
+            duration: 8000,
+            description: `${warning.scheduledUnits}/${warning.maxUnits} units scheduled. Overload courses must be assigned by Program Head.`
+          });
+        } else if (totalConflicts > 0) {
+          toast.warning(`Schedule generated with ${totalConflicts} conflicts detected`);
+        } else {
+          toast.success('Schedule generated successfully with no conflicts!');
+        }
       } else {
-        toast.success('Schedule generated successfully with no conflicts!');
+        throw new Error('Invalid response from server');
       }
-    } catch (error) {
+    } catch (error: any) {
       console.error('Error generating schedule:', error);
       setIsGenerating(false);
       setCurrentStep('Error occurred during generation');
-      toast.error('Failed to generate schedule. Please try again.');
+      
+      // Show specific error message from server if available
+      const errorMessage = error?.response?.data?.message || error?.message || 'Failed to generate schedule from server. Please try again.';
+      toast.error(errorMessage, {
+        duration: 5000,
+        description: error?.response?.data?.success === false ? 'Please check the curriculum year selection' : undefined
+      });
     }
   };
 

@@ -21,6 +21,10 @@ interface Faculty {
   totalUnits?: number;
   currentSemesterLoad?: number;
   maxUnits?: number;
+  yearsOfExperience?: number;
+  previousSubjects?: any;
+  availableDays?: any;
+  preferredTimeSlots?: any;
 }
 
 const FacultyProfile = () => {
@@ -197,7 +201,7 @@ const FacultyProfile = () => {
               </div>
 
               {/* Teaching Load */}
-              {member.totalUnits !== undefined && member.maxUnits && (
+              {/* {member.totalUnits !== undefined && member.maxUnits && (
                 <div className="mb-4">
                   <div className="flex justify-between items-center mb-2">
                     <span className="text-sm font-medium text-gray-700">Teaching Load</span>
@@ -215,10 +219,10 @@ const FacultyProfile = () => {
                     ></div>
                   </div>
                 </div>
-              )}
+              )} */}
 
               {/* Subjects and Date Info */}
-              <div className="flex items-center justify-between text-sm text-gray-600 mb-4">
+              {/* <div className="flex items-center justify-between text-sm text-gray-600 mb-4">
                 <div className="flex items-center">
                   <BookOpen className="w-4 h-4 mr-1" />
                   {member.totalSubjects || 0} subjects
@@ -227,7 +231,7 @@ const FacultyProfile = () => {
                   <Calendar className="w-4 h-4 mr-1" />
                   Since {new Date(member.createdAt).getFullYear()}
                 </div>
-              </div>
+              </div> */}
 
               {/* Actions */}
               <div className="flex space-x-2">
@@ -325,8 +329,99 @@ const FacultyProfile = () => {
                 <p className="text-sm font-medium text-gray-900">{getSpecialization(selectedFaculty.specialization)}</p>
               </div>
 
+              {/* Years of Experience */}
+              {selectedFaculty.yearsOfExperience !== undefined && (
+                <div>
+                  <h3 className="text-lg font-semibold text-gray-900 mb-3">Teaching Experience</h3>
+                  <p className="text-sm font-medium text-gray-900">
+                    {selectedFaculty.yearsOfExperience ? selectedFaculty.yearsOfExperience : 'Not Specified'}
+
+                  </p>
+                </div>
+              )}
+
+              {/* Previous Subjects */}
+              {selectedFaculty.previousSubjects && (
+                <div>
+                  <h3 className="text-lg font-semibold text-gray-900 mb-3">Previous Subjects Taught</h3>
+                  <div className="flex flex-wrap gap-2">
+                    {(() => {
+                      const subjects = typeof selectedFaculty.previousSubjects === 'string' 
+                        ? JSON.parse(selectedFaculty.previousSubjects)
+                        : selectedFaculty.previousSubjects;
+                      
+                      if (Array.isArray(subjects) && subjects.length > 0) {
+                        return subjects.map((subject: string, index: number) => (
+                          <span key={index} className="px-3 py-1 bg-blue-100 text-blue-800 rounded-full text-sm font-medium">
+                            {subject}
+                          </span>
+                        ));
+                      }
+                      return <p className="text-sm text-gray-500">No previous subjects recorded</p>;
+                    })()}
+                  </div>
+                </div>
+              )}
+
+              {/* Time Availability */}
+              <div>
+                <h3 className="text-lg font-semibold text-gray-900 mb-3">Time Availability</h3>
+                <div className="space-y-3">
+                  {/* Available Days */}
+                  {selectedFaculty.availableDays && (
+                    <div>
+                      <label className="block text-xs font-medium text-gray-500 uppercase tracking-wider mb-2">Available Days</label>
+                      <div className="flex flex-wrap gap-2">
+                        {(() => {
+                          const days = typeof selectedFaculty.availableDays === 'string' 
+                            ? JSON.parse(selectedFaculty.availableDays)
+                            : selectedFaculty.availableDays;
+                          
+                          if (Array.isArray(days) && days.length > 0) {
+                            return days.map((day: string, index: number) => (
+                              <span key={index} className="px-3 py-1 bg-green-100 text-green-800 rounded-lg text-sm font-medium">
+                                {day}
+                              </span>
+                            ));
+                          }
+                          return <p className="text-sm text-gray-500">Not specified</p>;
+                        })()}
+                      </div>
+                    </div>
+                  )}
+                  
+                  {/* Preferred Time Slots */}
+                  {selectedFaculty.preferredTimeSlots && (
+                    <div>
+                      <label className="block text-xs font-medium text-gray-500 uppercase tracking-wider mb-2">Preferred Time Slots</label>
+                      <div className="flex items-center gap-2">
+                        {(() => {
+                          const slots = typeof selectedFaculty.preferredTimeSlots === 'string' 
+                            ? JSON.parse(selectedFaculty.preferredTimeSlots)
+                            : selectedFaculty.preferredTimeSlots;
+                          
+                          if (Array.isArray(slots) && slots.length > 0) {
+                            let start = '07:00', end = '19:00';
+                            slots.forEach((slot: string) => {
+                              if (slot.startsWith('start:')) start = slot.replace('start:', '');
+                              if (slot.startsWith('end:')) end = slot.replace('end:', '');
+                            });
+                            return (
+                              <span className="px-4 py-2 bg-purple-100 text-purple-800 rounded-lg text-sm font-semibold">
+                                {start} - {end}
+                              </span>
+                            );
+                          }
+                          return <p className="text-sm text-gray-500">Not specified</p>;
+                        })()}
+                      </div>
+                    </div>
+                  )}
+                </div>
+              </div>
+
               {/* Teaching Load Information */}
-              {selectedFaculty.totalUnits !== undefined && (
+              {/* {selectedFaculty.totalUnits !== undefined && (
                 <div>
                   <h3 className="text-lg font-semibold text-gray-900 mb-3">Teaching Load</h3>
                   <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
@@ -365,7 +460,7 @@ const FacultyProfile = () => {
                     </div>
                   </div>
                 </div>
-              )}
+              )} */}
             </div>
 
             <div className="flex justify-end space-x-3 mt-6 pt-6 border-t border-gray-200">

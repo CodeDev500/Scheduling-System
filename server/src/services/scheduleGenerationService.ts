@@ -2,81 +2,99 @@ import { PrismaClient } from '@prisma/client';
 
 const prisma = new PrismaClient();
 
-interface GenerationParams {
-  department: string;
-  academicYear: string;
-  semester: string;
-  yearLevel?: string;
-  constraints: any[];
-  preferences: any;
+interface CourseInput {
+  id: string | number;
+  subjectCode?: string;
+  subjectDescription?: string;
+  lec?: number;
+  lab?: number;
+  units: number;
+  hours?: number;
+  yearLevel?: number | string;
+  semester?: string | number;
+  period?: string | number;
+  programCode?: string;
+  tags?: any;
 }
 
 interface ScheduleItem {
   id: string;
+  subjectId: string;
   subjectCode: string;
-  subjectDescription: string;
-  faculty?: string;
-  room?: string;
+  subjectName: string;
+  facultyId: string;
+  facultyName: string;
+  roomId: string;
+  roomName: string;
   day: string;
   startTime: string;
   endTime: string;
-  yearLevel: string;
-  section: string;
   units: number;
-  type: 'lecture' | 'laboratory';
+  lec: number;
+  lab: number;
+  yearLevel: string;
+  semester: string;
+  type: 'Lec' | 'Lab' | 'Lec/Lab';
+  recommendedFaculty: any[];
 }
 
-interface Conflict {
-  type: 'TIME_OVERLAP' | 'ROOM_DOUBLE_BOOKING' | 'FACULTY_OVERLOAD' | 'CONSTRAINT_VIOLATION' | 'RESOURCE_UNAVAILABLE';
-  description: string;
-  affectedItems: string[];
-  severity: 'LOW' | 'MEDIUM' | 'HIGH' | 'CRITICAL';
+interface UsedTimeSlot {
+  day: string;
+  startTime: string;
+  endTime: string;
+  facultyId: string;
+  roomId: string;
+  subjectId: string;
+  programCode?: string;
+  yearLevel?: string | number;
 }
 
-interface GenerationResult {
-  success: boolean;
-  scheduleData: ScheduleItem[];
-  conflicts: Conflict[];
-  statistics: {
-    totalSubjects: number;
-    scheduledSubjects: number;
-    conflictsFound: number;
-    roomUtilization: number;
-  };
-}
+// Global state tracking
+let usedTimeSlots: UsedTimeSlot[] = [];
+let globalTimeSlotIndex: number = 0;
+let scheduledCourseCount: number = 0;
 
-// Time slot utilities
-const timeSlots = [
-  '07:00', '07:30', '08:00', '08:30', '09:00', '09:30',
-  '10:00', '10:30', '11:00', '11:30', '12:00', '12:30',
-  '13:00', '13:30', '14:00', '14:30', '15:00', '15:30',
-  '16:00', '16:30', '17:00', '17:30', '18:00', '18:30',
-  '19:00', '19:30', '20:00'
-];
-
-const days = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'];
-
-// Convert time string to minutes for easier calculation
+// Utility functions
 function timeToMinutes(time: string): number {
   const [hours, minutes] = time.split(':').map(Number);
   return hours * 60 + minutes;
 }
 
-// Convert minutes back to time string
-function minutesToTime(minutes: number): string {
-  const hours = Math.floor(minutes / 60);
-  const mins = minutes % 60;
-  return `${hours.toString().padStart(2, '0')}:${mins.toString().padStart(2, '0')}`;
+function addMinutes(timeString: string, minutes: number): string {
+  const [hourStr, minuteStr] = timeString.split(':');
+  const totalMinutes = parseInt(hourStr) * 60 + parseInt(minuteStr) + minutes;
+  const newHour = Math.floor(totalMinutes / 60);
+  const newMinute = totalMinutes % 60;
+  return `${newHour.toString().padStart(2, '0')}:${newMinute.toString().padStart(2, '0')}`;
 }
 
-// Check if two time ranges overlap
+function compareTime(time1: string, time2: string): number {
+  const [hour1, minute1] = time1.split(':').map(Number);
+  const [hour2, minute2] = time2.split(':').map(Number);
+  return (hour1 * 60 + minute1) - (hour2 * 60 + minute2);
+}
+
 function timeRangesOverlap(start1: string, end1: string, start2: string, end2: string): boolean {
-  const start1Min = timeToMinutes(start1);
-  const end1Min = timeToMinutes(end1);
-  const start2Min = timeToMinutes(start2);
-  const end2Min = timeToMinutes(end2);
+  const start1Minutes = timeToMinutes(start1);
+  const end1Minutes = timeToMinutes(end1);
+  const start2Minutes = timeToMinutes(start2);
+  const end2Minutes = timeToMinutes(end2);
+  return start1Minutes < end2Minutes && start2Minutes < end1Minutes;
+}
+
+function hasInstructorGap(start1: string, end1: string, start2: string, end2: string): boolean {
+  const end1Minutes = timeToMinutes(end1);
+  const start2Minutes = timeToMinutes(start2);
+  const end2Minutes = timeToMinutes(end2);
+  const start1Minutes = timeToMinutes(start1);
   
-  return start1Min < end2Min && start2Min < end1Min;
+  if (end1Minutes <= start2Minutes) {
+    return (start2Minutes - end1Minutes) >= 30;
+  }
+  if (end2Minutes <= start1Minutes) {
+    return (start1Minutes - end2Minutes) >= 30;
+  }
+  return false;
 }
 
 // Get available rooms

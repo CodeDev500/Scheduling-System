@@ -254,79 +254,6 @@ const ViewTeachingLoad: React.FC = () => {
       </div>
 
       {/* Summary Cards */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-6">
-        <div className="bg-white rounded-lg shadow-sm p-6">
-          <div className="flex items-center">
-            <div className="p-3 bg-blue-100 rounded-lg">
-              <BookOpen className="w-6 h-6 text-blue-600" />
-            </div>
-            <div className="ml-4">
-              <p className="text-sm font-medium text-gray-500">Total Units</p>
-              <p className="text-2xl font-bold text-gray-900">
-                {teachingLoad.totalUnits}/{teachingLoad.maxUnits}
-              </p>
-              <p className="text-xs text-gray-400">units assigned</p>
-            </div>
-          </div>
-        </div>
-
-        <div className="bg-white rounded-lg shadow-sm p-6">
-          <div className="flex items-center">
-            <div className="p-3 bg-green-100 rounded-lg">
-              <Clock className="w-6 h-6 text-green-600" />
-            </div>
-            <div className="ml-4">
-              <p className="text-sm font-medium text-gray-500">Total Hours</p>
-              <p className="text-2xl font-bold text-gray-900">{teachingLoad.totalHours}</p>
-              <p className="text-xs text-gray-400">hours per week</p>
-            </div>
-          </div>
-        </div>
-
-        <div className="bg-white rounded-lg shadow-sm p-6">
-          <div className="flex items-center">
-            <div className="p-3 bg-purple-100 rounded-lg">
-              <Users className="w-6 h-6 text-purple-600" />
-            </div>
-            <div className="ml-4">
-              <p className="text-sm font-medium text-gray-500">Total Students</p>
-              <p className="text-2xl font-bold text-gray-900">{teachingLoad.totalStudents}</p>
-              <p className="text-xs text-gray-400">across all courses</p>
-            </div>
-          </div>
-        </div>
-
-        <div className="bg-white rounded-lg shadow-sm p-6">
-          <div className="flex items-center">
-            <div className={`p-3 rounded-lg ${workloadStatus.bg}`}>
-              <BarChart3 className={`w-6 h-6 ${workloadStatus.color}`} />
-            </div>
-            <div className="ml-4">
-              <p className="text-sm font-medium text-gray-500">Workload</p>
-              <p className={`text-2xl font-bold ${workloadStatus.color}`}>
-                {teachingLoad.workloadPercentage.toFixed(1)}%
-              </p>
-              <p className={`text-xs ${workloadStatus.color}`}>{workloadStatus.status}</p>
-            </div>
-          </div>
-        </div>
-      </div>
-
-      {/* Workload Alert */}
-      {teachingLoad.workloadPercentage > 100 && (
-        <div className="bg-red-50 border border-red-200 rounded-lg p-4 mb-6">
-          <div className="flex items-center">
-            <AlertCircle className="w-5 h-5 text-red-600 mr-2" />
-            <div>
-              <h3 className="text-sm font-medium text-red-800">Workload Warning</h3>
-              <p className="text-sm text-red-700 mt-1">
-                Your current workload exceeds the recommended maximum of {teachingLoad.maxUnits} units. 
-                Please consider redistributing some courses or contact your department head.
-              </p>
-            </div>
-          </div>
-        </div>
-      )}
 
       {/* Content based on view mode */}
       {viewMode === 'summary' ? (
@@ -409,7 +336,7 @@ const ViewTeachingLoad: React.FC = () => {
                   <th className="px-6 py-4 text-left text-sm font-semibold text-gray-700">Hours</th>
                   <th className="px-6 py-4 text-left text-sm font-semibold text-gray-700">Students</th>
                   <th className="px-6 py-4 text-left text-sm font-semibold text-gray-700">Status</th>
-                  <th className="px-6 py-4 text-left text-sm font-semibold text-gray-700">Actions</th>
+                
                 </tr>
               </thead>
               <tbody className="divide-y divide-gray-200">
@@ -437,11 +364,7 @@ const ViewTeachingLoad: React.FC = () => {
                         {course.status}
                       </span>
                     </td>
-                    <td className="px-6 py-4">
-                      <button className="text-blue-600 hover:text-blue-800 text-sm font-medium">
-                        <Eye className="w-4 h-4" />
-                      </button>
-                    </td>
+
                   </tr>
                 ))}
               </tbody>
@@ -449,17 +372,6 @@ const ViewTeachingLoad: React.FC = () => {
           </div>
         </div>
       )}
-
-      {/* Workload Trend Chart Placeholder */}
-      <div className="bg-white rounded-lg shadow-sm p-6 mt-6">
-        <div className="flex items-center justify-between mb-4">
-          <h3 className="text-lg font-semibold text-gray-800">Workload Trend</h3>
-          <TrendingUp className="w-5 h-5 text-gray-400" />
-        </div>
-        <div className="h-32 bg-gray-50 rounded-lg flex items-center justify-center">
-          <p className="text-gray-500 text-sm">Workload trend chart will be displayed here</p>
-        </div>
-      </div>
     </div>
   );
 };

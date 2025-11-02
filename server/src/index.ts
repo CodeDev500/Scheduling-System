@@ -38,9 +38,10 @@ const corsOptions = {
 
 // Middlewares
 app.use(cors(corsOptions));
-app.use(express.json());
-// app.use(express.urlencoded({ extended: false }));
-app.use(bodyParser.urlencoded({ extended: false }));
+// Increase payload limit to handle large schedule data (default is 100kb)
+app.use(express.json({ limit: '50mb' }));
+app.use(express.urlencoded({ extended: false, limit: '50mb' }));
+app.use(bodyParser.urlencoded({ extended: false, limit: '50mb' }));
 app.use(cookieParser());
 
 app.use(express.static("public"));
@@ -50,6 +51,7 @@ app.get("/uploads/:filename", (req: Request, res: Response) => {
   res.sendFile(`${__dirname}/uploads/${filename}`);
 });
 
+app.use("/specializations", specializationRoutes);
 app.use("/auth", authRoutes);
 app.post("/refresh", refreshToken);
 app.use("/protected", verifyToken, async (req: Request, res: Response) => {
@@ -68,12 +70,12 @@ app.use("/user-subject", userSubjectRoutes);
 app.use("/program", academicProgramRoutes);
 app.use("/curriculum", curriculumRoutes);
 app.use("/schedules", schedulesRoutes);
+app.use("/schedules/generation", scheduleGenerationRoutes);
 app.use("/rooms", roomRoutes);
 app.use("/total-units", totalUnitsRoutes);
 app.use("/faculty-assignments", facultySubjectAssignmentRoutes);
 app.use("/faculty-subjects", facultySubjectRoutes);
-app.use("/schedule-generation", scheduleGenerationRoutes);
-app.use("/specializations", specializationRoutes);
+
 app.use("/program-priorities", programPriorityRoutes);
 app.use("/faculty-recommendations", facultyRecommendationRouter);
 app.use("/academic-years", academicYearRoutes);

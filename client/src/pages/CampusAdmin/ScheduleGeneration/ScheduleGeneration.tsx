@@ -4,8 +4,13 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
+
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { 
-  Grid, 
+  Download, 
+  Filter, 
+  Plus, 
+  RefreshCw, 
   Users, 
   Clock,
   BookOpen,
@@ -19,7 +24,9 @@ import {
   Table,
   Search,
   GripVertical,
-  Save
+  Save,
+  Calendar, FileText,
+  FileSpreadsheet
 } from 'lucide-react';
 import {
   DndContext,
@@ -44,6 +51,7 @@ import { Eye } from 'lucide-react';
 
 // Import extracted components
 import { ScheduleHeader } from './components/ScheduleHeader';
+import { GenerateScheduleModal } from './components/GenerateScheduleModal';
 import { GenerationProgress } from './components/GenerationProgress';
 
 // Import hooks
@@ -61,7 +69,12 @@ import type { GeneratedSchedule, ScheduleItem, FacultyRecommendation, Subject } 
 import type { AcademicProgram } from '../../../types/types';
 
 import { formatTimeRange as formatTimeRangeUtil } from './utils/timeUtils';
+import { validateScheduleConflicts, formatConflictMessage } from './utils/conflictValidation';
+import type { ConflictDetail } from './utils/conflictValidation';
+import { exportToPDF, exportToExcel, exportToCSV } from './utils/exportUtils';
+import { parseDaysCombination } from './utils/dayUtils';
 import api from '@/api/axios';
+
 // Define Schedule type for the sample data
 interface Schedule {
   id: string;
@@ -87,6 +100,8 @@ interface Schedule {
   students?: string;
   recommendedFaculty?: any[];
   roomName?: string;
+  type?: string;
+  allSessions?: Schedule[];
 }
 
 // Utility function to format time range using timeUtils
@@ -101,6 +116,8 @@ const formatTimeRange = (startTime: string, endTime: string): string => {
 const ScheduleGeneration: React.FC = () => {
   const [viewScheduleItem, setViewScheduleItem] = useState<Schedule | null>(null);
   const [showViewModal, setShowViewModal] = useState(false);
+  const [scheduleConflicts, setScheduleConflicts] = useState<ConflictDetail[]>([]);
+  const [showConflictsDialog, setShowConflictsDialog] = useState(false);
   // Redux hooks
   const dispatch = useAppDispatch();
   const { academicPrograms, isLoading: programsLoading, error: programsError } = useAppSelector((state) => state.academicProgram);
@@ -113,6 +130,8 @@ const ScheduleGeneration: React.FC = () => {
   const [searchTerm, setSearchTerm] = useState("");
   const [filterSemester, setFilterSemester] = useState("all");
   const [filterProgram, setFilterProgram] = useState("all");
+  const [curriculumYear, setCurriculumYear] = useState<string>("");
+  const [academicYears, setAcademicYears] = useState<any[]>([]);
   const [programs, setPrograms] = useState<any[]>([]);
   const [programPriorities, setProgramPriorities] = useState<string[]>([]);
   const [showPrioritySettings, setShowPrioritySettings] = useState(false);
@@ -129,6 +148,29 @@ const ScheduleGeneration: React.FC = () => {
       }
     };
     getInstructors();
+  }, []);
+
+  // Modal state
+  const [showGenerateModal, setShowGenerateModal] = useState(false);
+
+  // Fetch academic years and set active one as default
+  useEffect(() => {
+    const loadAcademicYears = async () => {
+      try {
+        const response = await api.get('/academic-years');
+        if (response.data.success) {
+          setAcademicYears(response.data.data);
+          // Set active year as default
+          const activeYear = response.data.data.find((year: any) => year.isActive);
+          if (activeYear) {
+            setCurriculumYear(activeYear.year);
+          }
+        }
+      } catch (error) {
+        console.error('Error loading academic years:', error);
+      }
+    };
+    loadAcademicYears();
   }, []);
 
   // Fetch faculty max units from settings
@@ -181,7 +223,7 @@ const ScheduleGeneration: React.FC = () => {
     generationProgress,
     currentStep,
     handleGenerateSchedule
-  } = useScheduleGeneration(instructors);
+  } = useScheduleGeneration(instructors, curriculumYear);
 
   useEffect(() => {
     // Fetch academic programs and program priorities when component mounts
@@ -213,9 +255,15 @@ const ScheduleGeneration: React.FC = () => {
 
   useEffect(() => {  
     const fetchLatestSavedSchedule = async () => {
+    // Only fetch if curriculumYear is set
+    if (!curriculumYear) {
+      console.log('⏳ Waiting for curriculum year to be set...');
+      return;
+    }
+
     try {
       // Use the unfiltered endpoint that returns all subject_schedules rows
-      const response = await api.get('/schedule-generation/items');
+      const response = await api.get(`/schedules/generation/items?academicYear=${curriculumYear}`);
       const rawData = response.data?.data || [];
       
       console.log('📥 Fetched saved schedules:', rawData);
@@ -239,7 +287,7 @@ const ScheduleGeneration: React.FC = () => {
   };
     // Fetch and display all subject_schedules rows directly (no filters, no wrapping)
     fetchLatestSavedSchedule();
-  }, []);
+  }, [curriculumYear]);
 
   
   // When generating a new schedule, clear current display first
@@ -317,14 +365,28 @@ const ScheduleGeneration: React.FC = () => {
 
 
 // Calculate faculty loads (total units assigned per faculty)
+// IMPORTANT: Count units ONCE per subject, not per session!
 const facultyLoads = useMemo(() => {
   const loads: Record<string, number> = {};
+  const facultySubjects: Record<string, Set<string>> = {}; // Track which subjects each faculty has
   
   schedules?.forEach((schedule) => {
     const facultyId = schedule.facultyId || schedule.faculty;
-    if (facultyId && facultyId !== 'unassigned') {
-      const units = schedule.units || 0;
-      loads[facultyId] = (loads[facultyId] || 0) + units;
+    const subjectCode = schedule.subjectCode || schedule.subject;
+    
+    if (facultyId && facultyId !== 'unassigned' && subjectCode) {
+      // Initialize tracking for this faculty if needed
+      if (!facultySubjects[facultyId]) {
+        facultySubjects[facultyId] = new Set();
+        loads[facultyId] = 0;
+      }
+      
+      // Only add units if this is the first time we see this subject for this faculty
+      if (!facultySubjects[facultyId].has(subjectCode)) {
+        facultySubjects[facultyId].add(subjectCode);
+        const units = schedule.units || 0;
+        loads[facultyId] += units;
+      }
     }
   });
   
@@ -332,8 +394,32 @@ const facultyLoads = useMemo(() => {
 }, [schedules]);
 
 const filteredSchedules = useMemo(() => {
-  // Step 1: Filter schedules based on search term, semester, and program
-  let filtered = schedules?.filter((schedule) => {
+  // Step 1: Expand schedules with combined days into separate rows
+  const expandedSchedules: Schedule[] = [];
+  
+  schedules?.forEach((schedule) => {
+    const dayString = schedule.day || '';
+    
+    // Parse the day combination to get individual days
+    const individualDays = parseDaysCombination(dayString);
+    
+    // If there are multiple days, create a separate row for each day
+    if (individualDays.length > 1) {
+      individualDays.forEach((day) => {
+        expandedSchedules.push({
+          ...schedule,
+          day: day, // Use the full day name (e.g., "Monday", "Tuesday")
+          id: `${schedule.id}-${day}` // Create unique ID for each day
+        });
+      });
+    } else {
+      // Single day or no day, keep as is
+      expandedSchedules.push(schedule);
+    }
+  });
+
+  // Step 2: Filter schedules based on search term, semester, and program
+  let filtered = expandedSchedules.filter((schedule) => {
     const searchMatch =
       !searchTerm ||
       (schedule.facultyName &&
@@ -352,12 +438,12 @@ const filteredSchedules = useMemo(() => {
     return searchMatch && semesterMatch && programMatch;
   });
 
-  // Step 2: If no filters applied, show all schedules
+  // Step 3: If no filters applied, show all schedules
   if (!searchTerm && filterSemester === "all" && filterProgram === "all") {
-    filtered = schedules;
+    filtered = expandedSchedules;
   }
 
-  // Step 3: Sort schedules based on program priority (BSIT → BSCS → BSIS)
+  // Step 4: Sort schedules based on program priority (BSIT → BSCS → BSIS)
   const sortedSchedules =
     programPriorities && programPriorities.length > 0
       ? [...filtered].sort((a, b) => {
@@ -442,8 +528,21 @@ const SortableItem = ({ id, children }: { id: string; children: React.ReactNode 
       return;
     }
     
-    toast.success(`Exporting schedule as ${format.toUpperCase()}...`);
-    // Implementation would go here
+    try {
+      if (format === 'pdf') {
+        exportToPDF(selectedSchedule, curriculumYear, selectedSemester);
+        toast.success('Schedule exported as PDF successfully!');
+      } else if (format === 'excel') {
+        exportToExcel(selectedSchedule, curriculumYear, selectedSemester);
+        toast.success('Schedule exported as Excel successfully!');
+      } else if (format === 'csv') {
+        exportToCSV(selectedSchedule, curriculumYear, selectedSemester);
+        toast.success('Schedule exported as CSV successfully!');
+      }
+    } catch (error) {
+      console.error('Export error:', error);
+      toast.error(`Failed to export schedule as ${format.toUpperCase()}`);
+    }
   };
 
   // Save the currently selected/generated schedule to the server (overwriting previous)
@@ -455,9 +554,35 @@ const SortableItem = ({ id, children }: { id: string; children: React.ReactNode 
         return;
       }
 
-      const response = await api.post('/schedule-generation/save', schedules);
+      // Check if curriculum year is selected
+      if (!curriculumYear) {
+        toast.error('Please select a curriculum year before saving.');
+        return;
+      }
+
+      // Add curriculum year to each schedule
+      const schedulesWithCurriculumYear = schedules.map(schedule => ({
+        ...schedule,
+        curriculumYear: curriculumYear
+      }));
+
+      // Validate for time conflicts before saving
+      const conflicts = validateScheduleConflicts(schedulesWithCurriculumYear);
+      
+      if (conflicts.length > 0) {
+        // Store conflicts and show dialog
+        setScheduleConflicts(conflicts);
+        setShowConflictsDialog(true);
+        
+        // Show error toast
+        toast.error(`Cannot save schedule: ${conflicts.length} conflict(s) detected. Please review the conflicts.`);
+        return;
+      }
+
+      const response = await api.post('/schedules/generation/save', schedulesWithCurriculumYear);
       if (response.data?.success) {
-        toast.success('Schedule saved successfully. Previous schedule has been overwritten.');
+        const message = response.data?.message || `Schedule saved successfully for ${curriculumYear}`;
+        toast.success(message);
       } else {
         toast.error(response.data?.message || 'Failed to save schedule.');
       }
@@ -496,10 +621,21 @@ const SortableItem = ({ id, children }: { id: string; children: React.ReactNode 
         {/* Header Section */}
         <ScheduleHeader
           isGenerating={isGenerating}
-          onGenerateSchedule={handleGenerateSchedule}
+          onOpenGenerateModal={() => setShowGenerateModal(true)}
           onExportSchedule={handleExportSchedule}
           onSaveSchedule={handleSaveSchedule}
           canSave={!!selectedSchedule}
+        />
+
+        {/* Generate Schedule Modal */}
+        <GenerateScheduleModal
+          open={showGenerateModal}
+          onOpenChange={setShowGenerateModal}
+          onGenerate={(year, semester) => {
+            handleGenerateSchedule(year, semester);
+            setShowGenerateModal(false);
+          }}
+          isGenerating={isGenerating}
         />
 
         {/* Generation Progress */}
@@ -526,9 +662,53 @@ const SortableItem = ({ id, children }: { id: string; children: React.ReactNode 
                     <p className="text-blue-100 text-sm">Detailed view of all schedule items</p>
                   </div>
                 </div>
-                <Badge variant="secondary" className="bg-white/20 text-white border-white/30 text-sm font-semibold px-3 py-1">
-                  {schedules.length} schedule items
-                </Badge>
+                <div className='flex gap-2'>
+              
+               
+                <div className="flex items-center space-x-3">
+                  Curriculum Year:
+                </div>
+                <Select value={curriculumYear} onValueChange={setCurriculumYear}>
+                  <SelectTrigger className="w-48 bg-white text-gray-900 border-white/50 hover:bg-white/95 focus:ring-2 focus:ring-white/50 font-semibold shadow-md">
+                    <SelectValue placeholder="Select Curriculum Year" />
+                  </SelectTrigger>
+                  <SelectContent className="bg-white border-gray-200">
+                    {academicYears.map(year => (
+                      <SelectItem 
+                        key={year.id} 
+                        value={year.year} 
+                        className="text-gray-900 hover:bg-blue-50 focus:bg-blue-100 focus:text-blue-900 cursor-pointer"
+                      >
+                        {year.year}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+                  <Select 
+                onValueChange={(value) => handleExportSchedule(value as 'pdf' | 'excel' | 'csv')}
+                >
+                  <SelectTrigger className="w-40">
+                    <SelectValue placeholder="Export as..." />
+                  </SelectTrigger>
+                  <SelectContent className="bg-white border-gray-200">
+                    <SelectItem value="pdf" className="text-gray-900 hover:bg-blue-50 focus:bg-blue-100 focus:text-blue-900 cursor-pointer"
+                      >
+                      <div className="flex items-center space-x-2">
+                        <FileText className="h-4 w-4 text-red-500" />
+                        <span>PDF</span>
+                      </div>
+                    </SelectItem>
+                    <SelectItem value="excel" className="text-gray-900 hover:bg-blue-50 focus:bg-blue-100 focus:text-blue-900 cursor-pointer"
+                      >
+                      <div className="flex items-center space-x-2">
+                        <FileSpreadsheet className="h-4 w-4 text-green-500" />
+                        <span>Excel</span>
+                      </div>
+                    </SelectItem>
+                   
+                  </SelectContent>
+                </Select>
+                 </div>
               </div>
               
               {/* Enhanced Filter Controls */}
@@ -592,14 +772,7 @@ const SortableItem = ({ id, children }: { id: string; children: React.ReactNode 
                       <th className="px-6 py-4 text-left text-xs font-bold text-gray-700 uppercase tracking-wider">
                         <div className="flex items-center space-x-2">
                           <Clock className="h-4 w-4 text-blue-500" />
-                          <span>Schedule</span>
-                        </div>
-                      </th>
-                      {/* Room */}
-                      <th className="px-6 py-4 text-left text-xs font-bold text-gray-700 uppercase tracking-wider">
-                        <div className="flex items-center space-x-2">
-                          <MapPin className="h-4 w-4 text-red-600" />
-                          <span>Room</span>
+                          <span>Schedule & Room</span>
                         </div>
                       </th>
                       {/* Faculty */}
@@ -614,6 +787,13 @@ const SortableItem = ({ id, children }: { id: string; children: React.ReactNode 
                         <div className="flex items-center space-x-2">
                           <GraduationCap className="h-4 w-4 text-purple-600" />
                           <span>Program</span>
+                        </div>
+                      </th>
+                      {/* Semester */}
+                      <th className="px-6 py-4 text-left text-xs font-bold text-gray-700 uppercase tracking-wider">
+                        <div className="flex items-center space-x-2">
+                          <Calendar className="h-4 w-4 text-indigo-600" />
+                          <span>Semester</span>
                         </div>
                       </th>
                       {/* Units */}
@@ -633,95 +813,194 @@ const SortableItem = ({ id, children }: { id: string; children: React.ReactNode 
                     </tr>
                   </thead>
                   <tbody className="bg-white divide-y divide-gray-100">
-                    {filteredSchedules.map((subject, index) => {
-                      return (
-                        <React.Fragment key={subject.id}>
-                          <tr className={`hover:bg-gradient-to-r hover:from-blue-50 hover:to-indigo-50 transition-all duration-200 ${
-                            index % 2 === 0 ? 'bg-gray-50/30' : 'bg-white'
-                          }`}>
-                            {/* Subject */}
-                            <td className="px-6 py-5">
-                              <div>
-                                <div className="text-sm font-bold text-gray-900">{subject?.subjectCode || 'N/A'}</div>
-                                <div className="text-xs text-gray-500 truncate max-w-xs">{subject.subjectName}</div>
-                              </div>
-                            </td>
-                            
-                            {/* Schedule */}
-                            <td className="px-6 py-5 whitespace-nowrap">
-                              <div className="space-y-1">
-                                <Badge variant="outline" className="text-xs px-2 py-1 bg-orange-50 text-orange-700 border-orange-200">
-                                  {subject.day || 'N/A'}
-                                </Badge>
-                                <div className="text-xs text-gray-600">
-                                  {formatTimeRange(subject.startTime || 'N/A', subject.endTime || 'N/A')}
+                    {(() => {
+                      // Group schedules by subject code
+                      const groupedSchedules = filteredSchedules.reduce((acc, subject) => {
+                        const key = `${subject.subjectCode}-${subject.program}-${subject.yearLevel}-${subject.semester}`;
+                        if (!acc[key]) {
+                          acc[key] = [];
+                        }
+                        acc[key].push(subject);
+                        return acc;
+                      }, {} as Record<string, Schedule[]>);
+
+                      return Object.entries(groupedSchedules).map(([key, subjects], groupIndex) => {
+                        // Get the first subject for common info
+                        const firstSubject = subjects[0];
+                        
+                        return (
+                          <React.Fragment key={key}>
+                            <tr className={`hover:bg-gradient-to-r hover:from-blue-50 hover:to-indigo-50 transition-all duration-200 ${
+                              groupIndex % 2 === 0 ? 'bg-gray-50/30' : 'bg-white'
+                            }`}>
+                              {/* Subject */}
+                              <td className="px-6 py-5 truncate max-w-xs">
+                                <div>
+                                  <div className="text-sm font-bold text-gray-900">{firstSubject?.subjectCode || 'N/A'}</div>
+                                  <div className="text-xs text-gray-500 truncate max-w-xs">{firstSubject.subjectName}</div>
                                 </div>
-                              </div>
-                            </td>
-                            
-                            {/* Room */}
-                            <td className="px-6 py-5 whitespace-nowrap">
-                              <div className="text-sm font-semibold text-gray-900">{subject.roomName || 'N/A'}</div>
-                            </td>
-                            
-                            {/* Faculty */}
-                            <td className="px-6 py-5 whitespace-nowrap">
-                              <div>
-                                <div className="text-sm font-semibold text-gray-900">{subject.facultyName}</div>
-                                <div className="text-xs text-gray-500">
+                              </td>
+                              
+                              {/* Schedule - Show all time slots grouped by time and room */}
+                              <td className="px-6 py-5">
+                                <div className="space-y-3">
                                   {(() => {
-                                    const facultyId = subject.facultyId || subject.faculty;
-                                    const assignedUnits = facultyLoads[facultyId] || 0;
-                                    const isOverloaded = assignedUnits > facultyMaxUnits;
-                                    return (
-                                      <span className={isOverloaded ? 'text-red-600 font-medium' : ''}>
-                                        {assignedUnits}/{facultyMaxUnits} units
-                                      </span>
-                                    );
+                                    // Group subjects by time, room, and type
+                                    const grouped = subjects.reduce((acc: any, subject) => {
+                                      const key = `${subject.startTime}-${subject.endTime}-${subject.roomName}-${subject.type}`;
+                                      if (!acc[key]) {
+                                        acc[key] = {
+                                          days: [],
+                                          startTime: subject.startTime,
+                                          endTime: subject.endTime,
+                                          roomName: subject.roomName,
+                                          type: subject.type
+                                        };
+                                      }
+                                      acc[key].days.push(subject.day);
+                                      return acc;
+                                    }, {});
+
+                                    // Convert to array and sort by start time, then by type (Lecture before Lab)
+                                    const sortedGroups = Object.values(grouped).sort((a: any, b: any) => {
+                                      // First sort by start time (with safety checks)
+                                      const timeA = a.startTime || '';
+                                      const timeB = b.startTime || '';
+                                      if (timeA !== timeB) {
+                                        return timeA.localeCompare(timeB);
+                                      }
+                                      // Then by type (Lecture before Laboratory)
+                                      const typeA = a.type || '';
+                                      const typeB = b.type || '';
+                                      return typeA.localeCompare(typeB);
+                                    });
+
+                                    return sortedGroups.map((group: any, idx) => {
+                                      // Sort days in proper order (M, T, W, Th, F, S, Su)
+                                      const dayOrder: any = {
+                                        'Monday': 1,
+                                        'Tuesday': 2,
+                                        'Wednesday': 3,
+                                        'Thursday': 4,
+                                        'Friday': 5,
+                                        'Saturday': 6,
+                                        'Sunday': 7
+                                      };
+                                      
+                                      const sortedDays = [...group.days].sort((a, b) => dayOrder[a] - dayOrder[b]);
+                                      
+                                      // Combine days (e.g., "Monday", "Wednesday" -> "MW")
+                                      const dayAbbr = sortedDays.map((day: string) => {
+                                        const abbr: any = {
+                                          'Monday': 'M',
+                                          'Tuesday': 'T',
+                                          'Wednesday': 'W',
+                                          'Thursday': 'Th',
+                                          'Friday': 'F',
+                                          'Saturday': 'S',
+                                          'Sunday': 'Su'
+                                        };
+                                        return abbr[day] || day.charAt(0);
+                                      }).join('');
+
+                                      return (
+                                        <div key={idx} className="flex whitespace-nowrap items-start gap-3 p-2 bg-gradient-to-r from-blue-50/50 to-indigo-50/50 rounded-lg border border-blue-100">
+                                          <div className="flex-1 min-w-0">
+                                            <div className="flex items-center gap-2 mb-1">
+                                              <Badge variant="outline" className="text-xs px-2 py-1 bg-orange-100 text-orange-700 border-orange-300 font-bold">
+                                                {dayAbbr}
+                                              </Badge>
+                                              <span className="text-xs font-semibold text-gray-700">
+                                                {formatTimeRange(group.startTime || 'N/A', group.endTime || 'N/A')}
+                                              </span>
+                                            </div>
+                                            <div className="flex items-center gap-1 text-xs text-gray-600">
+                                              <MapPin className="h-3 w-3 text-red-500" />
+                                              <span className="font-medium">{group.roomName || 'N/A'}</span>
+                                            </div>
+                                          </div>
+                                        </div>
+                                      );
+                                    });
                                   })()}
                                 </div>
-                              </div>
-                            </td>
-                            
-                            {/* Program */}
-                            <td className="px-6 py-5 whitespace-nowrap">
-                              <div>
-                                <div className="text-sm font-semibold text-gray-900">{subject.program}</div>
-                                <div className="text-xs text-gray-500">{subject.yearLevel}</div>
-                              </div>
-                            </td>
-                            
-                            {/* Units */}
-                            <td className="px-6 py-5 whitespace-nowrap">
-                              <div className="space-y-1">
-                                <Badge variant="outline" className="bg-yellow-50 text-yellow-700 border-yellow-300">
-                                  {subject.units || 0} units
-                                </Badge>
-                                <div className="text-xs text-gray-500">
-                                  Lec: {subject.lec || 0} | Lab: {subject.lab || 0}
+                              </td>
+                              
+                              {/* Removed separate Room column since it's now integrated in Schedule */}
+                              
+                              {/* Faculty */}
+                              <td className="px-6 py-5 whitespace-nowrap">
+                                <div>
+                                  <div className="text-sm font-semibold text-gray-900">{firstSubject.facultyName}</div>
+                                  <div className="text-xs text-gray-500">
+                                    {(() => {
+                                      const facultyId = firstSubject.facultyId || firstSubject.faculty;
+                                      const assignedUnits = facultyLoads[facultyId] || 0;
+                                      const isOverloaded = assignedUnits > facultyMaxUnits;
+                                      return (
+                                        <span className={isOverloaded ? 'text-red-600 font-medium' : ''}>
+                                          {assignedUnits}/{facultyMaxUnits} units
+                                        </span>
+                                      );
+                                    })()}
+                                  </div>
                                 </div>
-                              </div>
-                            </td>
-                            
-                            {/* Actions */}
-                            <td className="px-6 py-5 whitespace-nowrap">
-                              <Button
-                                variant="outline"
-                                size="sm"
-                                onClick={() => {
-                                  setViewScheduleItem(subject);
-                                  setShowViewModal(true);
-                                }}
-                                className="flex items-center gap-2 hover:bg-blue-50"
-                              >
-                                <Eye className="h-4 w-4" />
-                                View
-                              </Button>
-                            </td>
-                          </tr>
-                        </React.Fragment>
-                      );
-                    })}
+                              </td>
+                              
+                              {/* Program */}
+                              <td className="px-6 py-5 whitespace-nowrap">
+                                <div>
+                                  <div className="text-sm font-semibold text-gray-900">{firstSubject.program}</div>
+                                  <div className="text-xs text-gray-500">{firstSubject.yearLevel}</div>
+                                </div>
+                              </td>
+                              
+                              {/* Semester */}
+                              <td className="px-6 py-5 whitespace-nowrap">
+                                <Badge variant="outline" className="bg-indigo-50 text-indigo-700 border-indigo-300">
+                                  {firstSubject.semester || 'N/A'}
+                                </Badge>
+                              </td>
+                              
+                              {/* Units */}
+                              <td className="px-6 py-5 whitespace-nowrap">
+                                <div className="space-y-1">
+                                  <Badge variant="outline" className="bg-yellow-50 text-yellow-700 border-yellow-300">
+                                    {firstSubject.units || 0} units
+                                  </Badge>
+                                  <div className="text-xs text-gray-500">
+                                    Lec: {firstSubject.lec || 0} | Lab: {firstSubject.lab || 0}
+                                  </div>
+                                </div>
+                              </td>
+                              
+                              {/* Actions */}
+                              <td className="px-6 py-5 whitespace-nowrap">
+                                <Button
+                                  variant="outline"
+                                  size="sm"
+                                  onClick={() => {
+                                    // Get ALL sessions for this subject (not just grouped ones)
+                                    const allSubjectSessions = filteredSchedules.filter(s => 
+                                      s.subjectCode === firstSubject.subjectCode &&
+                                      s.program === firstSubject.program &&
+                                      s.yearLevel === firstSubject.yearLevel &&
+                                      s.semester === firstSubject.semester
+                                    );
+                                    setViewScheduleItem({ ...firstSubject, allSessions: allSubjectSessions });
+                                    setShowViewModal(true);
+                                  }}
+                                  className="flex items-center gap-2 hover:bg-blue-50"
+                                >
+                                  <Eye className="h-4 w-4" />
+                                  View
+                                </Button>
+                              </td>
+                            </tr>
+                          </React.Fragment>
+                        );
+                      });
+                    })()}
                   </tbody>
                 </table>
               </div>
@@ -734,7 +1013,7 @@ const SortableItem = ({ id, children }: { id: string; children: React.ReactNode 
                   <h3 className="text-xl font-bold text-gray-900 mb-2">No Generated Schedules</h3>
                   <p className="text-gray-600 mb-6">Generate a schedule to see the detailed schedule items here.</p>
                   <Button 
-                    onClick={handleGenerateSchedule} 
+                    onClick={() => setShowGenerateModal(true)} 
                     disabled={isGenerating}
                     className="bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700"
                   >
@@ -945,28 +1224,128 @@ const SortableItem = ({ id, children }: { id: string; children: React.ReactNode 
                     <Clock className="h-4 w-4" />
                     Schedule Information
                   </h3>
-                  <div className="grid grid-cols-2 gap-4">
-                    <div>
-                      <p className="text-xs text-green-700 font-medium">Day</p>
-                      <Badge variant="outline" className="mt-1 bg-green-100 text-green-800 border-green-300">
-                        {viewScheduleItem.day}
-                      </Badge>
+                  
+                  {viewScheduleItem.allSessions && viewScheduleItem.allSessions.length > 1 ? (
+                    // Show all sessions grouped by time and room
+                    <div className="space-y-4">
+                      {(() => {
+                        // Group sessions by time, room, and type
+                        const grouped = viewScheduleItem.allSessions.reduce((acc: any, session) => {
+                          const key = `${session.startTime}-${session.endTime}-${session.roomName}-${session.type}`;
+                          if (!acc[key]) {
+                            acc[key] = {
+                              days: [],
+                              startTime: session.startTime,
+                              endTime: session.endTime,
+                              roomName: session.roomName,
+                              type: session.type,
+                              semester: session.semester
+                            };
+                          }
+                          acc[key].days.push(session.day);
+                          return acc;
+                        }, {});
+
+                        // Sort groups by start time, then by type
+                        const sortedGroups = Object.values(grouped).sort((a: any, b: any) => {
+                          // Safety checks for undefined values
+                          const timeA = a.startTime || '';
+                          const timeB = b.startTime || '';
+                          if (timeA !== timeB) {
+                            return timeA.localeCompare(timeB);
+                          }
+                          const typeA = a.type || '';
+                          const typeB = b.type || '';
+                          return typeA.localeCompare(typeB);
+                        });
+
+                        return sortedGroups.map((group: any, idx) => {
+                          // Sort days in proper order (M, T, W, Th, F, S, Su)
+                          const dayOrder: any = {
+                            'Monday': 1,
+                            'Tuesday': 2,
+                            'Wednesday': 3,
+                            'Thursday': 4,
+                            'Friday': 5,
+                            'Saturday': 6,
+                            'Sunday': 7
+                          };
+                          
+                          const sortedDays = [...group.days].sort((a, b) => dayOrder[a] - dayOrder[b]);
+                          
+                          // Combine days (e.g., "Monday", "Wednesday" -> "MW")
+                          const dayAbbr = sortedDays.map((day: string) => {
+                            const abbr: any = {
+                              'Monday': 'M',
+                              'Tuesday': 'T',
+                              'Wednesday': 'W',
+                              'Thursday': 'Th',
+                              'Friday': 'F',
+                              'Saturday': 'S',
+                              'Sunday': 'Su'
+                            };
+                            return abbr[day] || day.charAt(0);
+                          }).join('');
+
+                          return (
+                            <div key={idx} className="bg-white rounded-lg p-3 border border-green-200">
+                              {group.type && (
+                                <Badge variant="outline" className="mb-2 bg-purple-100 text-purple-800 border-purple-300">
+                                  {group.type}
+                                </Badge>
+                              )}
+                              <div className="grid grid-cols-2 gap-3">
+                                <div>
+                                  <p className="text-xs text-green-700 font-medium">Days</p>
+                                  <Badge variant="outline" className="mt-1 bg-green-100 text-green-800 border-green-300 font-bold">
+                                    {dayAbbr}
+                                  </Badge>
+                                </div>
+                                <div>
+                                  <p className="text-xs text-green-700 font-medium">Time</p>
+                                  <p className="text-sm font-semibold text-green-900 ">
+                                    {formatTimeRange(group.startTime || 'N/A', group.endTime || 'N/A')}
+                                  </p>
+                                </div>
+                                <div>
+                                  <p className="text-xs text-green-700 font-medium">Room</p>
+                                  <p className="text-sm font-semibold text-green-900">{group.roomName || 'N/A'}</p>
+                                </div>
+                                <div>
+                                  <p className="text-xs text-green-700 font-medium">Semester</p>
+                                  <p className="text-sm font-semibold text-green-900">{group.semester}</p>
+                                </div>
+                              </div>
+                            </div>
+                          );
+                        });
+                      })()}
                     </div>
-                    <div>
-                      <p className="text-xs text-green-700 font-medium">Time</p>
-                      <p className="text-sm font-semibold text-green-900">
-                        {formatTimeRange(viewScheduleItem.startTime || 'N/A', viewScheduleItem.endTime || 'N/A')}
-                      </p>
+                  ) : (
+                    // Show single session
+                    <div className="grid grid-cols-2 gap-4">
+                      <div>
+                        <p className="text-xs text-green-700 font-medium">Day</p>
+                        <Badge variant="outline" className="mt-1 bg-green-100 text-green-800 border-green-300">
+                          {viewScheduleItem.day}
+                        </Badge>
+                      </div>
+                      <div>
+                        <p className="text-xs text-green-700 font-medium">Time</p>
+                        <p className="text-sm font-semibold text-green-900">
+                          {formatTimeRange(viewScheduleItem.startTime || 'N/A', viewScheduleItem.endTime || 'N/A')}
+                        </p>
+                      </div>
+                      <div>
+                        <p className="text-xs text-green-700 font-medium">Room</p>
+                        <p className="text-sm font-semibold text-green-900">{viewScheduleItem.roomName || 'N/A'}</p>
+                      </div>
+                      <div>
+                        <p className="text-xs text-green-700 font-medium">Semester</p>
+                        <p className="text-sm font-semibold text-green-900">{viewScheduleItem.semester}</p>
+                      </div>
                     </div>
-                    <div>
-                      <p className="text-xs text-green-700 font-medium">Room</p>
-                      <p className="text-sm font-semibold text-green-900">{viewScheduleItem.roomName || 'N/A'}</p>
-                    </div>
-                    <div>
-                      <p className="text-xs text-green-700 font-medium">Semester</p>
-                      <p className="text-sm font-semibold text-green-900">{viewScheduleItem.semester}</p>
-                    </div>
-                  </div>
+                  )}
                 </div>
 
                 {/* Faculty Information */}
@@ -998,26 +1377,87 @@ const SortableItem = ({ id, children }: { id: string; children: React.ReactNode 
                   {/* Faculty Recommendations */}
                   {viewScheduleItem.recommendedFaculty && viewScheduleItem.recommendedFaculty.length > 0 && (
                     <div className="mt-4 pt-4 border-t border-purple-200">
-                      <p className="text-xs text-purple-700 font-medium mb-2">Recommended Faculty (Based on Specialization Match)</p>
+                      <p className="text-xs text-purple-700 font-medium mb-2">Recommended Faculty (Ranked by Priority)</p>
                       <div className="space-y-2">
-                        {viewScheduleItem.recommendedFaculty.slice(0, 3).map((faculty: any, index: number) => (
-                          <div key={index} className="flex items-center justify-between bg-white rounded-lg p-3 border border-purple-100">
-                            <div className="flex items-center gap-3">
-                              <div className="w-8 h-8 bg-purple-100 rounded-full flex items-center justify-center">
-                                <User className="h-4 w-4 text-purple-600" />
+                        {viewScheduleItem.recommendedFaculty.slice(0, 3).map((faculty: any, index: number) => {
+                          const rankLabels = ['1st Choice', '2nd Choice', '3rd Choice'];
+                          const rankColors = [
+                            'bg-yellow-100 text-yellow-800 border-yellow-300',
+                            'bg-gray-100 text-gray-800 border-gray-300',
+                            'bg-orange-100 text-orange-800 border-orange-300'
+                          ];
+                          
+                          return (
+                            <div key={index} className="flex items-center justify-between bg-white rounded-lg p-3 border border-purple-100">
+                              <div className="flex items-center gap-3 flex-1">
+                                <div className={`w-8 h-8 rounded-full flex items-center justify-center font-bold text-sm ${
+                                  index === 0 ? 'bg-yellow-100 text-yellow-700' :
+                                  index === 1 ? 'bg-gray-100 text-gray-700' :
+                                  'bg-orange-100 text-orange-700'
+                                }`}>
+                                  {index + 1}
+                                </div>
+                                <div className="flex-1">
+                                  <p className="text-sm font-semibold text-gray-900">
+                                    {faculty.firstname} {faculty.lastname}
+                                  </p>
+                                  <p className="text-xs text-gray-500">{faculty.email}</p>
+                                  <div className="space-y-1 mt-1">
+                                    <div className="flex items-center gap-2">
+                                      <span className="text-xs font-medium text-gray-700">
+                                        Tag Match: {faculty.tagMatchPercentage || 0}%
+                                      </span>
+                                      {faculty.matchedTagsCount !== undefined && faculty.totalTagsCount !== undefined && (
+                                        <span className="text-xs text-gray-500">
+                                          ({faculty.matchedTagsCount}/{faculty.totalTagsCount} tags)
+                                        </span>
+                                      )}
+                                    </div>
+                                    <div className="flex items-center gap-3 text-xs text-gray-600">
+                                      {faculty.yearsOfExperience !== undefined && (
+                                        <span className="flex items-center gap-1">
+                                          <span className="font-medium">Experience:</span> {faculty.yearsOfExperience} {faculty.yearsOfExperience === 1 ? 'year' : 'years'}
+                                        </span>
+                                      )}
+                                      {faculty.designation && (
+                                        <span className="flex items-center gap-1">
+                                          <span className="font-medium">Status:</span> {faculty.designation}
+                                        </span>
+                                      )}
+                                    </div>
+                                    {faculty.preferredTimeSlots && faculty.preferredTimeSlots.length > 0 && (
+                                      <div className="text-xs text-gray-600">
+                                        <span className="font-medium">Available:</span>{' '}
+                                        {(() => {
+                                          let start = '07:00', end = '17:00';
+                                          faculty.preferredTimeSlots.forEach((slot: string) => {
+                                            if (slot.startsWith('start:')) start = slot.replace('start:', '');
+                                            if (slot.startsWith('end:')) end = slot.replace('end:', '');
+                                          });
+                                          return `${start} - ${end}`;
+                                        })()}
+                                      </div>
+                                    )}
+                                    {faculty.previousSubjects && faculty.previousSubjects.length > 0 && (
+                                      <div className="text-xs">
+                                        <span className="font-medium text-green-700">✓ Has taught:</span>{' '}
+                                        <span className="text-gray-600">
+                                          {Array.isArray(faculty.previousSubjects) 
+                                            ? faculty.previousSubjects.slice(0, 3).join(', ')
+                                            : faculty.previousSubjects}
+                                          {faculty.previousSubjects.length > 3 && '...'}
+                                        </span>
+                                      </div>
+                                    )}
+                                  </div>
+                                </div>
                               </div>
-                              <div>
-                                <p className="text-sm font-semibold text-gray-900">
-                                  {faculty.firstname} {faculty.lastname}
-                                </p>
-                                <p className="text-xs text-gray-500">{faculty.email}</p>
-                              </div>
+                              <Badge variant="outline" className={`font-semibold ${rankColors[index]}`}>
+                                {rankLabels[index]}
+                              </Badge>
                             </div>
-                            <Badge variant="secondary" className="bg-green-100 text-green-800">
-                              {Math.round(faculty.matchScore || 0)}% Match
-                            </Badge>
-                          </div>
-                        ))}
+                          );
+                        })}
                       </div>
                     </div>
                   )}
@@ -1051,6 +1491,7 @@ const SortableItem = ({ id, children }: { id: string; children: React.ReactNode 
                     <div>
                       <p className="text-xs text-yellow-700 font-medium">Hours/Week</p>
                       <Badge variant="outline" className="mt-1 bg-green-100 text-green-800 border-green-300 font-bold">
+                        {/* Calculation: Lec units × 1 hour + Lab units × 3 hours */}
                         {((viewScheduleItem.lec || 0) * 1) + ((viewScheduleItem.lab || 0) * 3)} hrs
                       </Badge>
                     </div>
@@ -1060,6 +1501,123 @@ const SortableItem = ({ id, children }: { id: string; children: React.ReactNode 
 
               <div className="flex justify-end gap-3 mt-6 pt-4 border-t">
                 <Button variant="outline" onClick={() => setShowViewModal(false)}>
+                  Close
+                </Button>
+              </div>
+            </DialogContent>
+          </Dialog>
+        )}
+
+        {/* Schedule Conflicts Dialog */}
+        {showConflictsDialog && (
+          <Dialog open={showConflictsDialog} onOpenChange={setShowConflictsDialog}>
+            <DialogContent className="max-w-4xl max-h-[80vh] overflow-y-auto">
+              <DialogHeader>
+                <DialogTitle className="flex items-center gap-3">
+                  <div className="p-2 bg-red-100 rounded-lg">
+                    <AlertTriangle className="h-6 w-6 text-red-600" />
+                  </div>
+                  <div>
+                    <span className="text-xl font-bold text-red-900">Schedule Conflicts Detected</span>
+                    <p className="text-sm text-gray-500 font-normal">
+                      {scheduleConflicts.length} conflict{scheduleConflicts.length !== 1 ? 's' : ''} found in the schedule
+                    </p>
+                  </div>
+                </DialogTitle>
+              </DialogHeader>
+
+              <div className="space-y-4 mt-4">
+                <div className="p-4 bg-gradient-to-r from-red-50 to-orange-50 rounded-lg border border-red-200">
+                  <div className="flex items-start space-x-3">
+                    <AlertTriangle className="h-5 w-5 text-red-600 mt-0.5 flex-shrink-0" />
+                    <div>
+                      <p className="text-sm font-semibold text-red-900 mb-1">Cannot Save Schedule</p>
+                      <p className="text-sm text-red-700">
+                        The following conflicts must be resolved before saving. Classes with the same program, 
+                        year level, and overlapping day patterns cannot have overlapping time slots.
+                      </p>
+                    </div>
+                  </div>
+                </div>
+
+                <div className="space-y-3">
+                  {scheduleConflicts.map((conflict, index) => (
+                    <div 
+                      key={index} 
+                      className="border border-red-200 rounded-lg p-4 bg-white hover:bg-red-50 transition-colors"
+                    >
+                      <div className="flex items-start justify-between">
+                        <div className="flex-1">
+                          <div className="flex items-center gap-2 mb-2">
+                            <Badge variant="outline" className="bg-red-100 text-red-800 border-red-300 font-semibold">
+                              Conflict #{index + 1}
+                            </Badge>
+                            <Badge variant="outline" className={
+                              conflict.conflictType === 'room' 
+                                ? "bg-orange-100 text-orange-800 border-orange-300" 
+                                : "bg-blue-100 text-blue-800 border-blue-300"
+                            }>
+                              {conflict.conflictType === 'room' ? '🚪 Room Conflict' : '👨‍🏫 Instructor Conflict'}
+                            </Badge>
+                            {conflict.conflictType === 'room' && conflict.room && (
+                              <Badge variant="outline" className="bg-yellow-100 text-yellow-800 border-yellow-300">
+                                {conflict.room}
+                              </Badge>
+                            )}
+                            {conflict.conflictType === 'instructor' && (
+                              <>
+                                <Badge variant="outline" className="bg-blue-100 text-blue-800 border-blue-300">
+                                  {conflict.instructor || 'Unknown Instructor'}
+                                </Badge>
+                                <Badge variant="outline" className="bg-purple-100 text-purple-800 border-purple-300">
+                                  {conflict.yearLevel}
+                                </Badge>
+                              </>
+                            )}
+                          </div>
+                          
+                          <div className="space-y-2">
+                            <div className="flex items-center gap-2 text-sm">
+                              <BookOpen className="h-4 w-4 text-gray-500" />
+                              <span className="font-semibold text-gray-900">{conflict.subjectA}</span>
+                              <span className="text-gray-500">overlaps with</span>
+                              <span className="font-semibold text-gray-900">{conflict.subjectB}</span>
+                            </div>
+                            
+                            <div className="flex items-center gap-4 text-sm text-gray-600 ml-6">
+                              <div className="flex items-center gap-1">
+                                <Clock className="h-4 w-4" />
+                                <span>Days: <strong>{conflict.days}</strong></span>
+                              </div>
+                              <div className="flex items-center gap-1">
+                                <Clock className="h-4 w-4" />
+                                <span>Time: <strong>{formatTimeRange(conflict.startTime, conflict.endTime)}</strong></span>
+                              </div>
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+
+                <div className="p-4 bg-blue-50 rounded-lg border border-blue-200">
+                  <div className="flex items-start space-x-3">
+                    <Info className="h-5 w-5 text-blue-600 mt-0.5 flex-shrink-0" />
+                    <div className="text-sm text-blue-900">
+                      <p className="font-semibold mb-1">How to resolve conflicts:</p>
+                      <ul className="list-disc list-inside space-y-1 text-blue-800">
+                        <li>Regenerate the schedule to get a new conflict-free arrangement</li>
+                        <li>Manually adjust the conflicting class times in the schedule generation settings</li>
+                        <li>Review the curriculum to ensure proper course distribution</li>
+                      </ul>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              <div className="flex justify-end gap-3 mt-6 pt-4 border-t">
+                <Button variant="outline" onClick={() => setShowConflictsDialog(false)}>
                   Close
                 </Button>
               </div>
