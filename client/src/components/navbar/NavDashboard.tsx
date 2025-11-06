@@ -39,7 +39,7 @@ const NavDashboard: React.FC<NavDashboardProps> = ({ handleBurger }) => {
       <div className="flex justify-between items-center w-full">
         <h1 className="md:text-2xl text-sm font-bold text-main">{title}</h1>
         <div className="flex items-center lg:text-[16px] text-sm sm:gap-4 gap-2">
-          <div className="relative flex items-center">
+          {/* <div className="relative flex items-center">
             {unread > 0 && (
               <span className="text-sm px-1.5 absolute right-[-10px] top-[-10px] text-white bg-red-600 rounded-full">
                 {unread}
@@ -52,7 +52,7 @@ const NavDashboard: React.FC<NavDashboardProps> = ({ handleBurger }) => {
             >
               <IoMdNotificationsOutline className="text-2xl" />
             </button>
-          </div>
+          </div> */}
           <div className="flex items-center sm:gap-3 gap-2">
             <div className="flex flex-col">
               <span className="font-bold">{userData?.firstname} {userData?.lastname}</span>

@@ -9,6 +9,8 @@ import {
 import { FaFacebookF, FaTwitter, FaLinkedinIn } from "react-icons/fa";
 import Button from "../../components/buttons/Button";
 import InputField from "../../components/input_field/InputField";
+import emailjs from '@emailjs/browser';
+import { toast } from 'react-toastify';
 
 const ContactUs = () => {
   const [formData, setFormData] = useState({
@@ -28,6 +30,11 @@ const ContactUs = () => {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [submitSuccess, setSubmitSuccess] = useState(false);
 
+  // EmailJS Configuration - Replace with your actual values
+  const EMAILJS_SERVICE_ID = import.meta.env.VITE_EMAILJS_SERVICE_ID || 'service_rxa0rlc';
+  const EMAILJS_TEMPLATE_ID = import.meta.env.VITE_EMAILJS_TEMPLATE_ID || 'template_w97c13r';
+  const EMAILJS_PUBLIC_KEY = import.meta.env.VITE_EMAILJS_PUBLIC_KEY || 'PGlAvPNZGOAijDCyZ';
+
   const handleChange = (
     e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>
   ) => {
@@ -37,17 +44,62 @@ const ContactUs = () => {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    
+    // Basic validation
+    const newErrors = {
+      name: formData.name.trim() ? "" : "Name is required",
+      email: formData.email.trim() ? "" : "Email is required",
+      subject: formData.subject.trim() ? "" : "Subject is required",
+      message: formData.message.trim() ? "" : "Message is required",
+    };
+
+    setErrors(newErrors);
+
+    // Check if there are any errors
+    if (Object.values(newErrors).some(error => error !== "")) {
+      toast.error('Please fill in all required fields');
+      return;
+    }
+
     setIsSubmitting(true);
     
-    // Simulate API call
-    setTimeout(() => {
-      console.log(formData);
-      setIsSubmitting(false);
-      setSubmitSuccess(true);
-      setFormData({ name: "", email: "", subject: "", message: "" });
+    try {
+      // Prepare template parameters for EmailJS
+      const templateParams = {
+        from_name: formData.name,
+        from_email: formData.email,
+        subject: formData.subject,
+        message: formData.message,
+        to_name: 'OptiSched Team', // You can customize this
+      };
+
+      // Send email using EmailJS
+      const response = await emailjs.send(
+        EMAILJS_SERVICE_ID,
+        EMAILJS_TEMPLATE_ID,
+        templateParams,
+        EMAILJS_PUBLIC_KEY
+      );
+
+      console.log('Email sent successfully:', response);
       
+      // Show success message
+      setSubmitSuccess(true);
+      toast.success('Message sent successfully! We\'ll get back to you soon.');
+      
+      // Reset form
+      setFormData({ name: "", email: "", subject: "", message: "" });
+      setErrors({ name: "", email: "", subject: "", message: "" });
+      
+      // Hide success message after 5 seconds
       setTimeout(() => setSubmitSuccess(false), 5000);
-    }, 1500);
+      
+    } catch (error: any) {
+      console.error('Failed to send email:', error);
+      toast.error('Failed to send message. Please try again or contact us directly.');
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
   return (

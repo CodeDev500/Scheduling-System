@@ -1,9 +1,11 @@
 import React, { useState, useEffect } from "react";
-import { Search, Filter, Calendar, Clock, MapPin, User, Download, Eye, ChevronLeft, ChevronRight } from "lucide-react";
+import { Search, Calendar, Clock, MapPin, Download } from "lucide-react";
 import DashboardHeader from "../../../components/dashboard/DashboardHeader";
 import { useAppSelector } from "../../../hooks/redux";
 import api from "../../../api/axios";
 import { useToast } from "../../../hooks/useToast";
+import jsPDF from 'jspdf';
+import autoTable from 'jspdf-autotable';
 
 interface Schedule {
   id: string;
@@ -21,6 +23,7 @@ interface Schedule {
   status: 'Active' | 'Completed' | 'Cancelled';
   students: number;
   maxStudents: number;
+  totalStudents?: number;
 }
 
 const ViewSchedules: React.FC = () => {
@@ -29,8 +32,7 @@ const ViewSchedules: React.FC = () => {
   const [filterCurriculumYear, setFilterCurriculumYear] = useState("all");
   const [filterSemester, setFilterSemester] = useState("all");
   const [filterDay, setFilterDay] = useState("all");
-  const [isLoading, setIsLoading] = useState(false);
-  const [curriculumYears, setCurriculumYears] = useState<string[]>([]);
+  const [curriculumYears, setCurriculumYears] = useState<any[]>([]);
   
   const user = useAppSelector((state) => state.auth.user);
   const toast = useToast();
@@ -40,7 +42,6 @@ const ViewSchedules: React.FC = () => {
     const fetchSchedules = async () => {
       if (!user?.id) return;
       
-      setIsLoading(true);
       try {
         // Fetch all schedules
         const schedulesResponse = await api.get('/schedules/latest');
@@ -67,24 +68,42 @@ const ViewSchedules: React.FC = () => {
           section: schedule.section || 'A',
           status: 'Active' as const,
           students: schedule.enrolledStudents || 0,
-          maxStudents: schedule.maxStudents || 30
+          maxStudents: schedule.maxStudents || 30,
+          totalStudents: schedule.totalStudents || (schedule.students ? parseInt(schedule.students) : 0)
         }));
         
         setSchedules(transformedSchedules);
         
-        // Extract unique curriculum years
-        const years = Array.from(new Set(transformedSchedules.map((s: Schedule) => s.academicYear))).filter((y): y is string => !!y);
-        setCurriculumYears(years.sort().reverse());
+      
       } catch (error) {
         console.error('Error fetching schedules:', error);
         toast.error('Failed to load schedules');
-      } finally {
-        setIsLoading(false);
       }
     };
     
     fetchSchedules();
   }, [user?.id, toast]);
+
+    // Fetch academic years on mount
+  useEffect(() => {
+    const fetchAcademicYears = async () => {
+      try {
+        const response = await api.get('/academic-years');
+        if (response.data.success) {
+          const years = response.data.data;
+          setCurriculumYears(years);
+          // Set active year as default filter
+          const activeYear = years.find((year: any) => year.isActive);
+          if (activeYear) {
+            setFilterCurriculumYear(activeYear.year);
+          }
+        }
+      } catch (error) {
+        console.error('Error loading academic years:', error);
+      }
+    };
+    fetchAcademicYears();
+  }, []);
 
   // Filter schedules based on search and filters
   const filteredSchedules = schedules.filter(schedule => {
@@ -98,18 +117,76 @@ const ViewSchedules: React.FC = () => {
     const matchesSemester = filterSemester === "all" || schedule.semester === filterSemester;
     const matchesDay = filterDay === "all" || schedule.day === filterDay;
 
-    return matchesSearch && matchesCurriculumYear && matchesSemester && matchesDay ;
+    return matchesSearch && matchesCurriculumYear && matchesSemester && matchesDay;
   });
 
+  // Export to PDF function
+  const handleExportToPDF = () => {
+    if (!filteredSchedules || filteredSchedules.length === 0) {
+      toast.error('No schedules to export');
+      return;
+    }
 
-
-
-  const getStatusColor = (status: string) => {
-    switch (status) {
-      case 'Active': return 'bg-green-100 text-green-800';
-      case 'Completed': return 'bg-blue-100 text-blue-800';
-      case 'Cancelled': return 'bg-red-100 text-red-800';
-      default: return 'bg-gray-100 text-gray-800';
+    try {
+      const doc = new jsPDF('landscape');
+      
+      // Add title
+      doc.setFontSize(18);
+      doc.text('My Teaching Schedules', 14, 15);
+      
+      // Add faculty info
+      doc.setFontSize(11);
+      if (user?.firstname && user?.lastname) {
+        doc.text(`Faculty: ${user.firstname} ${user.lastname}`, 14, 25);
+      }
+      doc.text(`Generated: ${new Date().toLocaleDateString()}`, 14, 32);
+      
+      // Prepare table data
+      const tableData = filteredSchedules.map((schedule) => [
+        schedule.code,
+        schedule.subject,
+        schedule.day,
+        `${schedule.startTime} - ${schedule.endTime}`,
+        schedule.room,
+        `${schedule.yearLevel} - ${schedule.section}`,
+        schedule.totalStudents || 0,
+        schedule.semester,
+        schedule.program
+      ]);
+      
+      // Add table
+      autoTable(doc, {
+        startY: 38,
+        head: [['Code', 'Subject', 'Day', 'Time', 'Room', 'Class', 'Students', 'Semester', 'Program']],
+        body: tableData,
+        theme: 'striped',
+        headStyles: { fillColor: [127, 29, 29], textColor: 255, fontSize: 9 },
+        bodyStyles: { fontSize: 8 },
+        alternateRowStyles: { fillColor: [245, 247, 250] },
+        margin: { top: 38 },
+        styles: {
+          overflow: 'linebreak',
+          cellWidth: 'wrap'
+        },
+        columnStyles: {
+          0: { cellWidth: 25 },
+          1: { cellWidth: 50 },
+          2: { cellWidth: 25 },
+          3: { cellWidth: 35 },
+          4: { cellWidth: 25 },
+          5: { cellWidth: 25 },
+          6: { cellWidth: 20 },
+          7: { cellWidth: 30 },
+          8: { cellWidth: 30 }
+        }
+      });
+      
+      const fileName = `my_schedules_${new Date().getTime()}.pdf`;
+      doc.save(fileName);
+      toast.success('Schedule exported as PDF successfully!');
+    } catch (error) {
+      console.error('Export error:', error);
+      toast.error('Failed to export schedule as PDF');
     }
   };
 
@@ -143,8 +220,8 @@ const ViewSchedules: React.FC = () => {
               onChange={(e) => setFilterCurriculumYear(e.target.value)}
             >
               <option value="all">All Years</option>
-              {curriculumYears.map(year => (
-                <option key={year} value={year}>{year}</option>
+              {curriculumYears?.map(year => (
+                <option key={year.id} value={year.year}>{year.year}</option>
               ))}
             </select>
           </div>
@@ -185,9 +262,12 @@ const ViewSchedules: React.FC = () => {
           <div className="p-6 border-b border-gray-200">
             <div className="flex justify-between items-center">
               <h3 className="text-lg font-semibold text-gray-800">Schedule List</h3>
-              <button className="flex items-center px-4 py-2 bg-red-800 text-white rounded-lg hover:bg-red-900 transition-colors">
+              <button 
+                onClick={handleExportToPDF}
+                className="flex items-center px-4 py-2 bg-red-800 text-white rounded-lg hover:bg-red-900 transition-colors"
+              >
                 <Download className="w-4 h-4 mr-2" />
-                Export
+                Export to PDF
               </button>
             </div>
           </div>
@@ -200,7 +280,7 @@ const ViewSchedules: React.FC = () => {
                   <th className="px-6 py-4 text-left text-sm font-semibold text-gray-700">Schedule</th>
                   <th className="px-6 py-4 text-left text-sm font-semibold text-gray-700">Room</th>
                   <th className="px-6 py-4 text-left text-sm font-semibold text-gray-700">Class</th>
-                  {/* <th className="px-6 py-4 text-left text-sm font-semibold text-gray-700">Students</th> */}
+                  {/* <th className="px-6 py-4 text-left text-sm font-semibold text-gray-700">Total Students</th> */}
                 </tr>
               </thead>
               <tbody className="divide-y divide-gray-200">
@@ -235,7 +315,7 @@ const ViewSchedules: React.FC = () => {
                       {schedule.yearLevel} - {schedule.section}
                     </td>
                     {/* <td className="px-6 py-4 text-sm text-gray-900">
-                      {schedule.students}/{schedule.maxStudents}
+                      {schedule.totalStudents || 0}
                     </td> */}
                   </tr>
                 ))}

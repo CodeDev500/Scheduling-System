@@ -300,6 +300,8 @@ model SubjectSchedule {
   lec             Int      @default(0)
   lab             Int      @default(0)
   students        String?
+  totalStudents   Int?     @default(0)
+  type            String?  @db.VarChar(32)
   tags            Json?
   recommendedFaculty Json?
   hasConflict     Boolean?

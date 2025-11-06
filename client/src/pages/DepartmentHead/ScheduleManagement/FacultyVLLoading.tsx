@@ -68,6 +68,7 @@ interface Schedule {
   yearLevel: string;
   courseCode?: string;
   students?: string;
+  totalStudents?: number;
   recommendedFaculty?: any[];
   roomName?: string;
   type?: string;
@@ -150,19 +151,17 @@ const userData = useAppSelector((state) => state.auth.user);
       // Use the unfiltered endpoint that returns all subject_schedules rows
       const response = await api.get(`/schedules/generation/items?academicYear=${curriculumYear}`);
       const rawData = response.data?.data || [];
-      
-      console.log('📥 Fetched saved schedules:', rawData);
-      
+ 
       // Ensure lec and lab fields are properly mapped
       const mappedSchedules = rawData.map((item: any) => ({
         ...item,
         lec: item.lec || 0,
         lab: item.lab || 0,
         units: item.units || 0,
-        facultyId: item.facultyId || item.faculty
+        facultyId: item.facultyId || item.faculty,
+        totalStudents: item.totalStudents || (item.students ? parseInt(item.students) : 0)
       }));
-      
-      console.log('📊 Mapped schedules with lec/lab:', mappedSchedules);
+
       setSchedules(mappedSchedules);
     } catch (error: any) {
       if (error?.response?.status !== 404) {
@@ -495,7 +494,8 @@ const filteredSchedules = useMemo(() => {
       program: userData?.department || '',
       yearLevel: '',
       roomName: '',
-      type: 'Lecture'
+      type: 'Lecture',
+      totalStudents: 0
     });
     setIsAddingNew(true);
     setSubjectSearch('');
@@ -509,11 +509,28 @@ const filteredSchedules = useMemo(() => {
     if (!editScheduleItem) return;
 
     try {
+      // Prepare the base data with all fields including totalStudents
+      const baseData = {
+        subjectCode: editScheduleItem.subjectCode,
+        subjectName: editScheduleItem.subjectName,
+        units: editScheduleItem.units || 0,
+        lec: editScheduleItem.lec || 0,
+        lab: editScheduleItem.lab || 0,
+        facultyId: editScheduleItem.facultyId,
+        facultyName: editScheduleItem.facultyName,
+        semester: editScheduleItem.semester,
+        academicYear: editScheduleItem.academicYear,
+        program: editScheduleItem.program,
+        yearLevel: editScheduleItem.yearLevel,
+        totalStudents: editScheduleItem.totalStudents || 0
+      };
+
+
       if (isAddingNew) {
         // Create new schedules for each session
         const promises = scheduleSessions.map(session => 
           api.post('/schedules/generation/items', {
-            ...editScheduleItem,
+            ...baseData,
             day: session.day,
             type: session.type,
             startTime: session.startTime,
@@ -543,7 +560,7 @@ const filteredSchedules = useMemo(() => {
         // Create new sessions
         const promises = scheduleSessions.map(session => 
           api.post('/schedules/generation/items', {
-            ...editScheduleItem,
+            ...baseData,
             day: session.day,
             type: session.type,
             startTime: session.startTime,
@@ -934,6 +951,13 @@ const filteredSchedules = useMemo(() => {
                           <span>Units</span>
                         </div>
                       </th>
+                      {/* Total Students */}
+                      {/* <th className="px-6 py-4 text-left text-xs font-bold text-gray-700 uppercase tracking-wider">
+                        <div className="flex items-center space-x-2">
+                          <Users className="h-4 w-4 text-indigo-500" />
+                          <span>Students</span>
+                        </div>
+                      </th> */}
                       {/* Actions */}
                       <th className="px-6 py-4 text-left text-xs font-bold text-gray-700 uppercase tracking-wider">
                         <div className="flex items-center space-x-2">
@@ -1104,6 +1128,13 @@ const filteredSchedules = useMemo(() => {
                                   </div>
                                 </div>
                               </td>
+                              
+                              {/* Total Students */}
+                              {/* <td className="px-6 py-5 whitespace-nowrap">
+                                <Badge variant="outline" className="bg-indigo-50 text-indigo-700 border-indigo-300">
+                                  {firstSubject.totalStudents || 0}
+                                </Badge>
+                              </td> */}
                               
                               {/* Actions */}
                               <td className="px-6 py-5 whitespace-nowrap">
@@ -1885,7 +1916,7 @@ const filteredSchedules = useMemo(() => {
                     <Award className="h-4 w-4" />
                     Units Information
                   </h3>
-                  <div className="grid grid-cols-3 gap-4">
+                  <div className="grid grid-cols-4 gap-4">
                     <div>
                       <label className="text-xs text-yellow-700 font-medium block mb-1">Lecture Units *</label>
                       <input
@@ -1923,6 +1954,20 @@ const filteredSchedules = useMemo(() => {
                         className="w-full px-3 py-2 border border-yellow-300 rounded-lg text-sm bg-yellow-100 cursor-not-allowed"
                       />
                     </div>
+                    {/* <div>
+                      <label className="text-xs text-yellow-700 font-medium block mb-1">Total Students *</label>
+                      <input
+                        type="number"
+                        min="0"
+                        value={editScheduleItem.totalStudents || 0}
+                        onChange={(e) => {
+                          const totalStudents = parseInt(e.target.value) || 0;
+                          setEditScheduleItem({ ...editScheduleItem, totalStudents });
+                        }}
+                        className="w-full px-3 py-2 border border-yellow-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-yellow-500"
+                        placeholder="e.g., 40"
+                      />
+                    </div> */}
                   </div>
                 </div>
               </div>

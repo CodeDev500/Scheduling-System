@@ -970,6 +970,8 @@ export const saveLatestSchedule = async (req: Request, res: Response): Promise<v
         lec: Number(item.lec ?? 0),
         lab: Number(item.lab ?? 0),
         students: item.students ?? null,
+        totalStudents: Number(item.totalStudents ?? 0),
+        type: item.type ?? null,
         tags: Array.isArray(item.tags) || typeof item.tags === 'object' ? (item.tags as any) : undefined,
         recommendedFaculty: Array.isArray(item.recommendedFaculty) || typeof item.recommendedFaculty === 'object' ? (item.recommendedFaculty as any) : undefined,
         hasConflict: typeof item.hasConflict === 'boolean' ? item.hasConflict : null,
@@ -1204,7 +1206,8 @@ export const createScheduleItem = async (req: Request, res: Response): Promise<v
       academicYear,
       program,
       yearLevel,
-      type
+      type,
+      totalStudents
     } = req.body;
 
     // Validate required fields
@@ -1237,7 +1240,10 @@ export const createScheduleItem = async (req: Request, res: Response): Promise<v
         academicYear,
         program,
         yearLevel,
-        status: 'active'
+        type: type || 'Lecture',
+        status: 'active',
+        students: totalStudents ? String(totalStudents) : '0',
+        totalStudents: totalStudents || 0
       }
     });
 
@@ -1271,7 +1277,8 @@ export const updateScheduleItem = async (req: Request, res: Response): Promise<v
       academicYear,
       program,
       yearLevel,
-      type
+      type,
+      totalStudents
     } = req.body;
 
     // Check if schedule exists
@@ -1308,7 +1315,10 @@ export const updateScheduleItem = async (req: Request, res: Response): Promise<v
         semester,
         academicYear,
         program,
-        yearLevel
+        yearLevel,
+        type: type || 'Lecture',
+        students: totalStudents ? String(totalStudents) : '0',
+        totalStudents: totalStudents || 0
       }
     });
 
