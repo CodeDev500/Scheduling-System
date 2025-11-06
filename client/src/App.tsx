@@ -103,11 +103,6 @@ function App() {
       component: <ManageUser />,
     },
     {
-      title: "View Teaching Load",
-      path: "/teaching-load",
-      component: <TeachingLoad />,
-    },
-    {
       title: "Room Management",
       path: "/room-management",
       component: <RoomManagement />,
@@ -203,11 +198,6 @@ function App() {
       title: "Faculty Profile",
       path: "/department-head-faculty",
       component: <DepartmentHeadFacultyProfile />
-    },
-    {
-      title: "View Teaching Load",
-      path: "/department-head-teaching-load",
-      component: <DepartmentHeadTeachingLoad />
     }
    ];
 
@@ -220,12 +210,7 @@ function App() {
     {
       title: "View Schedules",
       path: "/faculty-schedules",
-      component: <TeachingLoad />
-    },
-    {
-      title: "View Teaching Load",
-      path: "/faculty-teaching-load",
-      component: <FacultyViewTeachingLoad />
+      component: <FacultyViewSchedules />
     },
     {
       title: "Teaching Preferences",
@@ -295,14 +280,6 @@ function App() {
           </Route>
         ))}
 
-        <Route
-          path="/admin-dashboard"
-          element={
-            <LayoutDashboard>
-              <Dashboard />
-            </LayoutDashboard>
-          }
-        />
 
         {/* User Profile - Accessible to all authenticated users */}
         <Route
@@ -317,6 +294,19 @@ function App() {
             }
           />
         </Route>
+
+    <Route element={<ProtectedRoute allowedRoles={[UserRoles[0], UserRoles[1], UserRoles[2], UserRoles[3]]} />}
+        >
+    <Route
+      path="/teaching-load"
+      element={
+        <LayoutDashboard>
+          <TeachingLoad />
+        </LayoutDashboard>
+      }
+    />
+
+     </Route>   
 
         <Route path="/*" element={<PageNotFound />} />
       </Routes>

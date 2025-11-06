@@ -1,16 +1,11 @@
 import React, { useRef, useState, useEffect, useMemo } from 'react';
 import { Badge } from '@/components/ui/badge';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-
+ import {AlertTriangle} from 'lucide-react';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { 
-  Download, 
-  Filter, 
-  Plus, 
-  RefreshCw, 
   Users, 
   Clock,
   BookOpen,
@@ -19,7 +14,6 @@ import {
   Award,
   User,
   Target,
-  AlertTriangle,
   Info,
   Table,
   Search,
@@ -65,15 +59,17 @@ import { fetchCurriculums } from '../../../services/curriculumSlice';
 import { fetchProgramPriorities, saveProgramPriorities } from '../../../services/programPrioritySlice';
 
 // Import types
-import type { GeneratedSchedule, ScheduleItem, FacultyRecommendation, Subject } from '../../../types';
+import type { Subject } from '../../../types';
 import type { AcademicProgram } from '../../../types/types';
 
 import { formatTimeRange as formatTimeRangeUtil } from './utils/timeUtils';
-import { validateScheduleConflicts, formatConflictMessage } from './utils/conflictValidation';
+import { validateScheduleConflicts } from './utils/conflictValidation';
 import type { ConflictDetail } from './utils/conflictValidation';
-import { exportToPDF, exportToExcel, exportToCSV } from './utils/exportUtils';
 import { parseDaysCombination } from './utils/dayUtils';
 import api from '@/api/axios';
+import jsPDF from 'jspdf';
+import autoTable from 'jspdf-autotable';
+import * as XLSX from 'xlsx';
 
 // Define Schedule type for the sample data
 interface Schedule {
@@ -128,7 +124,7 @@ const ScheduleGeneration: React.FC = () => {
   const [selectedSubject, setSelectedSubject] = useState<Subject | null>(null);
   const [schedules, setSchedules] = useState<Schedule[]>([]);
   const [searchTerm, setSearchTerm] = useState("");
-  const [filterSemester, setFilterSemester] = useState("all");
+  const [filterSemester, setFilterSemester] = useState("1st Semester");
   const [filterProgram, setFilterProgram] = useState("all");
   const [curriculumYear, setCurriculumYear] = useState<string>("");
   const [academicYears, setAcademicYears] = useState<any[]>([]);
@@ -521,28 +517,147 @@ const SortableItem = ({ id, children }: { id: string; children: React.ReactNode 
 
 
 
-  // Export handler
+  // Export handler - exports the displayed table data (filteredSchedules)
   const handleExportSchedule = (format: 'pdf' | 'excel' | 'csv') => {
-    if (!selectedSchedule) {
-      toast.error('No schedule selected for export');
+    if (!filteredSchedules || filteredSchedules.length === 0) {
+      toast.error('No schedule data to export');
       return;
     }
     
     try {
       if (format === 'pdf') {
-        exportToPDF(selectedSchedule, curriculumYear, selectedSemester);
+        exportScheduleToPDF(filteredSchedules, curriculumYear, filterSemester);
         toast.success('Schedule exported as PDF successfully!');
       } else if (format === 'excel') {
-        exportToExcel(selectedSchedule, curriculumYear, selectedSemester);
+        exportScheduleToExcel(filteredSchedules, curriculumYear, filterSemester);
         toast.success('Schedule exported as Excel successfully!');
       } else if (format === 'csv') {
-        exportToCSV(selectedSchedule, curriculumYear, selectedSemester);
+        exportScheduleToCSV(filteredSchedules, curriculumYear, filterSemester);
         toast.success('Schedule exported as CSV successfully!');
       }
     } catch (error) {
       console.error('Export error:', error);
       toast.error(`Failed to export schedule as ${format.toUpperCase()}`);
     }
+  };
+
+  // Export to PDF using displayed table data
+  const exportScheduleToPDF = (schedules: Schedule[], curriculumYear?: string, semester?: string) => {
+    const doc = new jsPDF('landscape');
+    
+    doc.setFontSize(18);
+    doc.text('Class Schedule', 14, 15);
+    
+    doc.setFontSize(11);
+    if (curriculumYear) {
+      doc.text(`Curriculum Year: ${curriculumYear}`, 14, 25);
+    }
+    if (semester) {
+      doc.text(`Semester: ${semester}`, 14, 32);
+    }
+    doc.text(`Generated: ${new Date().toLocaleDateString()}`, 14, 39);
+    
+    const tableData = schedules.map((item) => [
+      item.subjectCode || '',
+      item.subjectName || '',
+      item.day || '',
+      `${item.startTime || ''} - ${item.endTime || ''}`,
+      item.roomName || '',
+      item.facultyName || '',
+      `${item.units || 0}`,
+      `${item.lec || 0} | ${item.lab || 0}`,
+      item.yearLevel || '',
+      item.program || ''
+    ]);
+    
+    autoTable(doc, {
+      startY: 45,
+      head: [['Code', 'Subject', 'Days', 'Time', 'Room', 'Faculty', 'Units', 'Lec|Lab', 'Year', 'Program']],
+      body: tableData,
+      theme: 'striped',
+      headStyles: { fillColor: [59, 130, 246], textColor: 255, fontSize: 9 },
+      bodyStyles: { fontSize: 8 },
+      alternateRowStyles: { fillColor: [245, 247, 250] },
+      margin: { top: 45 },
+      styles: {
+        overflow: 'linebreak',
+        cellWidth: 'wrap'
+      },
+      columnStyles: {
+        0: { cellWidth: 20 },
+        1: { cellWidth: 45 },
+        2: { cellWidth: 20 },
+        3: { cellWidth: 35 },
+        4: { cellWidth: 25 },
+        5: { cellWidth: 35 },
+        6: { cellWidth: 15 },
+        7: { cellWidth: 20 },
+        8: { cellWidth: 20 },
+        9: { cellWidth: 25 }
+      }
+    });
+    
+    const fileName = `schedule_${curriculumYear || 'export'}_${semester || ''}_${new Date().getTime()}.pdf`;
+    doc.save(fileName);
+  };
+
+  // Export to Excel using displayed table data
+  const exportScheduleToExcel = (schedules: Schedule[], curriculumYear?: string, semester?: string) => {
+    const excelData = schedules.map((item) => ({
+      'Subject Code': item.subjectCode || '',
+      'Subject Name': item.subjectName || '',
+      'Days': item.day || '',
+      'Start Time': item.startTime || '',
+      'End Time': item.endTime || '',
+      'Room': item.roomName || '',
+      'Faculty': item.facultyName || '',
+      'Units': item.units || 0,
+      'Lecture': item.lec || 0,
+      'Lab': item.lab || 0,
+      'Year Level': item.yearLevel || '',
+      'Semester': item.semester || '',
+      'Program': item.program || ''
+    }));
+    
+    const wb = XLSX.utils.book_new();
+    const ws = XLSX.utils.json_to_sheet(excelData);
+    
+    ws['!cols'] = [
+      { wch: 12 }, { wch: 35 }, { wch: 10 }, { wch: 12 }, { wch: 12 },
+      { wch: 20 }, { wch: 25 }, { wch: 8 }, { wch: 8 }, { wch: 8 },
+      { wch: 12 }, { wch: 15 }, { wch: 15 }
+    ];
+    
+    XLSX.utils.book_append_sheet(wb, ws, 'Schedule');
+    
+    const fileName = `schedule_${curriculumYear || 'export'}_${semester || ''}_${new Date().getTime()}.xlsx`;
+    XLSX.writeFile(wb, fileName);
+  };
+
+  // Export to CSV using displayed table data
+  const exportScheduleToCSV = (schedules: Schedule[], curriculumYear?: string, semester?: string) => {
+    const csvData = schedules.map((item) => ({
+      'Subject Code': item.subjectCode || '',
+      'Subject Name': item.subjectName || '',
+      'Days': item.day || '',
+      'Start Time': item.startTime || '',
+      'End Time': item.endTime || '',
+      'Room': item.roomName || '',
+      'Faculty': item.facultyName || '',
+      'Units': item.units || 0,
+      'Lecture': item.lec || 0,
+      'Lab': item.lab || 0,
+      'Year Level': item.yearLevel || '',
+      'Semester': item.semester || '',
+      'Program': item.program || ''
+    }));
+    
+    const wb = XLSX.utils.book_new();
+    const ws = XLSX.utils.json_to_sheet(csvData);
+    XLSX.utils.book_append_sheet(wb, ws, 'Schedule');
+    
+    const fileName = `schedule_${curriculumYear || 'export'}_${semester || ''}_${new Date().getTime()}.csv`;
+    XLSX.writeFile(wb, fileName, { bookType: 'csv' });
   };
 
   // Save the currently selected/generated schedule to the server (overwriting previous)
@@ -616,23 +731,24 @@ const SortableItem = ({ id, children }: { id: string; children: React.ReactNode 
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-50 via-blue-50 to-indigo-100">
-      <div className="mx-auto space-y-8">
+    <div className="min-h-screen">
+      <div className="w-[1220px] mx-auto  max-w-full  overflow-x-auto">
         {/* Header Section */}
         <ScheduleHeader
           isGenerating={isGenerating}
           onOpenGenerateModal={() => setShowGenerateModal(true)}
           onExportSchedule={handleExportSchedule}
           onSaveSchedule={handleSaveSchedule}
-          canSave={!!selectedSchedule}
+          canSave={schedules.length > 0}
         />
 
         {/* Generate Schedule Modal */}
         <GenerateScheduleModal
           open={showGenerateModal}
           onOpenChange={setShowGenerateModal}
-          onGenerate={(year, semester) => {
-            handleGenerateSchedule(year, semester);
+          onGenerate={async (year, semester) => {
+            await handleGenerateSchedule(year, semester);
+            // Modal will close automatically after generation completes
             setShowGenerateModal(false);
           }}
           isGenerating={isGenerating}
@@ -834,7 +950,7 @@ const SortableItem = ({ id, children }: { id: string; children: React.ReactNode 
                               groupIndex % 2 === 0 ? 'bg-gray-50/30' : 'bg-white'
                             }`}>
                               {/* Subject */}
-                              <td className="px-6 py-5 truncate max-w-xs">
+                              <td className="px-6 py-5 truncate max-w-50">
                                 <div>
                                   <div className="text-sm font-bold text-gray-900">{firstSubject?.subjectCode || 'N/A'}</div>
                                   <div className="text-xs text-gray-500 truncate max-w-xs">{firstSubject.subjectName}</div>

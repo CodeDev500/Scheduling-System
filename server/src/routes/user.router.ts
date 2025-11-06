@@ -15,8 +15,8 @@ router.get("/id/:id", UserController.getUserById);
 router.get("/faculty", UserController.getAllFaculty);
 
 // Get faculty with teaching load
-router.get("/faculty/with-load/:curriculumYear/:semester/:id", UserController.getFacultyWithLoad);
-
+// router.get("/faculty/with-load/:curriculumYear/:semester/:id", UserController.getFacultyWithLoad);
+router.get("/faculty/with-load", UserController.getFacultyWithLoad);
 // Get faculty by department
 router.get("/faculty/department/:department", UserController.getFacultyByDepartment);
 

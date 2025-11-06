@@ -25,11 +25,15 @@ const UpdateSubject: FC<UpdateSubjectProps> = ({ subject, onClose, onSubjectUpda
     lab: 0,
     units: 0,
     tags: [] as string[],
+    prerequisite: [] as string[],
   });
+
+  const [prerequisiteInput, setPrerequisiteInput] = useState("");
 
   useEffect(() => {
     if (subject) {
       let parsedTags: string[] = [];
+      let parsedPrerequisite: string[] = [];
       
       // Handle tags field - parse if it's a string, otherwise use as array
       if (subject.tags) {
@@ -45,6 +49,20 @@ const UpdateSubject: FC<UpdateSubjectProps> = ({ subject, onClose, onSubjectUpda
         }
       }
 
+      // Handle prerequisite field - parse if it's a string, otherwise use as array
+      if (subject.prerequisite) {
+        if (typeof subject.prerequisite === 'string') {
+          try {
+            parsedPrerequisite = JSON.parse(subject.prerequisite);
+          } catch (error) {
+            console.error('Error parsing prerequisite JSON:', error);
+            parsedPrerequisite = [];
+          }
+        } else if (Array.isArray(subject.prerequisite)) {
+          parsedPrerequisite = subject.prerequisite;
+        }
+      }
+
       const lecUnits = subject.lec ?? 0;
       const labUnits = subject.lab ?? 0;
       setFormData({
@@ -54,7 +72,11 @@ const UpdateSubject: FC<UpdateSubjectProps> = ({ subject, onClose, onSubjectUpda
         lab: labUnits,
         units: lecUnits + labUnits, // Auto-calculate total units
         tags: parsedTags,
+        prerequisite: parsedPrerequisite,
       });
+      
+      // Set prerequisite input as comma-separated string
+      setPrerequisiteInput(parsedPrerequisite.join(', '));
     }
   }, [subject]);
 
@@ -87,6 +109,22 @@ const UpdateSubject: FC<UpdateSubjectProps> = ({ subject, onClose, onSubjectUpda
     }));
   };
 
+  const handlePrerequisiteChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const value = e.target.value;
+    setPrerequisiteInput(value);
+    
+    // Split by comma and trim whitespace
+    const prereqArray = value
+      .split(',')
+      .map(item => item.trim())
+      .filter(item => item.length > 0);
+    
+    setFormData((prev) => ({
+      ...prev,
+      prerequisite: prereqArray,
+    }));
+  };
+
   const handleUpdate = () => {
     if (subject?.id == null) return;
 
@@ -95,6 +133,7 @@ const UpdateSubject: FC<UpdateSubjectProps> = ({ subject, onClose, onSubjectUpda
       ...formData,
       id: subject.id,
       tags: formData.tags && formData.tags.length > 0 ? formData.tags : undefined,
+      prerequisite: formData.prerequisite && formData.prerequisite.length > 0 ? formData.prerequisite : undefined,
     };
 
     dispatch(
@@ -189,6 +228,22 @@ const UpdateSubject: FC<UpdateSubjectProps> = ({ subject, onClose, onSubjectUpda
                 className="w-full px-3 py-2 border border-gray-300 rounded-lg text-center bg-gray-100 text-gray-700 cursor-not-allowed"
               />
             </div>
+          </div>
+          
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">
+              Prerequisite
+            </label>
+            <input
+              type="text"
+              value={prerequisiteInput}
+              onChange={handlePrerequisiteChange}
+              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+              placeholder="e.g., CC 100, HIST 100, CC 102"
+            />
+            <p className="text-xs text-gray-500 mt-1">
+              Separate multiple prerequisites with commas
+            </p>
           </div>
           
           <MultiSelectField

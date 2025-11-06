@@ -15,6 +15,16 @@ export const addSubject = async (req: Request, res: Response) => {
       }
     }
     
+    // Handle prerequisite field - parse JSON string if it exists
+    if (data.prerequisite && typeof data.prerequisite === 'string') {
+      try {
+        data.prerequisite = JSON.parse(data.prerequisite);
+      } catch (error) {
+        console.error('Error parsing prerequisite JSON:', error);
+        data.prerequisite = [];
+      }
+    }
+    
     const subject = await SubjectSlice.createSubject(data);
     res.status(200).json(subject);
   } catch (error: any) {
@@ -52,6 +62,16 @@ export const updateSubject = async (req: Request, res: Response) => {
       } catch (error) {
         console.error('Error parsing tags JSON:', error);
         data.tags = [];
+      }
+    }
+    
+    // Handle prerequisite field - parse JSON string if it exists
+    if (data.prerequisite && typeof data.prerequisite === 'string') {
+      try {
+        data.prerequisite = JSON.parse(data.prerequisite);
+      } catch (error) {
+        console.error('Error parsing prerequisite JSON:', error);
+        data.prerequisite = [];
       }
     }
     

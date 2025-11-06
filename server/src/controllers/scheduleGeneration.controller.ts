@@ -1063,3 +1063,289 @@ export const getAllSubjectSchedule = async (req: Request, res: Response): Promis
     res.status(500).json({ success: false, message: 'Failed to fetch schedules' });
   }
 };
+
+// Get prospectus schedules - all subjects from 1st to 4th year including summer
+export const getProspectusSchedules = async (req: Request, res: Response): Promise<void> => {
+  try {
+    const { academicYear, program } = req.query as Record<string, string | undefined>;
+    
+    if (!academicYear || !program) {
+      res.status(400).json({ 
+        success: false, 
+        message: 'Academic year and program are required' 
+      });
+      return;
+    }
+    
+    console.log('📚 Fetching prospectus schedules for:', { academicYear, program });
+    
+    // Fetch all curriculum courses for the given academic year and program
+    const curriculumCourses = await prisma.curriculumCourse.findMany({
+      where: {
+        curriculumYear: academicYear,
+        programCode: program
+      },
+      orderBy: [
+        { yearLevel: 'asc' },
+        { period: 'asc' },
+        { subjectCode: 'asc' }
+      ]
+    });
+    
+    // Fetch all subjects to get prerequisite information
+    const subjects = await prisma.subject.findMany({
+      select: {
+        subjectCode: true,
+        subjectDescription: true,
+        lec: true,
+        lab: true,
+        units: true,
+        prerequisite: true
+      }
+    });
+    
+    // Create a map of subject codes to subject details
+    const subjectDetailsMap = new Map<string, any>();
+    subjects.forEach(subject => {
+      let prereqString = 'None';
+      if (subject.prerequisite) {
+        try {
+          const prereqArray = typeof subject.prerequisite === 'string' 
+            ? JSON.parse(subject.prerequisite) 
+            : subject.prerequisite;
+          prereqString = Array.isArray(prereqArray) && prereqArray.length > 0 ? prereqArray.join(', ') : 'None';
+        } catch (error) {
+          prereqString = 'None';
+        }
+      }
+      
+      subjectDetailsMap.set(subject.subjectCode, {
+        subjectDescription: subject.subjectDescription,
+        lec: subject.lec,
+        lab: subject.lab,
+        units: subject.units,
+        prerequisite: prereqString
+      });
+    });
+    
+    // Group schedules by year level and semester
+    const groupedData: Record<string, Record<string, any[]>> = {
+      '1st Year': { '1st Semester': [], '2nd Semester': [], 'Summer': [] },
+      '2nd Year': { '1st Semester': [], '2nd Semester': [], 'Summer': [] },
+      '3rd Year': { '1st Semester': [], '2nd Semester': [], 'Summer': [] },
+      '4th Year': { '1st Semester': [], '2nd Semester': [], 'Summer': [] }
+    };
+    
+    // Use a Map to track unique subjects by code within each year/semester
+    const subjectMap: Record<string, Record<string, Map<string, any>>> = {
+      '1st Year': { '1st Semester': new Map(), '2nd Semester': new Map(), 'Summer': new Map() },
+      '2nd Year': { '1st Semester': new Map(), '2nd Semester': new Map(), 'Summer': new Map() },
+      '3rd Year': { '1st Semester': new Map(), '2nd Semester': new Map(), 'Summer': new Map() },
+      '4th Year': { '1st Semester': new Map(), '2nd Semester': new Map(), 'Summer': new Map() }
+    };
+
+    // Populate the map with subjects from curriculum
+    curriculumCourses.forEach(course => {
+      const yearLevel = course.yearLevel || 'Unknown';
+      const semester = course.period || 'Unknown';
+      
+      if (subjectMap[yearLevel] && subjectMap[yearLevel][semester]) {
+        const subjectCode = course.subjectCode || '';
+        
+        // Only add if not already in the map
+        if (subjectCode && !subjectMap[yearLevel][semester].has(subjectCode)) {
+          const subjectDetails = subjectDetailsMap.get(subjectCode);
+          
+          subjectMap[yearLevel][semester].set(subjectCode, {
+            code: subjectCode,
+            title: subjectDetails?.subjectDescription || course.subjectDescription || '',
+            prereq: subjectDetails?.prerequisite || 'None',
+            lec: subjectDetails?.lec ?? course.lec ?? 0,
+            lab: subjectDetails?.lab ?? course.lab ?? 0,
+            total: subjectDetails?.units ?? course.units ?? 0
+          });
+        }
+      }
+    });
+
+    // Convert Maps to arrays
+    Object.keys(subjectMap).forEach(yearLevel => {
+      Object.keys(subjectMap[yearLevel]).forEach(semester => {
+        groupedData[yearLevel][semester] = Array.from(subjectMap[yearLevel][semester].values());
+      });
+    });
+    
+    console.log(`✅ Found ${curriculumCourses.length} curriculum courses for prospectus`);
+    res.json({ success: true, data: groupedData });
+  } catch (error) {
+    console.error('Error fetching prospectus schedules:', error);
+    res.status(500).json({ success: false, message: 'Failed to fetch prospectus schedules' });
+  }
+};
+
+// ===============================
+// 📝 CREATE SCHEDULE ITEM
+// ===============================
+export const createScheduleItem = async (req: Request, res: Response): Promise<void> => {
+  try {
+    const {
+      subjectCode,
+      subjectName,
+      units,
+      lec,
+      lab,
+      startTime,
+      endTime,
+      facultyId,
+      facultyName,
+      roomName,
+      day,
+      semester,
+      academicYear,
+      program,
+      yearLevel,
+      type
+    } = req.body;
+
+    // Validate required fields
+    if (!subjectCode || !subjectName || !day || !startTime || !endTime || !roomName || !semester || !academicYear || !program || !yearLevel) {
+      res.status(400).json({ success: false, message: 'Missing required fields' });
+      return;
+    }
+
+    // Create the schedule item
+    const newSchedule = await prisma.subjectSchedule.create({
+      data: {
+        subjectId: subjectCode,
+        subject: subjectCode,
+        subjectCode,
+        subjectName,
+        units: units || 0,
+        lec: lec || 0,
+        lab: lab || 0,
+        startTime,
+        endTime,
+        time: `${startTime}-${endTime}`,
+        faculty: facultyId || facultyName || 'TBA',
+        facultyId: facultyId || 'TBA',
+        facultyName: facultyName || 'TBA',
+        room: roomName,
+        roomId: roomName,
+        roomName,
+        day,
+        semester,
+        academicYear,
+        program,
+        yearLevel,
+        status: 'active'
+      }
+    });
+
+    console.log(`✅ Created schedule item: ${subjectCode} - ${day} ${startTime}-${endTime}`);
+    res.status(201).json({ success: true, data: newSchedule });
+  } catch (error) {
+    console.error('Error creating schedule item:', error);
+    res.status(500).json({ success: false, message: 'Failed to create schedule item' });
+  }
+};
+
+// ===============================
+// ✏️ UPDATE SCHEDULE ITEM
+// ===============================
+export const updateScheduleItem = async (req: Request, res: Response): Promise<void> => {
+  try {
+    const { id } = req.params;
+    const {
+      subjectCode,
+      subjectName,
+      units,
+      lec,
+      lab,
+      startTime,
+      endTime,
+      facultyId,
+      facultyName,
+      roomName,
+      day,
+      semester,
+      academicYear,
+      program,
+      yearLevel,
+      type
+    } = req.body;
+
+    // Check if schedule exists
+    const existingSchedule = await prisma.subjectSchedule.findUnique({
+      where: { id: parseInt(id) }
+    });
+
+    if (!existingSchedule) {
+      res.status(404).json({ success: false, message: 'Schedule not found' });
+      return;
+    }
+
+    // Update the schedule item
+    const updatedSchedule = await prisma.subjectSchedule.update({
+      where: { id: parseInt(id) },
+      data: {
+        subjectId: subjectCode,
+        subject: subjectCode,
+        subjectCode,
+        subjectName,
+        units,
+        lec,
+        lab,
+        startTime,
+        endTime,
+        time: `${startTime}-${endTime}`,
+        faculty: facultyId || facultyName || 'TBA',
+        facultyId: facultyId || 'TBA',
+        facultyName: facultyName || 'TBA',
+        room: roomName,
+        roomId: roomName,
+        roomName,
+        day,
+        semester,
+        academicYear,
+        program,
+        yearLevel
+      }
+    });
+
+    console.log(`✅ Updated schedule item: ${id}`);
+    res.json({ success: true, data: updatedSchedule });
+  } catch (error) {
+    console.error('Error updating schedule item:', error);
+    res.status(500).json({ success: false, message: 'Failed to update schedule item' });
+  }
+};
+
+// ===============================
+// 🗑️ DELETE SCHEDULE ITEM
+// ===============================
+export const deleteScheduleItem = async (req: Request, res: Response): Promise<void> => {
+  try {
+    const { id } = req.params;
+
+    // Check if schedule exists
+    const existingSchedule = await prisma.subjectSchedule.findUnique({
+      where: { id: parseInt(id) }
+    });
+
+    if (!existingSchedule) {
+      res.status(404).json({ success: false, message: 'Schedule not found' });
+      return;
+    }
+
+    // Delete the schedule item
+    await prisma.subjectSchedule.delete({
+      where: { id: parseInt(id) }
+    });
+
+    console.log(`✅ Deleted schedule item: ${id}`);
+    res.json({ success: true, message: 'Schedule deleted successfully' });
+  } catch (error) {
+    console.error('Error deleting schedule item:', error);
+    res.status(500).json({ success: false, message: 'Failed to delete schedule item' });
+  }
+};

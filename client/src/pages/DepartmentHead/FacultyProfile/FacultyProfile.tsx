@@ -23,6 +23,10 @@ interface Faculty {
   totalUnits?: number;
   currentSemesterLoad?: number;
   maxUnits?: number;
+  yearsOfExperience?: number;
+  previousSubjects?: any;
+  availableDays?: any;
+  preferredTimeSlots?: any;
 }
 
 const FacultyProfile = () => {
@@ -196,7 +200,7 @@ const FacultyProfile = () => {
                   </div>
 
                   {/* Teaching Load */}
-                  {member.totalUnits !== undefined && member.maxUnits && (
+                  {/* {member.totalUnits !== undefined && member.maxUnits && (
                     <div className="mb-4">
                       <div className="flex justify-between items-center mb-2">
                         <span className="text-sm font-medium text-gray-700">Teaching Load</span>
@@ -214,7 +218,7 @@ const FacultyProfile = () => {
                         ></div>
                       </div>
                     </div>
-                  )}
+                  )} */}
 
                   {/* Subjects and Date Info */}
                   <div className="flex items-center justify-between text-sm text-gray-600 mb-4">
@@ -326,8 +330,110 @@ const FacultyProfile = () => {
                   <p className="text-sm font-medium text-gray-900">{getSpecialization(selectedFaculty.specialization)}</p>
                 </div>
 
+                {/* Years of Experience */}
+                {selectedFaculty.yearsOfExperience !== undefined && (
+                  <div>
+                    <h3 className="text-lg font-semibold text-gray-900 mb-3">Teaching Experience</h3>
+                    <p className="text-sm font-medium text-gray-900">
+                      {selectedFaculty.yearsOfExperience ? selectedFaculty.yearsOfExperience : 'Not Specified'}
+                    </p>
+                  </div>
+                )}
+
+                {/* Previous Subjects */}
+                {selectedFaculty.previousSubjects && (
+                  <div>
+                    <h3 className="text-lg font-semibold text-gray-900 mb-3">Previous Subjects Taught</h3>
+                    <div className="flex flex-wrap gap-2">
+                      {(() => {
+                        const subjects = typeof selectedFaculty.previousSubjects === 'string' 
+                          ? JSON.parse(selectedFaculty.previousSubjects)
+                          : selectedFaculty.previousSubjects;
+                        
+                        if (Array.isArray(subjects) && subjects.length > 0) {
+                          return subjects.map((subject: string, index: number) => (
+                            <span key={index} className="px-3 py-1 bg-blue-100 text-blue-800 rounded-full text-sm font-medium">
+                              {subject}
+                            </span>
+                          ));
+                        }
+                        return <p className="text-sm text-gray-500">No previous subjects recorded</p>;
+                      })()}
+                    </div>
+                  </div>
+                )}
+
+                {/* Time Availability */}
+                <div>
+                  <h3 className="text-lg font-semibold text-gray-900 mb-3">Time Availability</h3>
+                  <div className="space-y-3">
+                    {/* Available Days */}
+                    {selectedFaculty.availableDays && (
+                      <div>
+                        <label className="block text-xs font-medium text-gray-500 uppercase tracking-wider mb-2">Available Days</label>
+                        <div className="flex flex-wrap gap-2">
+                          {(() => {
+                            const days = typeof selectedFaculty.availableDays === 'string' 
+                              ? JSON.parse(selectedFaculty.availableDays)
+                              : selectedFaculty.availableDays;
+                            
+                            if (Array.isArray(days) && days.length > 0) {
+                              return days.map((day: string, index: number) => (
+                                <span key={index} className="px-3 py-1 bg-green-100 text-green-800 rounded-lg text-sm font-medium">
+                                  {day}
+                                </span>
+                              ));
+                            }
+                            return <p className="text-sm text-gray-500">Not specified</p>;
+                          })()}
+                        </div>
+                      </div>
+                    )}
+                    
+                    {/* Preferred Time Slots */}
+                    {selectedFaculty.preferredTimeSlots ? (
+                      <div>
+                        <label className="block text-xs font-medium text-gray-500 uppercase tracking-wider mb-2">Preferred Time Slots</label>
+                        <div className="flex items-center gap-2">
+                          {(() => {
+                            // Ensure we have a string to work with
+                            const timeString = String(selectedFaculty.preferredTimeSlots || '');
+                            
+                            // Parse the time string format: "start:07:00end:20:00"
+                            const startMatch = timeString.match(/start:(\d{2}):(\d{2})/);
+                            const endMatch = timeString.match(/end:(\d{2}):(\d{2})/);
+                            
+                            if (startMatch && endMatch) {
+                              // Convert 24-hour to 12-hour format
+                              const formatTime = (hours: string, minutes: string) => {
+                                const hour = parseInt(hours);
+                                const ampm = hour >= 12 ? 'PM' : 'AM';
+                                const hour12 = hour % 12 || 12;
+                                return `${hour12}:${minutes} ${ampm}`;
+                              };
+                              
+                              const startTime = formatTime(startMatch[1], startMatch[2]);
+                              const endTime = formatTime(endMatch[1], endMatch[2]);
+                              
+                              return (
+                                <span className="px-4 py-2 bg-purple-100 text-purple-800 rounded-lg text-sm font-semibold">
+                                  {startTime} - {endTime}
+                                </span>
+                              );
+                            }
+                            
+                            return <p className="text-sm text-gray-500">{timeString}</p>;
+                          })()}
+                        </div>
+                      </div>
+                    ) : (
+                      <p className="text-sm text-gray-500">Not specified</p>
+                    )}
+                  </div>
+                </div>
+
                 {/* Teaching Load Information */}
-                {selectedFaculty.totalUnits !== undefined && (
+                {/* {selectedFaculty.totalUnits !== undefined && (
                   <div>
                     <h3 className="text-lg font-semibold text-gray-900 mb-3">Teaching Load</h3>
                     <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
@@ -366,7 +472,7 @@ const FacultyProfile = () => {
                       </div>
                     </div>
                   </div>
-                )}
+                )} */}
               </div>
 
               <div className="flex justify-end space-x-3 mt-6 pt-6 border-t border-gray-200">

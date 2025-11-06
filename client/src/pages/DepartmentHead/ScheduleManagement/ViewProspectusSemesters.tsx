@@ -1,234 +1,232 @@
 import React, { useEffect, useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { Card, CardContent, CardHeader, CardTitle } from '../../../components/ui/card';
 import { Button } from '../../../components/ui/button';
-import { Badge } from '../../../components/ui/badge';
-import { useAppSelector, useAppDispatch } from '../../../hooks/redux';
-import { programDescription } from '../../../utils/getProgramDescription';
-import { fetchCurriculumByProgramAndYear } from '../../../services/curriculumSlice';
 import api from '../../../api/axios';
-import { Calendar, Clock, BookOpen, ArrowLeft, ArrowRight } from 'lucide-react';
+import { ArrowLeft, Download, Printer } from 'lucide-react';
 
-interface Semester {
-  id: string;
-  name: string;
-  description: string;
-  status: 'active' | 'upcoming' | 'completed';
-  subjectCount: number;
+interface Subject {
+  code: string;
+  title: string;
+  prereq: string;
+  lec: number;
+  lab: number;
+  total: number;
+}
+
+interface ProspectusData {
+  [yearLevel: string]: {
+    [semester: string]: Subject[];
+  };
 }
 
 const ViewProspectusSemesters: React.FC = () => {
-  const { programCode, yearLevel } = useParams<{ programCode: string; yearLevel: string }>();
+  const { programCode } = useParams<{ programCode: string }>();
   const navigate = useNavigate();
-  const dispatch = useAppDispatch();
-  const userData = useAppSelector((state) => state.auth.user);
-  const { academicPrograms } = useAppSelector((state) => state.academicProgram);
-  const { curriculums, isLoading } = useAppSelector((state) => state.curriculum);
-  
-  const [semesters, setSemesters] = useState<Semester[]>([]);
-  const [subjects, setSubjects] = useState<any[]>([]);
-  const [loadingSubjects, setLoadingSubjects] = useState(false);
-  
-  // Fetch subjects data when component mounts
+
+  const [prospectusData, setProspectusData] = useState<ProspectusData | null>(null);
+  const [loading, setLoading] = useState(false);
+  const [activeAcademicYear, setActiveAcademicYear] = useState<string>('');
+
+  // Fetch active academic year and prospectus data
   useEffect(() => {
-    if (programCode && yearLevel) {
-      fetchSubjectsData();
+    fetchActiveAcademicYear();
+  }, []);
+
+  useEffect(() => {
+    if (programCode && activeAcademicYear) {
+      fetchProspectusData();
     }
-  }, [programCode, yearLevel]);
-  
-  // Fetch subjects with schedules
-  const fetchSubjectsData = async () => {
-    if (!programCode || !yearLevel) return;
-    
-    setLoadingSubjects(true);
+  }, [programCode, activeAcademicYear]);
+
+  const fetchActiveAcademicYear = async () => {
     try {
-      const response = await api.get(
-        `/schedules/subjects/${programCode}/${encodeURIComponent(yearLevel)}`
-      );
-      setSubjects(response.data);
+      const response = await api.get('/academic-years');
+      if (response.data.success) {
+        const activeYear = response.data.data.find((year: any) => year.isActive);
+        if (activeYear) {
+          setActiveAcademicYear(activeYear.year);
+        }
+      }
     } catch (error) {
-      console.error('Error fetching subjects:', error);
-    } finally {
-      setLoadingSubjects(false);
+      console.error('Error fetching active academic year:', error);
     }
   };
-  
-  // Convert subjects data to semesters format
-  useEffect(() => {
-    if (subjects && subjects.length > 0) {
-      const semesterCounts = {
-        '1st Semester': 0,
-        '2nd Semester': 0,
-        'Summer': 0
-      };
-      
-      // Count subjects by their period
-      subjects.forEach((subject: any) => {
-        if (subject.period && semesterCounts.hasOwnProperty(subject.period)) {
-          semesterCounts[subject.period as keyof typeof semesterCounts]++;
+
+  const fetchProspectusData = async () => {
+    if (!programCode || !activeAcademicYear) return;
+
+    setLoading(true);
+    try {
+      const response = await api.get('/schedules/generation/prospectus', {
+        params: {
+          academicYear: activeAcademicYear,
+          program: programCode
         }
       });
-      
-      const dynamicSemesters: Semester[] = [
-        {
-          id: '1',
-          name: '1st Semester',
-          description: 'First semester of the academic year',
-          status: 'active',
-          subjectCount: semesterCounts['1st Semester']
-        },
-        {
-          id: '2',
-          name: '2nd Semester',
-          description: 'Second semester of the academic year',
-          status: 'upcoming',
-          subjectCount: semesterCounts['2nd Semester']
-        },
-        {
-          id: '3',
-          name: 'Summer',
-          description: 'Summer semester',
-          status: 'completed',
-          subjectCount: semesterCounts['Summer']
-        }
-      ];
-      
-      setSemesters(dynamicSemesters);
-    } else {
-      // If no subjects data, show default semesters with 0 subjects
-      setSemesters([
-        {
-          id: '1',
-          name: '1st Semester',
-          description: 'First semester of the academic year',
-          status: 'active',
-          subjectCount: 0
-        },
-        {
-          id: '2',
-          name: '2nd Semester',
-          description: 'Second semester of the academic year',
-          status: 'upcoming',
-          subjectCount: 0
-        },
-        {
-          id: '3',
-          name: 'Summer',
-          description: 'Summer semester',
-          status: 'completed',
-          subjectCount: 0
-        }
-      ]);
-    }
-  }, [subjects]);
-
-  const handleSemesterSelect = (semester: Semester) => {
-    // Navigate to the scheduling page with year level and semester
-    navigate(`/schedule-management/view-prospectus-scheduling?programCode=${programCode}&yearLevel=${yearLevel}&semester=${encodeURIComponent(semester.name)}`);
-  };
-
-  const getStatusColor = (status: string) => {
-    switch (status) {
-      case 'active': return 'bg-green-100 text-green-800';
-      case 'upcoming': return 'bg-blue-100 text-blue-800';
-      case 'completed': return 'bg-gray-100 text-gray-800';
-      default: return 'bg-gray-100 text-gray-800';
+      if (response.data.success) {
+        setProspectusData(response.data.data);
+      }
+    } catch (error) {
+      console.error('Error fetching prospectus data:', error);
+    } finally {
+      setLoading(false);
     }
   };
+
+  const handlePrint = () => {
+    window.print();
+  };
+
+  const handleDownloadPDF = () => {
+    // Trigger print dialog which can save as PDF
+    window.print();
+  };
+
+  const renderSemesterTable = (yearLevel: string, semester: string) => {
+    const subjects = prospectusData?.[yearLevel]?.[semester] || [];
+    const totalLec = subjects.reduce((sum, s) => sum + s.lec, 0);
+    const totalLab = subjects.reduce((sum, s) => sum + s.lab, 0);
+    const totalUnits = subjects.reduce((sum, s) => sum + s.total, 0);
+
+    return (
+      <div className="flex-1">
+        <h3 className="text-lg font-bold text-center mb-3">{semester}</h3>
+        <table className="w-full border-collapse border border-black text-sm">
+          <thead>
+            <tr className="bg-gray-100">
+              <th className="border border-black px-2 py-2 text-left font-bold">Code</th>
+              <th className="border border-black px-2 py-2 text-left font-bold">Descriptive Title</th>
+              <th className="border border-black px-2 py-2 text-center font-bold">Prereq</th>
+              <th className="border border-black px-2 py-2 text-center font-bold" colSpan={3}>Units</th>
+            </tr>
+            <tr className="bg-gray-100">
+              <th className="border border-black px-2 py-1"></th>
+              <th className="border border-black px-2 py-1"></th>
+              <th className="border border-black px-2 py-1"></th>
+              <th className="border border-black px-2 py-1 text-center font-bold">Lec</th>
+              <th className="border border-black px-2 py-1 text-center font-bold">Lab</th>
+              <th className="border border-black px-2 py-1 text-center font-bold">Total</th>
+            </tr>
+          </thead>
+          <tbody>
+            {subjects.length > 0 ? (
+              subjects.map((subject, idx) => (
+                <tr key={idx} className="hover:bg-gray-50">
+                  <td className="border border-black px-2 py-2">{subject.code}</td>
+                  <td className="border border-black px-2 py-2">{subject.title}</td>
+                  <td className="border border-black px-2 py-2 text-center">{subject.prereq}</td>
+                  <td className="border border-black px-2 py-2 text-center">{subject.lec}</td>
+                  <td className="border border-black px-2 py-2 text-center">{subject.lab}</td>
+                  <td className="border border-black px-2 py-2 text-center font-bold">{subject.total}</td>
+                </tr>
+              ))
+            ) : (
+              <tr>
+                <td colSpan={6} className="border border-black px-2 py-8 text-center text-gray-500">
+                  No subjects available
+                </td>
+              </tr>
+            )}
+            <tr className="bg-gray-100 font-bold">
+              <td colSpan={3} className="border border-black px-2 py-2 text-right">TOTAL</td>
+              <td className="border border-black px-2 py-2 text-center">{totalLec}</td>
+              <td className="border border-black px-2 py-2 text-center">{totalLab}</td>
+              <td className="border border-black px-2 py-2 text-center">{totalUnits}</td>
+            </tr>
+          </tbody>
+        </table>
+        <p className="text-xs mt-1 text-gray-600">*NOTE: 1 Laboratory Unit = _3_ number of contact hours</p>
+      </div>
+    );
+  };
+
+  if (loading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto mb-4"></div>
+          <p className="text-gray-600">Loading prospectus...</p>
+        </div>
+      </div>
+    );
+  }
 
   return (
-    <div className=" space-y-6 max-w-6xl mx-auto">
-      {/* Header */}
-      <div className="text-center space-y-4">
-        <div className="flex items-center justify-center gap-2 mb-2">
+    <div className="min-h-screen bg-white p-8">
+      <style>{`
+        @media print {
+          .no-print {
+            display: none !important;
+          }
+          body {
+            print-color-adjust: exact;
+            -webkit-print-color-adjust: exact;
+          }
+          @page {
+            size: A4;
+            margin: 1cm;
+          }
+        }
+      `}</style>
+      
+      <div className="max-w-[1200px] mx-auto">
+        {/* Action Buttons - Hidden when printing */}
+        <div className="no-print flex justify-between items-center mb-4">
           <Button 
             variant="ghost" 
             size="sm" 
             onClick={() => navigate('/schedule-management/view-prospectus')}
-            className="text-blue-600 hover:text-blue-800 hover:bg-blue-50"
           >
             <ArrowLeft className="h-4 w-4 mr-1" />
             Back
           </Button>
-        </div>
-        <div className="space-y-2">
-          <h1 className="text-4xl font-bold bg-gradient-to-r from-blue-600 to-purple-600 bg-clip-text text-transparent">
-            {programDescription(programCode ?? "", academicPrograms ?? [])} - {yearLevel}
-          </h1>
-          <p className="text-lg text-gray-600 max-w-2xl mx-auto">Choose a semester to manage your course schedules</p>
-        </div>
-      </div>
 
-      {/* Semesters Grid */}
-      <div className="max-w-4xl mx-auto">
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
-          {(isLoading || loadingSubjects) ? (
-            // Loading state
-            Array.from({ length: 3 }).map((_, index) => (
-              <Card key={index} className="animate-pulse h-48">
-                <CardContent className="p-8 flex flex-col items-center justify-center space-y-4">
-                  <div className="h-12 w-12 bg-gray-200 rounded-full"></div>
-                  <div className="h-6 bg-gray-200 rounded w-32"></div>
-                  <div className="h-4 bg-gray-200 rounded w-20"></div>
-                </CardContent>
-              </Card>
-            ))
-          ) : semesters.length === 0 ? (
-            // Empty state
-            <div className="col-span-full text-center py-16">
-              <Calendar className="h-16 w-16 mx-auto mb-6 text-gray-300" />
-              <h3 className="text-xl font-semibold text-gray-700 mb-2">No Curriculum Found</h3>
-              <p className="text-gray-500">Create a curriculum to get started with scheduling</p>
+          <div className="flex gap-2">
+            <Button 
+              variant="outline" 
+              size="sm" 
+              onClick={handlePrint}
+            >
+              <Printer className="h-4 w-4 mr-1" />
+              Print
+            </Button>
+            <Button 
+              variant="default" 
+              size="sm" 
+              onClick={handleDownloadPDF}
+            >
+              <Download className="h-4 w-4 mr-1" />
+              Download PDF
+            </Button>
+          </div>
+        </div>
+
+        {/* Header */}
+        <div className="text-center mb-6">
+          <p className="text-sm italic mb-2">Effective SY {activeAcademicYear}</p>
+          <h1 className="text-2xl font-bold mb-4">PROGRAM CURRICULAR PROSPECTUS</h1>
+        </div>
+
+        {/* Year Levels */}
+        {['1st Year', '2nd Year', '3rd Year', '4th Year'].map((yearLevel) => (
+          <div key={yearLevel} className="mb-12">
+            <h2 className="text-xl font-bold text-center mb-4">{yearLevel.toUpperCase()}</h2>
+            
+            {/* First and Second Semester Side by Side */}
+            <div className="flex gap-6 mb-6">
+              {renderSemesterTable(yearLevel, '1st Semester')}
+              {renderSemesterTable(yearLevel, '2nd Semester')}
             </div>
-          ) : semesters.map((semester, index) => {
-            const colors = [
-              'from-blue-500 to-blue-600',
-              'from-purple-500 to-purple-600', 
-              'from-green-500 to-green-600'
-            ];
-            const bgColors = [
-              'bg-blue-50 hover:bg-blue-100',
-              'bg-purple-50 hover:bg-purple-100',
-              'bg-green-50 hover:bg-green-100'
-            ];
-            return (
-              <Card 
-                key={semester.id}
-                className={`cursor-pointer transition-all duration-300 hover:shadow-xl hover:scale-105 border-0 ${bgColors[index]} group`}
-                onClick={() => handleSemesterSelect(semester)}
-              >
-                <CardContent className="p-8 text-center space-y-6">
-                  <div className={`w-16 h-16 mx-auto rounded-full bg-gradient-to-r ${colors[index]} flex items-center justify-center group-hover:scale-110 transition-transform duration-300`}>
-                    <Calendar className="h-8 w-8 text-white" />
-                  </div>
-                  
-                  <div className="space-y-2">
-                    <h3 className="text-2xl font-bold text-gray-800">{semester.name}</h3>
-                    <div className="flex items-center justify-center gap-2 text-gray-600">
-                      <BookOpen className="h-4 w-4" />
-                      <span className="font-medium">{semester.subjectCount} Subjects</span>
-                    </div>
-                  </div>
-                  
-                  <Button 
-                    className={`w-full bg-gradient-to-r ${colors[index]} hover:opacity-90 text-white font-semibold py-3 rounded-lg transition-all duration-200 group-hover:shadow-lg`}
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      handleSemesterSelect(semester);
-                    }}
-                  >
-                    <Clock className="h-4 w-4 mr-2" />
-                    Manage Schedule
-                    <ArrowRight className="h-4 w-4 ml-2" />
-                  </Button>
-                </CardContent>
-              </Card>
-            );
-          })}
-        </div>
+
+            {/* Summer Semester (if exists) */}
+            {prospectusData?.[yearLevel]?.['Summer'] && prospectusData[yearLevel]['Summer'].length > 0 && (
+              <div className="mt-6">
+                {renderSemesterTable(yearLevel, 'Summer')}
+              </div>
+            )}
+          </div>
+        ))}
       </div>
-
-
     </div>
   );
 };

@@ -17,4 +17,12 @@ router.put('/conflict/:id/resolve', ScheduleGenerationController.resolveConflict
 // Return all subject_schedules rows (unfiltered)
 router.get('/items', ScheduleGenerationController.getAllSubjectSchedule);
 
+// Get prospectus schedules grouped by year level and semester
+router.get('/prospectus', ScheduleGenerationController.getProspectusSchedules);
+
+// CRUD operations for schedule items
+router.post('/items', ScheduleGenerationController.createScheduleItem);
+router.put('/items/:id', ScheduleGenerationController.updateScheduleItem);
+router.delete('/items/:id', ScheduleGenerationController.deleteScheduleItem);
+
 export default router;

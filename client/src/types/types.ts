@@ -44,6 +44,7 @@ export interface SubjectTypes {
   lab: number;
   units: number;
   tags?: string[];
+  prerequisite?: string[];
 }
 
 export interface AcademicProgram {

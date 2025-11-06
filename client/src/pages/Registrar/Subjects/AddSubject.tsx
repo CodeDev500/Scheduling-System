@@ -23,7 +23,10 @@ const AddSubject: React.FC<AddSubjectProps> = ({ onClose, onSubjectAdded }) => {
     lab: 0,
     units: 0,
     tags: [],
+    prerequisite: [],
   });
+
+  const [prerequisiteInput, setPrerequisiteInput] = useState("");
 
   const [errors, setErrors] = useState({
     subjectCode: "",
@@ -71,6 +74,22 @@ const AddSubject: React.FC<AddSubjectProps> = ({ onClose, onSubjectAdded }) => {
     }));
   };
 
+  const handlePrerequisiteChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const value = e.target.value;
+    setPrerequisiteInput(value);
+    
+    // Split by comma and trim whitespace
+    const prereqArray = value
+      .split(',')
+      .map(item => item.trim())
+      .filter(item => item.length > 0);
+    
+    setFormData((prev) => ({
+      ...prev,
+      prerequisite: prereqArray,
+    }));
+  };
+
   const validateForm = (): boolean => {
     const newErrors = {
       subjectCode: "",
@@ -113,6 +132,7 @@ const AddSubject: React.FC<AddSubjectProps> = ({ onClose, onSubjectAdded }) => {
     const submitData = {
       ...formData,
       tags: formData.tags && formData.tags.length > 0 ? formData.tags : undefined,
+      prerequisite: formData.prerequisite && formData.prerequisite.length > 0 ? formData.prerequisite : undefined,
     };
 
     dispatch(createSubject(submitData))
@@ -123,8 +143,9 @@ const AddSubject: React.FC<AddSubjectProps> = ({ onClose, onSubjectAdded }) => {
         onClose();
       })
       .catch((error) => {
-        const errorMessage = typeof error === 'string' ? error : 'Failed to add subject';
+        const errorMessage = typeof error === 'string' ? error : error?.message || 'Failed to add subject';
         toast.error(errorMessage);
+        console.error('Error adding subject:', error);
       });
   };
 
@@ -215,6 +236,22 @@ const AddSubject: React.FC<AddSubjectProps> = ({ onClose, onSubjectAdded }) => {
           {errors.units && (
             <p className="text-xs text-red-500 -mt-2">{errors.units}</p>
           )}
+          
+          <div>
+            <label className="text-sm text-gray-600">
+              Prerequisite
+            </label>
+            <input
+              type="text"
+              value={prerequisiteInput}
+              onChange={handlePrerequisiteChange}
+              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+              placeholder="e.g., CC 100, HIST 100, CC 102"
+            />
+            <p className="text-xs text-gray-500 mt-1">
+              Separate multiple prerequisites with commas
+            </p>
+          </div>
           
           <MultiSelectField
             label="Tags"

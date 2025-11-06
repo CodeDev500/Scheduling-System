@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { Calendar, Clock, User, ChevronDown, Printer, Grid, CalendarDays } from 'lucide-react';
 import { Calendar as BigCalendar, momentLocalizer, Views, type View } from 'react-big-calendar';
 import moment from 'moment';
@@ -10,7 +10,263 @@ import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, Di
 import { Button } from '@/components/ui/button';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { useAppSelector } from '../../../hooks/redux';
+import { useReactToPrint } from 'react-to-print';
 // import './TeachingLoad.css';
+
+// Add print styles
+const printStyles = `
+  @media print {
+    /* Hide non-essential elements */
+    .no-print {
+      display: none !important;
+    }
+    
+    /* Hide navbar and other UI elements */
+    nav, header, .sidebar, .navbar, [role="navigation"] {
+      display: none !important;
+    }
+    
+    /* Page setup - FIT TO ONE LANDSCAPE PAGE */
+    @page {
+      size: landscape;
+      margin: 8mm;
+    }
+    
+    body {
+      print-color-adjust: exact;
+      -webkit-print-color-adjust: exact;
+      background: white !important;
+      margin: 0 !important;
+      padding: 0 !important;
+    }
+    
+    /* Container adjustments - FILL ENTIRE PAGE */
+    .print-container {
+      width: 100%;
+      max-width: none;
+      padding: 0;
+      background: white !important;
+      margin: 0 !important;
+      transform: scale(0.95);
+      transform-origin: top center;
+      page-break-after: avoid;
+      page-break-inside: avoid;
+      height: 100%;
+      display: flex;
+      flex-direction: column;
+    }
+    
+    /* Print header - PROFESSIONAL DESIGN */
+    .print-header {
+      display: flex !important;
+      flex-direction: column;
+      align-items: center;
+      margin-bottom: 8px;
+      padding: 8px 0;
+      border-bottom: 2px solid #333;
+    }
+    
+    .print-header-circle {
+      width: 55px;
+      height: 55px;
+      border-radius: 50%;
+      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+      display: flex !important;
+      align-items: center;
+      justify-content: center;
+      margin-bottom: 6px;
+      font-size: 18px;
+      font-weight: 700;
+      color: white;
+      letter-spacing: 1px;
+      box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+    }
+    
+    .print-header h1 {
+      font-size: 16px;
+      font-weight: 700;
+      margin: 0 0 3px 0;
+      color: #1a1a1a;
+      letter-spacing: 0.5px;
+      text-transform: uppercase;
+    }
+    
+    .print-header p {
+      font-size: 10px;
+      margin: 0 0 4px 0;
+      color: #666;
+      font-weight: 500;
+      font-style: italic;
+    }
+    
+    /* Table styling for print - FILL PAGE */
+    .print-table {
+      width: 100%;
+      border-collapse: separate;
+      border-spacing: 0;
+      background: white;
+      border: 2px solid #333;
+      table-layout: fixed;
+      border-radius: 4px;
+      overflow: hidden;
+      flex: 1;
+    }
+    
+    .print-table th,
+    .print-table td {
+      border-right: 1px solid #ddd !important;
+      border-bottom: 1px solid #ddd !important;
+      padding: 6px 4px !important;
+      text-align: center !important;
+      vertical-align: top !important;
+    }
+    
+    .print-table th:last-child,
+    .print-table td:last-child {
+      border-right: none !important;
+    }
+    
+    .print-table th {
+      background: linear-gradient(180deg, #f8f9fa 0%, #e9ecef 100%) !important;
+      color: #1a1a1a !important;
+      font-weight: 700 !important;
+      font-size: 9px !important;
+      padding: 8px 4px !important;
+      border-bottom: 2px solid #333 !important;
+    }
+    
+    .print-table td {
+      min-height: 50px !important;
+      height: 50px !important;
+      font-size: 8px !important;
+      background: white !important;
+      overflow: hidden;
+    }
+    
+    .print-table tbody tr:nth-child(even) td {
+      background: #f8f9fa !important;
+    }
+    
+    /* Day header badges - MODERN DESIGN */
+    .day-badge-print {
+      display: inline-flex !important;
+      align-items: center;
+      justify-content: center;
+      width: 32px;
+      height: 32px;
+      border-radius: 50%;
+      font-weight: 700;
+      font-size: 9px;
+      color: white !important;
+      box-shadow: 0 1px 3px rgba(0,0,0,0.2);
+    }
+    
+    /* Time column - LARGER FOR READABILITY */
+    .time-column-print {
+      background: linear-gradient(180deg, #f8f9fa 0%, #e9ecef 100%) !important;
+      font-weight: 700 !important;
+      font-size: 8px !important;
+      color: #1a1a1a !important;
+      width: 50px !important;
+      max-width: 50px !important;
+      min-width: 50px !important;
+      padding: 6px 4px !important;
+      text-align: center !important;
+      vertical-align: middle !important;
+      writing-mode: horizontal-tb !important;
+      transform: none !important;
+      border-right: 2px solid #333 !important;
+    }
+    
+    .print-time-display {
+      display: inline !important;
+    }
+    
+    /* Schedule card styling - LARGER FOR VISIBILITY */
+    .schedule-subject-card {
+      background: linear-gradient(135deg, #667eea15 0%, #764ba215 100%) !important;
+      color: #1a1a1a !important;
+      padding: 4px !important;
+      border-radius: 2px !important;
+      font-size: 7px !important;
+      line-height: 1.4 !important;
+      margin: 2px !important;
+      text-align: left !important;
+      border-left: 2px solid #667eea !important;
+      position: relative !important;
+      display: block !important;
+      overflow: hidden !important;
+      text-overflow: ellipsis !important;
+      white-space: nowrap !important;
+      box-shadow: 0 1px 2px rgba(0,0,0,0.05) !important;
+    }
+    
+    .schedule-subject-card .font-medium {
+      font-weight: 600 !important;
+      color: #333 !important;
+      margin-bottom: 2px !important;
+      display: block !important;
+      font-size: 8px !important;
+    }
+    
+    .schedule-subject-card .opacity-75,
+    .schedule-subject-card .opacity-60 {
+      opacity: 1 !important;
+      color: #666 !important;
+      font-size: 7px !important;
+      display: block !important;
+      margin: 2px 0 !important;
+    }
+    
+    /* Hide time display in schedule cards for print */
+    .schedule-subject-card .opacity-60 {
+      display: none !important;
+    }
+    
+    .schedule-code {
+      font-weight: 600;
+      color: #333;
+      margin-bottom: 2px;
+      font-size: 8px;
+    }
+    
+    .schedule-time {
+      color: #666;
+      font-size: 7px;
+      margin-bottom: 3px;
+    }
+    
+    .schedule-badge {
+      display: inline-block;
+      padding: 2px 8px;
+      border-radius: 2px;
+      font-size: 7px;
+      font-weight: 700;
+      text-transform: uppercase;
+      margin-top: 2px;
+    }
+    
+    .badge-lab1 {
+      background-color: #f4c430 !important;
+      color: #333 !important;
+    }
+    
+    .badge-lab2 {
+      background-color: #a8b8c8 !important;
+      color: white !important;
+    }
+    
+    .badge-lec {
+      background-color: #6b9b6e !important;
+      color: white !important;
+    }
+    
+    /* Avoid page breaks inside table rows */
+    tr {
+      page-break-inside: avoid;
+    }
+  }
+`;
 
 const localizer = momentLocalizer(moment);
 
@@ -48,12 +304,33 @@ const TeachingLoad = () => {
   const [viewMode, setViewMode] = useState<ViewMode>('grid');
   const [calendarView, setCalendarView] = useState<View>(Views.WEEK);
   const [isLoading, setIsLoading] = useState(false);
-  const [curriculumYear, setCurriculumYear] = useState('');
-  const [semester, setSemester] = useState('');
+  const [curriculumYear, setCurriculumYear] = useState('2025-2026');
+  const [semester, setSemester] = useState('1st Semester');
   const toast = useToast();
-    const [academicYears, setAcademicYears] = useState<any[]>([]);
-    const userData = useAppSelector((state) => state.auth.user);
-    const id = userData?.id;
+  const [academicYears, setAcademicYears] = useState<any[]>([]);
+  const userData = useAppSelector((state) => state.auth.user);
+  const id = userData?.id;
+  const printRef = useRef<HTMLDivElement>(null);
+
+  const handlePrint = useReactToPrint({
+    contentRef: printRef,
+    documentTitle: `Teaching_Load_${selectedFaculty?.name || 'Schedule'}_${curriculumYear}`,
+    pageStyle: `
+      @page {
+        size: landscape;
+        margin: 15mm;
+      }
+      @media print {
+        body {
+          -webkit-print-color-adjust: exact;
+          print-color-adjust: exact;
+        }
+        .no-print {
+          display: none !important;
+        }
+      }
+    `
+  });
 
   const timeSlots: TimeSlot[] = [
     { time: '7:00', display: '7:00 AM', endTime: '8:00' },
@@ -71,6 +348,17 @@ const TeachingLoad = () => {
     { time: '19:00', display: '7:00 PM', endTime: '20:00' },
     { time: '20:00', display: '8:00 PM', endTime: '21:00' },
   ];
+
+  // Inject print styles
+  useEffect(() => {
+    const styleElement = document.createElement('style');
+    styleElement.innerHTML = printStyles;
+    document.head.appendChild(styleElement);
+    
+    return () => {
+      document.head.removeChild(styleElement);
+    };
+  }, []);
 
   useEffect(() => {
     
@@ -452,10 +740,29 @@ const TeachingLoad = () => {
       </td>
     );
   };
+  // Get faculty initials for print
+  const getFacultyInitials = (name: string) => {
+    if (!name) return 'DR';
+    const parts = name.split(' ');
+    if (parts.length >= 2) {
+      return (parts[0][0] + parts[parts.length - 1][0]).toUpperCase();
+    }
+    return name.substring(0, 2).toUpperCase();
+  };
+
   return (
-    <div className="p-6 bg-gray-50 min-h-screen">
+    <div className="p-6 bg-gray-50 min-h-screen print-container" ref={printRef}>
+        {/* Print Header - Only visible when printing */}
+        <div className="print-header" style={{ display: 'none' }}>
+          <div className="print-header-circle">
+            {getFacultyInitials(selectedFaculty?.name || '')}
+          </div>
+          <h1>{(selectedFaculty?.name || 'Faculty Name').toUpperCase()}</h1>
+          <p>Class schedule</p>
+        </div>
+
         {/* Header */}
-        <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center mb-6 space-y-4 sm:space-y-0">
+        <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center mb-6 space-y-4 sm:space-y-0 no-print">
           <h1 className="text-xl sm:text-2xl font-bold text-gray-900">View Teaching Load</h1>
           <div className="flex flex-col sm:flex-row items-stretch sm:items-center space-y-2 sm:space-y-0 sm:space-x-4">
             {/* View Toggle */}
@@ -483,14 +790,18 @@ const TeachingLoad = () => {
                 <span>Calendar View</span>
               </button>
             </div>
-            <button className="p-2 text-gray-600 hover:text-gray-900">
+            <button 
+              onClick={handlePrint}
+              className="p-2 text-gray-600 hover:text-gray-900 hover:bg-gray-100 rounded-lg transition-colors"
+              title="Print Schedule"
+            >
               <Printer className="h-5 w-5" />
             </button>
           </div>
         </div>
 
         {/* Faculty Selection */}
-        <div className="bg-white rounded-lg shadow mb-2 ">
+        <div className="bg-white rounded-lg shadow mb-2 no-print">
 
           {/* <div className="flex items-center space-x-4">
             <Calendar className="h-5 w-5 text-gray-600" />
@@ -595,7 +906,7 @@ const TeachingLoad = () => {
             {viewMode === 'grid' ? (
               /* Grid View */
               <div className="overflow-x-auto">
-                <table className="min-w-full table-fixed">
+                <table className="min-w-full table-fixed print-table">
                   <colgroup>
                     <col className="w-20" />
                     {days.map((day) => (
@@ -605,18 +916,38 @@ const TeachingLoad = () => {
                   <thead>
                     <tr className="bg-red-800 text-white">
                       <th className="px-4 text-nowrap py-3 text-left text-xs font-medium uppercase tracking-wider">
-                        Time
+                        <span className="no-print">Time</span>
                       </th>
-                      {days.map((day) => (
-                        <th key={day} className="px-4 text-nowrap py-3 text-center text-xs font-medium uppercase tracking-wider">
-                          {day}
-                        </th>
-                      ))}
+                      {days.map((day, index) => {
+                        const dayColors = [
+                          '#E8C5B5', // M - Peach/Tan
+                          '#B5D4E8', // T - Light Blue
+                          '#D4C99C', // W - Beige/Yellow
+                          '#B5B5B5', // TH - Gray
+                          '#D4D4A8', // F - Light Green/Yellow
+                          '#C5B5E8', // S - Light Purple
+                          '#E8B5D4'  // SU - Light Pink
+                        ];
+                        return (
+                          <th key={day} className="px-4 text-nowrap py-3 text-center text-xs font-medium uppercase tracking-wider">
+                            <span className="no-print">{day}</span>
+                            <div className="day-badge-print" style={{ 
+                              backgroundColor: dayColors[index],
+                              display: 'none'
+                            }}>
+                              {day}
+                            </div>
+                          </th>
+                        );
+                      })}
                     </tr>
                   </thead>
                   <tbody>
                     {(() => {
                       const processedSchedule = processScheduleForGrid(selectedFaculty);
+                      let timeSlotIndex = 0;
+                      const timeCategories = ['MORNING', '', 'AFTERNOON'];
+                      
                       return timeSlots.map((slot) => {
                         // Render all cells, including nulls for rowspan
                         const cells = days.map((day) => renderGridCell(day, slot.time, processedSchedule));
@@ -625,10 +956,16 @@ const TeachingLoad = () => {
                         const allNull = cells.every(cell => cell === null);
                         if (allNull) return null;
                         
+                        const currentCategory = timeCategories[Math.floor(timeSlotIndex / 5)] || '';
+                        timeSlotIndex++;
+                        
                         return (
                           <tr key={slot.time} className="border-b border-gray-200">
-                            <td className="px-4 text-nowrap py-2 text-xs text-gray-600 bg-gray-50 font-medium h-16">
-                              {slot.display}
+                            <td className="px-4 text-nowrap py-2 text-xs text-gray-600 bg-gray-50 font-medium h-16 time-column-print">
+                              <span className="no-print">{slot.display}</span>
+                              <span style={{ display: 'none' }} className="print-time-display">
+                                {slot.display}
+                              </span>
                             </td>
                             {cells}
                           </tr>

@@ -4,12 +4,13 @@ import {
   IoEyeOutline,
   IoTrophyOutline,
   IoCheckmarkCircle,
-  IoCodeSlashOutline,
-  IoColorPaletteOutline,
-  IoServerOutline,
-  IoShieldCheckmarkOutline,
 } from "react-icons/io5";
-import { FaChartLine, FaClock, FaUsers, FaBrain, FaGithub, FaLinkedin } from "react-icons/fa";
+import { FaChartLine, FaClock, FaUsers, FaBrain } from "react-icons/fa";
+import adviser from "../../assets/PICTURES AND ROLES/Thesis Adviser.jpg";
+import projectManager from "../../assets/PICTURES AND ROLES/Project Manager.jpg";
+import systemDeveloper from "../../assets/PICTURES AND ROLES/System Developer.jpg";
+import trainingHead from "../../assets/PICTURES AND ROLES/Training Head.jpg";
+import tester from "../../assets/PICTURES AND ROLES/Tester.jpg";
 
 const About = () => {
   const features = [
@@ -41,32 +42,38 @@ const About = () => {
 
   const team = [
     {
-      name: "Development Team",
-      role: "Full-Stack Developers & System Architects",
-      icon: <IoCodeSlashOutline className="text-4xl" />,
-      color: "from-blue-500 to-blue-600",
-      description: "Responsible for designing, developing, and maintaining the OptiSched system architecture and features"
+      name: "Darllaine Lincopinis",
+      role: "Thesis Adviser",
+      image: adviser,
+      description: "Guiding and mentoring the development team throughout the thesis project, providing expert advice and ensuring academic excellence"
     },
     {
-      name: "UI/UX Design Team",
-      role: "User Interface & Experience Designers",
-      icon: <IoColorPaletteOutline className="text-4xl" />,
+      name: "Daisy Ann Magbato",
+      role: "Project Manager",
+      image: projectManager,
       color: "from-purple-500 to-purple-600",
-      description: "Creating intuitive and beautiful interfaces that enhance user experience and productivity"
+      description: "Leading the project team, coordinating tasks, managing timelines, and ensuring successful delivery of OptiSched"
     },
     {
-      name: "Backend Team",
-      role: "Database & API Specialists",
-      icon: <IoServerOutline className="text-4xl" />,
+      name: "Axl Heart Remegio",
+      role: "System Developer",
+      image: systemDeveloper,
       color: "from-green-500 to-green-600",
-      description: "Building robust APIs, managing databases, and ensuring system performance and scalability"
+      description: "Designing and developing the core system architecture, implementing features, and ensuring robust functionality"
     },
     {
-      name: "Quality Assurance Team",
-      role: "Testing & Security Specialists",
-      icon: <IoShieldCheckmarkOutline className="text-4xl" />,
+      name: "Meralyn Largo",
+      role: "Training Head",
+      image: trainingHead,
+      color: "from-pink-500 to-pink-600",
+      description: "Developing training materials, conducting user training sessions, and ensuring smooth system adoption"
+    },
+    {
+      name: "Charity Soriño",
+      role: "Tester",
+      image: tester,
       color: "from-red-500 to-red-600",
-      description: "Ensuring software quality, security, and reliability through rigorous testing and validation"
+      description: "Ensuring software quality through comprehensive testing, identifying bugs, and validating system functionality"
     }
   ];
 
@@ -153,18 +160,23 @@ const About = () => {
             </p>
           </div>
 
-          <div className="grid md:grid-cols-2 gap-8">
+          <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-8">
             {team.map((member, index) => (
               <div
                 key={index}
-                className="bg-white rounded-2xl p-8 shadow-xl hover:shadow-2xl transition-all duration-300 transform hover:-translate-y-2"
+                className="bg-white rounded-2xl p-6 shadow-xl hover:shadow-2xl transition-all duration-300 transform hover:-translate-y-2 overflow-hidden"
               >
-                <div className={`bg-gradient-to-br ${member.color} w-16 h-16 rounded-full flex items-center justify-center mb-6 text-white`}>
-                  {member.icon}
+                <div className="relative mb-6">
+                  <div className={`absolute inset-0 bg-gradient-to-br ${member.color} opacity-10 rounded-t-2xl`}></div>
+                  <img
+                    src={member.image}
+                    alt={member.name}
+                    className="w-full h-64 object-contain rounded-xl shadow-lg"
+                  />
                 </div>
-                <h3 className="text-2xl font-bold text-gray-900 mb-2">{member.name}</h3>
-                <p className="text-sm font-semibold text-blue-600 mb-4">{member.role}</p>
-                <p className="text-gray-600 leading-relaxed">{member.description}</p>
+                <h3 className="text-xl font-bold text-gray-900 mb-2 text-center">{member.name}</h3>
+                <p className="text-sm font-semibold text-blue-600 mb-4 text-center">{member.role}</p>
+                <p className="text-gray-600 leading-relaxed text-sm text-center">{member.description}</p>
               </div>
             ))}
           </div>
@@ -257,13 +269,13 @@ const About = () => {
           </p>
           <div className="flex flex-col sm:flex-row gap-4 justify-center">
             <a
-              href="/contact"
+              href="/contact-us"
               className="bg-white text-purple-600 font-bold py-4 px-8 rounded-lg shadow-lg hover:shadow-xl transition-all duration-300 transform hover:scale-105"
             >
               Contact Us
             </a>
             <a
-              href="/login"
+              href="/home"
               className="bg-transparent border-2 border-white text-white font-bold py-4 px-8 rounded-lg hover:bg-white hover:text-purple-600 transition-all duration-300 transform hover:scale-105"
             >
               Get Started

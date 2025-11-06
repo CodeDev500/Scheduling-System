@@ -42,6 +42,7 @@ model Subject {
   lec                Int           @default(0)
   lab                Int           @default(0)
   units              Int           @default(0)
+  prerequisite       Json?
   createdAt          DateTime      @default(now())
   updatedAt          DateTime      @updatedAt
   tags               Json?

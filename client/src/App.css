@@ -9,3 +9,7 @@
   --color-primary: #aa0022;
   --color-primary_hover: #8a001a;
 }
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;

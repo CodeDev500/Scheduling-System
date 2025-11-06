@@ -136,7 +136,7 @@ const Sidebar = ({ sidebar, handleBurger }: SidebarProps) => {
       },
       {
         title: "View Teaching Load",
-        path: "/department-head-teaching-load",
+        path: "/teaching-load",
         src: <TbReportAnalytics />,
       },
     ];
@@ -149,12 +149,12 @@ const Sidebar = ({ sidebar, handleBurger }: SidebarProps) => {
       },
        {
         title: "View Schedules",
-        path: "/faculty-teaching-load",
+        path: "/faculty-schedules",
         src: <TbReportAnalytics />,
       },
       {
         title: "View Teaching Load",
-        path: "/faculty-schedules",
+        path: "/teaching-load",
         src: <AiOutlineCalendar />,
       },
      

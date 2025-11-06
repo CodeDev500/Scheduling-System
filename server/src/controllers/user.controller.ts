@@ -110,7 +110,7 @@ export const deleteUser = async (req: Request, res: Response) => {
 // Get faculty with teaching load
 export const getFacultyWithLoad = async (req: Request, res: Response) => {
   try {
-    const { curriculumYear, semester } = req.params;
+    // const { curriculumYear, semester } = req.params;
     const faculty = await UserService.listUsers();
 
     // Get teaching load for each faculty from subject_schedules
@@ -127,8 +127,8 @@ export const getFacultyWithLoad = async (req: Request, res: Response) => {
           where: {
             facultyId: String(facultyMember.id),
             isActive: true,
-            academicYear: String(curriculumYear),
-            semester: String(semester),
+            // academicYear: String(curriculumYear),
+            // semester: String(semester),
           },
         });
 
