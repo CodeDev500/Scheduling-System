@@ -92,7 +92,7 @@ const ResultsTab: React.FC<ResultsTabProps> = ({
   
   // Group subjects by day and time for grid view
   const scheduleGrid = selectedSchedule.subjects.reduce((grid, subject) => {
-    subject.timeSlots.forEach(slot => {
+    subject.timeSlots?.forEach(slot => {
       const key = `${slot.day}-${slot.startTime}`;
       if (!grid[key]) grid[key] = [];
       grid[key].push({ ...subject, currentTimeSlot: slot });
@@ -124,7 +124,7 @@ const ResultsTab: React.FC<ResultsTabProps> = ({
             <div className="flex items-center justify-between">
               <div>
                 <p className="text-sm text-muted-foreground">Optimization Score</p>
-                <p className="text-2xl font-bold text-green-700 dark:text-green-300">{selectedSchedule.optimizationScore}%</p>
+                <p className="text-2xl font-bold text-green-700 dark:text-green-300">{selectedSchedule.optimizationScore?.overall || 0}%</p>
               </div>
               <Target className="h-8 w-8 text-green-600 dark:text-green-400" />
             </div>
@@ -271,7 +271,7 @@ const ResultsTab: React.FC<ResultsTabProps> = ({
                         </TableCell>
                         <TableCell>
                           <div className="space-y-1">
-                            {subject.timeSlots.map((slot, index) => (
+                            {subject.timeSlots?.map((slot, index) => (
                               <Badge key={index} variant="outline" className="text-xs bg-blue-50 text-blue-700 border-blue-200 dark:bg-blue-950 dark:text-blue-300 dark:border-blue-800">
                                 {formatDayTimeSlot(slot.day, slot.startTime, slot.endTime)}
                               </Badge>
@@ -308,7 +308,7 @@ const ResultsTab: React.FC<ResultsTabProps> = ({
                                 size="sm" 
                                 variant="outline"
                                 className="h-8 w-8 p-0 border-orange-200 hover:bg-orange-50 dark:border-orange-800 dark:hover:bg-orange-950"
-                                onClick={() => onResolveConflict(subject.id)}
+                                onClick={() => onResolveConflict(subject.id, {})}
                               >
                                 <RefreshCw className="h-3 w-3 text-orange-600 dark:text-orange-400" />
                               </Button>

@@ -192,7 +192,7 @@ export const CurriculumSlice = createSlice({
         state.isLoading = true;
         state.error = null;
       })
-      .addCase(createCurriculum.fulfilled, (state, action) => {
+      .addCase(createCurriculum.fulfilled, (state) => {
         state.isLoading = false;
         // The payload should contain the created/updated curriculum data
         // Since we're saving multiple subjects, we don't add to state here

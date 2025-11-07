@@ -139,8 +139,8 @@ const ManualAdjustments: React.FC<ManualAdjustmentsProps> = ({
   };
 
   const filteredSubjects = subjects.filter(subject =>
-    subject.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    subject.code.toLowerCase().includes(searchTerm.toLowerCase())
+    subject.name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+    subject.code?.toLowerCase().includes(searchTerm.toLowerCase())
   );
 
   const filteredConflicts = mockConflicts.filter(conflict => {
@@ -276,7 +276,7 @@ const ManualAdjustments: React.FC<ManualAdjustmentsProps> = ({
               // Find the scheduled subject in the generated schedule
               const scheduledSubject = schedule.subjects?.find(s => s.subjectId === subject.id);
               const currentFaculty = scheduledSubject?.faculty ? 
-                faculty.find(f => f.id === scheduledSubject.faculty.id) : 
+                faculty.find(f => f.id === scheduledSubject.faculty?.id) : 
                 null;
               const pendingAssignment = pendingAssignments.find(a => a.subjectId === subject.id);
               

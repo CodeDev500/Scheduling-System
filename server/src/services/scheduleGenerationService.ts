@@ -19,23 +19,27 @@ interface CourseInput {
 
 interface ScheduleItem {
   id: string;
-  subjectId: string;
+  subjectId?: string;
   subjectCode: string;
-  subjectName: string;
-  facultyId: string;
-  facultyName: string;
-  roomId: string;
-  roomName: string;
+  subjectName?: string;
+  subjectDescription?: string;
+  facultyId?: string;
+  facultyName?: string;
+  faculty?: string;
+  roomId?: string;
+  roomName?: string;
+  room?: string;
   day: string;
   startTime: string;
   endTime: string;
   units: number;
-  lec: number;
-  lab: number;
+  lec?: number;
+  lab?: number;
   yearLevel: string;
-  semester: string;
+  semester?: string;
+  section?: string;
   type: 'Lec' | 'Lab' | 'Lec/Lab';
-  recommendedFaculty: any[];
+  recommendedFaculty?: any[];
 }
 
 interface UsedTimeSlot {
@@ -49,15 +53,53 @@ interface UsedTimeSlot {
   yearLevel?: string | number;
 }
 
+interface Conflict {
+  type: string;
+  description: string;
+  affectedItems: string[];
+  severity: 'LOW' | 'MEDIUM' | 'HIGH' | 'CRITICAL';
+}
+
+interface GenerationParams {
+  department: string;
+  academicYear: string;
+  semester: string;
+  yearLevel?: string;
+  constraints: any[];
+  preferences?: any;
+}
+
+interface GenerationResult {
+  success: boolean;
+  scheduleData: ScheduleItem[];
+  conflicts: Conflict[];
+  statistics: {
+    totalSubjects: number;
+    scheduledSubjects: number;
+    conflictsFound: number;
+    roomUtilization: number;
+  };
+}
+
 // Global state tracking
 let usedTimeSlots: UsedTimeSlot[] = [];
 let globalTimeSlotIndex: number = 0;
 let scheduledCourseCount: number = 0;
 
+// Constants
+const days = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
+const timeSlots = ['07:00', '08:00', '09:00', '10:00', '11:00', '12:00', '13:00', '14:00', '15:00', '16:00', '17:00', '18:00', '19:00', '20:00'];
+
 // Utility functions
 function timeToMinutes(time: string): number {
   const [hours, minutes] = time.split(':').map(Number);
   return hours * 60 + minutes;
+}
+
+function minutesToTime(minutes: number): string {
+  const hours = Math.floor(minutes / 60);
+  const mins = minutes % 60;
+  return `${hours.toString().padStart(2, '0')}:${mins.toString().padStart(2, '0')}`;
 }
 
 function addMinutes(timeString: string, minutes: number): string {
@@ -186,7 +228,7 @@ function detectConflicts(schedule: ScheduleItem[]): Conflict[] {
       
       if (item1.day === item2.day) {
         // Check room conflicts
-        if (item1.room === item2.room && timeRangesOverlap(item1.startTime, item1.endTime, item2.startTime, item2.endTime)) {
+        if (item1.room && item2.room && item1.room === item2.room && timeRangesOverlap(item1.startTime, item1.endTime, item2.startTime, item2.endTime)) {
           conflicts.push({
             type: 'ROOM_DOUBLE_BOOKING',
             description: `Room ${item1.room} is double-booked on ${item1.day}`,
@@ -196,7 +238,7 @@ function detectConflicts(schedule: ScheduleItem[]): Conflict[] {
         }
         
         // Check faculty conflicts
-        if (item1.faculty === item2.faculty && timeRangesOverlap(item1.startTime, item1.endTime, item2.startTime, item2.endTime)) {
+        if (item1.faculty && item2.faculty && item1.faculty === item2.faculty && timeRangesOverlap(item1.startTime, item1.endTime, item2.startTime, item2.endTime)) {
           conflicts.push({
             type: 'FACULTY_OVERLOAD',
             description: `Faculty ${item1.faculty} has overlapping schedules on ${item1.day}`,
@@ -267,7 +309,7 @@ function assignRoom(scheduleItem: ScheduleItem, rooms: any[], existingSchedule: 
   // Find available rooms for the time slot
   for (const room of rooms) {
     const isRoomAvailable = !existingSchedule.some(item => 
-      item.room === room.name && 
+      item.room && item.room === room.name && 
       item.day === scheduleItem.day && 
       timeRangesOverlap(scheduleItem.startTime, scheduleItem.endTime, item.startTime, item.endTime)
     );
@@ -307,7 +349,7 @@ export async function scheduleGenerationAlgorithm(params: GenerationParams): Pro
           yearLevel: subject.yearLevel,
           section: 'A', // Default section
           units: subject.lec,
-          type: 'lecture'
+          type: 'Lec'
         });
       }
       
@@ -319,7 +361,7 @@ export async function scheduleGenerationAlgorithm(params: GenerationParams): Pro
           yearLevel: subject.yearLevel,
           section: 'A', // Default section
           units: subject.lab,
-          type: 'laboratory'
+          type: 'Lab'
         });
       }
       

@@ -86,7 +86,17 @@ const ScheduleManagement = () => {
   const [selectedFaculty, setSelectedFaculty] = useState<Faculty | null>(null);
   const [showAdvancedFilters, setShowAdvancedFilters] = useState(false);
 
-  const [formData, setFormData] = useState({
+  const [formData, setFormData] = useState<{
+    courseId: string;
+    facultyId: string;
+    roomId: string;
+    day: string;
+    startTime: string;
+    endTime: string;
+    semester: string;
+    academicYear: string;
+    status: 'Draft' | 'Published' | 'Cancelled';
+  }>({
     courseId: '',
     facultyId: '',
     roomId: '',
@@ -95,7 +105,7 @@ const ScheduleManagement = () => {
     endTime: '',
     semester: '1st Semester',
     academicYear: '2024-2025',
-    status: 'Draft' as const
+    status: 'Draft'
   });
 
   const days = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
@@ -327,7 +337,7 @@ const ScheduleManagement = () => {
       endTime: formData.endTime,
       semester: formData.semester,
       academicYear: formData.academicYear,
-      status: formData.status
+      status: formData.status 
     };
 
     if (modalType === 'create') {

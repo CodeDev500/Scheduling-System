@@ -41,7 +41,7 @@ const PreviewModal: React.FC<PreviewModalProps> = ({
 
   // Group subjects by day and time for grid view
   const scheduleGrid = schedule.subjects.reduce((grid, subject) => {
-    subject.timeSlots.forEach(slot => {
+    subject.timeSlots?.forEach(slot => {
       const key = `${slot.day}-${slot.startTime}`;
       if (!grid[key]) grid[key] = [];
       grid[key].push({ ...subject, currentTimeSlot: slot });
@@ -102,7 +102,7 @@ const PreviewModal: React.FC<PreviewModalProps> = ({
               <CardContent className="p-4 text-center">
                 <Clock className="h-6 w-6 mx-auto mb-2 text-orange-600 dark:text-orange-400" />
                 <div className="text-lg font-bold text-orange-700 dark:text-orange-300">
-                  {schedule.subjects.reduce((sum, subject) => sum + subject.timeSlots.length, 0)}
+                  {schedule.subjects.reduce((sum, subject) => sum + (subject.timeSlots?.length || 0), 0)}
                 </div>
                 <div className="text-xs text-muted-foreground">Time Slots</div>
               </CardContent>
@@ -196,7 +196,7 @@ const PreviewModal: React.FC<PreviewModalProps> = ({
                           </TableCell>
                           <TableCell>
                             <div className="space-y-1">
-                              {subject.timeSlots.map((slot, index) => (
+                              {subject.timeSlots?.map((slot, index) => (
                                 <Badge key={index} variant="outline" className="text-xs bg-blue-50 text-blue-700 border-blue-200 dark:bg-blue-950 dark:text-blue-300 dark:border-blue-800">
                                   {formatDayTimeSlot(slot.day, slot.startTime, slot.endTime)}
                                 </Badge>

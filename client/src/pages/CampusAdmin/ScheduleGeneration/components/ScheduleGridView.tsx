@@ -201,8 +201,10 @@ export const ScheduleGridView: React.FC<ScheduleGridViewProps> = ({
                               day: timeSlot.day, // Keep the combined day format
                               startTime: timeSlot.startTime,
                               endTime: timeSlot.endTime,
-                              type: scheduledSubject.lectureHours > 0 ? 'Lecture' : 'Laboratory',
+                              type: ((scheduledSubject.lectureHours || 0) > 0 ? 'Lec' : 'Lab') as 'Lec' | 'Lab' | 'Lec/Lab',
                               units: scheduledSubject.units,
+                              lec: scheduledSubject.lec || 0,
+                              lab: scheduledSubject.lab || 0,
                               yearLevel: 1,
                               semester: 1,
                               recommendedFaculty: getFacultyRecommendations(scheduledSubject, scheduledSubject.faculty?.id)

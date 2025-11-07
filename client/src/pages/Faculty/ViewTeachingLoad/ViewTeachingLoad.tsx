@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from "react";
-import { Clock, BookOpen, Users, Calendar, Download, Eye, BarChart3, TrendingUp, AlertCircle } from "lucide-react";
+import { Download } from "lucide-react";
 import DashboardHeader from "../../../components/dashboard/DashboardHeader";
 
 interface Course {
@@ -158,12 +158,6 @@ const ViewTeachingLoad: React.FC = () => {
     });
   }, [selectedSemester, selectedAcademicYear]);
 
-  const getWorkloadStatus = (percentage: number) => {
-    if (percentage <= 80) return { color: 'text-green-600', bg: 'bg-green-100', status: 'Normal' };
-    if (percentage <= 100) return { color: 'text-yellow-600', bg: 'bg-yellow-100', status: 'Near Limit' };
-    return { color: 'text-red-600', bg: 'bg-red-100', status: 'Overloaded' };
-  };
-
   const getStatusColor = (status: string) => {
     switch (status) {
       case 'Active': return 'bg-green-100 text-green-800';
@@ -186,8 +180,6 @@ const ViewTeachingLoad: React.FC = () => {
       </div>
     );
   }
-
-  const workloadStatus = getWorkloadStatus(teachingLoad.workloadPercentage);
 
   return (
     <div className="p-6 bg-gray-50 min-h-screen">

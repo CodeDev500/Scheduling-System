@@ -11,7 +11,7 @@ interface VerifyOTPProps {
   closeModal: () => void;
 }
 
-const VerifyOTP: React.FC<VerifyOTPProps> = ({ email, closeOTP, closeModal }) => {
+const VerifyOTP: React.FC<VerifyOTPProps> = ({ email, closeOTP }) => {
   const toast = toastUtils();
   const [otp, setOtp] = useState<string[]>(new Array(4).fill(""));
   const [countDown, setCountDown] = useState<number>(0);

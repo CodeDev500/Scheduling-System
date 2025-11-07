@@ -32,6 +32,10 @@ export interface User {
   role: string;
   status: string;
   password: string;
+  yearsOfExperience?: number;
+  previousSubjects?: string[];
+  availableDays?: string[];
+  preferredTimeSlots?: string[];
   createdAt: Date;
   updatedAt: Date;
 }

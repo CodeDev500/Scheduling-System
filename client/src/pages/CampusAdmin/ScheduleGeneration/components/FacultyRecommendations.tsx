@@ -41,13 +41,14 @@ const FacultyRecommendations: React.FC<FacultyRecommendationsProps> = ({
   const recommendationsBySubject = subjects.reduce((acc, subject) => {
     acc[subject.id] = facultyRecommendations
       .filter(rec => rec.subjectId === subject.id)
-      .sort((a, b) => a.rank - b.rank);
+      .sort((a, b) => (a.rank || 0) - (b.rank || 0));
     return acc;
   }, {} as Record<string, FacultyRecommendation[]>);
 
   // Group recommendations by faculty
   const recommendationsByFaculty = facultyRecommendations.reduce((acc, rec) => {
-    const facultyId = rec.faculty.id;
+    const facultyId = rec.faculty?.id;
+    if (!facultyId) return acc;
     if (!acc[facultyId]) {
       acc[facultyId] = [];
     }
@@ -102,7 +103,7 @@ const FacultyRecommendations: React.FC<FacultyRecommendationsProps> = ({
           <div className="space-y-6">
             {subjects.map(subject => {
               const recommendations = recommendationsBySubject[subject.id] || [];
-              const hasConflicts = recommendations.some(rec => rec.potentialConflicts.length > 0);
+              const hasConflicts = recommendations.some(rec => (rec.potentialConflicts?.length || 0) > 0);
               
               return (
                 <div key={subject.id} className="border rounded-lg p-4">
@@ -126,9 +127,9 @@ const FacultyRecommendations: React.FC<FacultyRecommendationsProps> = ({
                   <div className="space-y-3">
                     {recommendations.slice(0, 3).map((rec, index) => (
                       <div
-                        key={rec.faculty.id}
+                        key={rec.faculty?.id || rec.facultyId}
                         className={`border rounded-lg p-3 ${
-                          rec.potentialConflicts.length > 0 
+                          (rec.potentialConflicts?.length || 0) > 0 
                             ? 'border-red-200 bg-red-50' 
                             : 'border-gray-200 hover:border-primary/50'
                         }`}
@@ -136,11 +137,11 @@ const FacultyRecommendations: React.FC<FacultyRecommendationsProps> = ({
                         <div className="flex items-start justify-between">
                           <div className="flex-1">
                             <div className="flex items-center gap-2 mb-2">
-                              <Badge className={getRankColor(rec.rank)}>
+                              <Badge className={getRankColor(rec.rank || 0)}>
                                 #{rec.rank}
                               </Badge>
-                              <span className="font-medium">{rec.faculty.name}</span>
-                              <Badge className={getConfidenceColor(rec.confidence)}>
+                              <span className="font-medium">{rec.faculty?.name || 'Unknown'}</span>
+                              <Badge className={getConfidenceColor(rec.confidence || 'Low')}>
                                 {rec.confidence} Confidence
                               </Badge>
                             </div>
@@ -148,19 +149,19 @@ const FacultyRecommendations: React.FC<FacultyRecommendationsProps> = ({
                             <div className="grid grid-cols-2 md:grid-cols-4 gap-2 text-sm mb-2">
                               <div>
                                 <span className="text-muted-foreground">Match:</span>
-                                <span className="ml-1 font-medium">{rec.faculty.matchScore}%</span>
+                                <span className="ml-1 font-medium">{rec.faculty?.matchScore || 0}%</span>
                               </div>
                               <div>
                                 <span className="text-muted-foreground">Experience:</span>
-                                <span className="ml-1 font-medium">{rec.faculty.experienceScore}%</span>
+                                <span className="ml-1 font-medium">{rec.faculty?.experienceScore || 0}%</span>
                               </div>
                               <div>
                                 <span className="text-muted-foreground">Availability:</span>
-                                <span className="ml-1 font-medium">{rec.faculty.availabilityScore}%</span>
+                                <span className="ml-1 font-medium">{rec.faculty?.availabilityScore || 0}%</span>
                               </div>
                               <div>
                                 <span className="text-muted-foreground">Overall:</span>
-                                <span className="ml-1 font-medium text-primary">{rec.faculty.overallScore}%</span>
+                                <span className="ml-1 font-medium text-primary">{rec.faculty?.overallScore || 0}%</span>
                               </div>
                             </div>
 
@@ -172,11 +173,11 @@ const FacultyRecommendations: React.FC<FacultyRecommendationsProps> = ({
                               ))}
                             </div>
 
-                            {rec.potentialConflicts.length > 0 && (
+                            {(rec.potentialConflicts?.length || 0) > 0 && (
                               <Alert className="mt-2">
                                 <AlertTriangle className="h-4 w-4" />
                                 <AlertDescription className="text-sm">
-                                  <strong>Potential Conflicts:</strong> {rec.potentialConflicts.join(', ')}
+                                  <strong>Potential Conflicts:</strong> {rec.potentialConflicts?.join(', ') || 'None'}
                                 </AlertDescription>
                               </Alert>
                             )}
@@ -185,17 +186,17 @@ const FacultyRecommendations: React.FC<FacultyRecommendationsProps> = ({
                           <div className="flex flex-col gap-2 ml-4">
                             <Button
                               size="sm"
-                              onClick={() => onAssignFaculty(subject.id, rec.faculty.id)}
-                              disabled={rec.potentialConflicts.length > 0}
+                              onClick={() => onAssignFaculty(subject.id, rec.faculty?.id || '')}
+                              disabled={(rec.potentialConflicts?.length || 0) > 0}
                             >
                               <CheckCircle className="h-4 w-4 mr-1" />
                               Assign
                             </Button>
-                            {rec.potentialConflicts.length > 0 && (
+                            {(rec.potentialConflicts?.length || 0) > 0 && (
                               <Button
                                 size="sm"
                                 variant="outline"
-                                onClick={() => onViewConflicts(rec.faculty.id)}
+                                onClick={() => onViewConflicts(rec.faculty?.id || '')}
                               >
                                 <AlertTriangle className="h-4 w-4 mr-1" />
                                 View Conflicts
@@ -214,7 +215,7 @@ const FacultyRecommendations: React.FC<FacultyRecommendationsProps> = ({
           <div className="space-y-6">
             {Object.entries(recommendationsByFaculty).map(([facultyId, recommendations]) => {
               const faculty = recommendations[0].faculty;
-              const totalConflicts = recommendations.reduce((sum, rec) => sum + rec.potentialConflicts.length, 0);
+              const totalConflicts = recommendations.reduce((sum, rec) => sum + (rec.potentialConflicts?.length || 0), 0);
               
               return (
                 <div key={facultyId} className="border rounded-lg p-4">
@@ -222,14 +223,14 @@ const FacultyRecommendations: React.FC<FacultyRecommendationsProps> = ({
                     <div>
                       <h3 className="font-semibold text-lg flex items-center gap-2">
                         <User className="h-5 w-5" />
-                        {faculty.name}
+                        {faculty?.name || 'Unknown'}
                       </h3>
                       <div className="flex items-center gap-2 mt-1">
                         <Badge variant="outline">
-                          {faculty.specializations.join(', ')}
+                          {faculty?.specializations?.join(', ') || 'N/A'}
                         </Badge>
                         <Badge variant="outline">
-                          {faculty.experienceYears} years experience
+                          {faculty?.experienceYears || 0} years experience
                         </Badge>
                         {totalConflicts > 0 && (
                           <Badge variant="destructive" className="text-xs">
@@ -241,7 +242,7 @@ const FacultyRecommendations: React.FC<FacultyRecommendationsProps> = ({
                     </div>
                     <div className="text-right">
                       <div className="text-2xl font-bold text-primary">
-                        {Math.round(faculty.overallScore)}%
+                        {Math.round(faculty?.overallScore || 0)}%
                       </div>
                       <div className="text-sm text-muted-foreground">Overall Score</div>
                     </div>
@@ -257,7 +258,7 @@ const FacultyRecommendations: React.FC<FacultyRecommendationsProps> = ({
                         <div
                           key={rec.subjectId}
                           className={`flex items-center justify-between p-2 rounded border ${
-                            rec.potentialConflicts.length > 0 ? 'border-red-200 bg-red-50' : 'border-gray-200'
+                            (rec.potentialConflicts?.length || 0) > 0 ? 'border-red-200 bg-red-50' : 'border-gray-200'
                           }`}
                         >
                           <div>
@@ -268,8 +269,8 @@ const FacultyRecommendations: React.FC<FacultyRecommendationsProps> = ({
                           </div>
                           <Button
                             size="sm"
-                            onClick={() => onAssignFaculty(subject.id, faculty.id)}
-                            disabled={rec.potentialConflicts.length > 0}
+                            onClick={() => onAssignFaculty(subject.id, faculty?.id || '')}
+                            disabled={(rec.potentialConflicts?.length || 0) > 0}
                           >
                             Assign
                           </Button>

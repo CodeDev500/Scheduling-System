@@ -6,13 +6,11 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Input } from '@/components/ui/input';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
-import { Badge } from '@/components/ui/badge';
-import { Clock, Save, CheckCircle, Send, ArrowLeft, Plus, Edit, Loader2, AlertTriangle, CheckCircle2 } from 'lucide-react';
+import { Save, ArrowLeft, Loader2, AlertTriangle, CheckCircle2 } from 'lucide-react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '@/components/ui/dialog';
 import { Alert, AlertDescription } from '@/components/ui/alert';
-import { useAppSelector, useAppDispatch } from '../../../hooks/redux';
+import { useAppSelector } from '../../../hooks/redux';
 import { programDescription } from '../../../utils/getProgramDescription';
-import { fetchCurriculumByProgramAndYear } from '../../../services/curriculumSlice';
 import api from '../../../api/axios';
 
 interface Schedule {
@@ -57,34 +55,26 @@ interface Subject {
  department: string;
 }
 
-interface ScheduleBlock {
-  subject: Subject;
-  day: string;
-  startHour: number;
-  endHour: number;
-}
 
 const ViewProspectusScheduling: React.FC = () => {
   const [searchParams] = useSearchParams();
   const navigate = useNavigate();
-  const dispatch = useAppDispatch();
   const userData = useAppSelector((state) => state.auth.user);
   const { academicPrograms } = useAppSelector((state) => state.academicProgram);
-  const { curriculums, isLoading } = useAppSelector((state) => state.curriculum);
+  const { isLoading } = useAppSelector((state) => state.curriculum);
   
   // Get parameters from URL
   const programCode = searchParams.get('programCode') || userData?.department || '';
   const yearLevel = searchParams.get('yearLevel') || '1st Year';
   const semester = searchParams.get('semester') || '1st Sem';
   
-  const [selectedAcademicYear, setSelectedAcademicYear] = useState<string>('2024-2025');
-  const [selectedYearLevel, setSelectedYearLevel] = useState<number>(parseInt(yearLevel.match(/\d+/)?.[0] || '1'));
-  const [selectedSemester, setSelectedSemester] = useState<string>(semester);
+  const [selectedAcademicYear] = useState<string>('2024-2025');
+  const [selectedSemester] = useState<string>(semester);
   
   // State for subjects with schedules
   const [subjects, setSubjects] = useState<Subject[]>([]);
   const [rooms, setRooms] = useState<Room[]>([]);
-  const [loading, setLoading] = useState(false);
+  const [_loading, setLoading] = useState(false);
   const [saving, setSaving] = useState(false);
   
 
@@ -272,11 +262,10 @@ const ViewProspectusScheduling: React.FC = () => {
   }) => {
     setSaving(true);
     try {
-      let response;
       if (scheduleData.scheduleId) {
-        response = await api.put(`/schedules/${scheduleData.scheduleId}`, scheduleData);
+        await api.put(`/schedules/${scheduleData.scheduleId}`, scheduleData);
       } else {
-        response = await api.post('/schedules', scheduleData);
+        await api.post('/schedules', scheduleData);
       }
       
       // Refresh the subjects data
@@ -291,25 +280,6 @@ const ViewProspectusScheduling: React.FC = () => {
     }
   };
 
-  // Handle schedule form submission
-  const handleScheduleSubmit = async (subjectId: number, scheduleData: {
-    scheduleId?: number;
-    day: string;
-    timeStarts: string;
-    timeEnds: string;
-    room?: string;
-  }) => {
-    const subject = subjects.find(s => s.id === subjectId);
-    if (!subject) return;
-    
-    const offeringId = subject.courseOfferings[0]?.id; // Use first offering or create one
-    
-    await createOrUpdateSchedule({
-      ...scheduleData,
-      curriculumCourseId: subjectId,
-      offeringId,
-    });
-  };
 
 
 
@@ -406,8 +376,6 @@ const ViewProspectusScheduling: React.FC = () => {
     }
 
     const conflicts: any[] = [];
-    const currentSubject = subjects.find(s => s.id === subjectId);
-    
     // Check against all other subjects
     subjects.forEach(otherSubject => {
       if (otherSubject.id === subjectId) return;
@@ -557,7 +525,6 @@ const ViewProspectusScheduling: React.FC = () => {
       
       // Create one block per time group that spans across days
       Object.values(timeGroups).forEach(scheduleGroup => {
-        const firstSchedule = scheduleGroup[0];
         const days = scheduleGroup.map(s => normalizeDayName(s.day)).sort();
         const abbreviatedDays = getAbbreviatedDays(days);
         
@@ -957,9 +924,6 @@ const ViewProspectusScheduling: React.FC = () => {
                     // Calculate position and height using consistent formula
                     const startHour = Math.floor(startTimeMinutes / 60);
                     const endHour = Math.floor(endTimeMinutes / 60);
-                    const startMinute = startTimeMinutes % 60;
-                    const endMinute = endTimeMinutes % 60;
-                    
                     // Find day column index
                     const dayIndex = days.indexOf(block.day);
                     

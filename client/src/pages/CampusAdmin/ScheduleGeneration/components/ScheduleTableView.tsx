@@ -181,7 +181,7 @@ export const ScheduleTableView: React.FC<ScheduleTableViewProps> = ({
             <tbody className="bg-white divide-y divide-slate-200">
               {selectedSchedule.subjects.map((scheduledSubject, index) => {
                 // Create a flattened structure for each time slot
-                return scheduledSubject.timeSlots.map((timeSlot, timeIndex) => (
+                return scheduledSubject.timeSlots?.map((timeSlot, timeIndex) => (
                 <tr 
                   key={`${scheduledSubject.subjectId}-${timeIndex}`} 
                   className="hover:bg-slate-50 transition-colors duration-200 border-l-4 border-blue-400"

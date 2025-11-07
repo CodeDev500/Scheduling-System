@@ -3,6 +3,7 @@ export interface ScheduleConflict {
   message: string;
   conflictingSchedules: string[];
   severity?: 'low' | 'medium' | 'high';
+  suggestion?: string;
 }
 
 export interface ScheduleItem {
@@ -16,7 +17,7 @@ export interface ScheduleItem {
   startTime: string;
   endTime: string;
   day: string;
-  section?: string;
+  section: string;
   semester: string;
   academicYear: string;
 }

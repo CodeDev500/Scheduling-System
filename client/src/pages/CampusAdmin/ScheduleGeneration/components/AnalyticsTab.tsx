@@ -50,50 +50,50 @@ const AnalyticsTab: React.FC<AnalyticsTabProps> = ({
             <div className="text-center">
               <Badge 
                 variant={
-                  selectedSchedule.optimizationScore.overall >= 80 ? 'default' : 
-                  selectedSchedule.optimizationScore.overall >= 60 ? 'secondary' : 'destructive'
+                  (selectedSchedule.optimizationScore?.overall || 0) >= 80 ? 'default' : 
+                  (selectedSchedule.optimizationScore?.overall || 0) >= 60 ? 'secondary' : 'destructive'
                 }
                 className="mb-2"
               >
-                Overall: {selectedSchedule.optimizationScore.overall}%
+                Overall: {selectedSchedule.optimizationScore?.overall || 0}%
               </Badge>
-              <Progress value={selectedSchedule.optimizationScore.overall} className="h-2" />
+              <Progress value={selectedSchedule.optimizationScore?.overall || 0} className="h-2" />
             </div>
             <div className="text-center">
               <Badge 
                 variant={
-                  selectedSchedule.optimizationScore.roomUtilization >= 80 ? 'default' : 
-                  selectedSchedule.optimizationScore.roomUtilization >= 60 ? 'secondary' : 'destructive'
+                  (selectedSchedule.optimizationScore?.roomUtilization || 0) >= 80 ? 'default' : 
+                  (selectedSchedule.optimizationScore?.roomUtilization || 0) >= 60 ? 'secondary' : 'destructive'
                 }
                 className="mb-2"
               >
-                Room: {selectedSchedule.optimizationScore.roomUtilization}%
+                Room: {selectedSchedule.optimizationScore?.roomUtilization || 0}%
               </Badge>
-              <Progress value={selectedSchedule.optimizationScore.roomUtilization} className="h-2" />
+              <Progress value={selectedSchedule.optimizationScore?.roomUtilization || 0} className="h-2" />
             </div>
             <div className="text-center">
               <Badge 
                 variant={
-                  selectedSchedule.optimizationScore.facultyWorkload >= 80 ? 'default' : 
-                  selectedSchedule.optimizationScore.facultyWorkload >= 60 ? 'secondary' : 'destructive'
+                  (selectedSchedule.optimizationScore?.facultyWorkload || 0) >= 80 ? 'default' : 
+                  (selectedSchedule.optimizationScore?.facultyWorkload || 0) >= 60 ? 'secondary' : 'destructive'
                 }
                 className="mb-2"
               >
-                Faculty: {selectedSchedule.optimizationScore.facultyWorkload}%
+                Faculty: {selectedSchedule.optimizationScore?.facultyWorkload || 0}%
               </Badge>
-              <Progress value={selectedSchedule.optimizationScore.facultyWorkload} className="h-2" />
+              <Progress value={selectedSchedule.optimizationScore?.facultyWorkload || 0} className="h-2" />
             </div>
             <div className="text-center">
               <Badge 
                 variant={
-                  selectedSchedule.optimizationScore.timeDistribution >= 80 ? 'default' : 
-                  selectedSchedule.optimizationScore.timeDistribution >= 60 ? 'secondary' : 'destructive'
+                  (selectedSchedule.optimizationScore?.breakdown?.timeDistribution || 0) >= 80 ? 'default' : 
+                  (selectedSchedule.optimizationScore?.breakdown?.timeDistribution || 0) >= 60 ? 'secondary' : 'destructive'
                 }
                 className="mb-2"
               >
-                Time: {selectedSchedule.optimizationScore.timeDistribution}%
+                Time: {selectedSchedule.optimizationScore?.breakdown?.timeDistribution || 0}%
               </Badge>
-              <Progress value={selectedSchedule.optimizationScore.timeDistribution} className="h-2" />
+              <Progress value={selectedSchedule.optimizationScore?.breakdown?.timeDistribution || 0} className="h-2" />
             </div>
           </div>
 
@@ -141,8 +141,8 @@ const AnalyticsTab: React.FC<AnalyticsTabProps> = ({
                     <div className="flex items-center gap-2">
                       <Badge 
                         variant={
-                          conflict.severity === 'high' ? 'destructive' : 
-                          conflict.severity === 'medium' ? 'secondary' : 'outline'
+                          conflict.severity === 'High' ? 'destructive' : 
+                          conflict.severity === 'Medium' ? 'secondary' : 'outline'
                         }
                       >
                         {conflict.severity}

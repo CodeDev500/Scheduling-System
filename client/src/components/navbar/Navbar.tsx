@@ -8,11 +8,11 @@ import Login from "../../pages/Auth/Login";
 import Register from "../../pages/Auth/Register";
 import { useAppSelector } from "../../hooks/redux";
 import NavProfile from "../NavProfile";
-import api from "../../api/axios";
+import { getImageUrl } from "../../utils/imageUtils";
 
 const Navbar = () => {
   const userData = useAppSelector((state) => state.auth.user);
-  const profilePic = userData?.image ? `${api.defaults.baseURL}/${userData.image}` : userIcon;
+  const profilePic = getImageUrl(userData?.image, userIcon);
 
   const unread = 0;
   const [showNotification, setShowNotification] = useState(false);

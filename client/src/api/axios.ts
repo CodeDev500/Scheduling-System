@@ -7,7 +7,7 @@ interface CustomAxiosRequestConfig extends AxiosRequestConfig {
 }
 
 const api: AxiosInstance = axios.create({
-  baseURL: "http://localhost:3001",
+  baseURL: "https://optisched.vercel.app",
   // headers: {
   //   "Content-Type": "application/json",
   // },

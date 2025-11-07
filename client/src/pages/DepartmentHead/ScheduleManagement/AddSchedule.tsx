@@ -35,6 +35,9 @@ import type { ScheduleItem as ConflictScheduleItem, ScheduleConflict } from '../
 import { useFacultyPreferences } from '../../../contexts/FacultyPreferencesContext';
 import { getFacultyPreferences } from '../../../utils/facultyPreferences';
 
+// Type alias for Conflict
+type Conflict = ScheduleConflict;
+
 interface Subject {
   id: string;
   code: string;
@@ -90,6 +93,15 @@ interface SubjectSchedule {
   endTime: string;
   days: string[];
   roomId: string;
+  room?: {
+    id: string;
+    name: string;
+    type: string;
+    capacity: number;
+    building: string;
+    floor: number;
+    equipment: string[];
+  };
   section: string;
   semester: string;
   academicYear: string;

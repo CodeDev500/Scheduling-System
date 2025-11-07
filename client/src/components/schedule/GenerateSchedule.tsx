@@ -4,9 +4,9 @@ import { Button } from "@/components/ui/button";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { ScheduleHeader } from "@/components/schedule/ScheduleHeader";
 import { ScheduleGrid } from "@/components/schedule/ScheduleGrid";
-import { FacultyRecommendations } from "@/components/schedule/FacultyRecommendations";
+import { FacultyRecommendations } from "@/components/schedule/FacultyRecommendation";
 import { LoadingOverlay } from "@/components/schedule/LoadingOverlay";
-import { useToast } from "@/hooks/use-toast";
+import { useToast } from "@/hooks/useToast";
 import { Grid, Table, Filter } from "lucide-react";
 
 // Mock data - in real app this would come from backend
@@ -111,7 +111,7 @@ export default function Dashboard() {
   const [currentStep, setCurrentStep] = useState("");
   const [viewMode, setViewMode] = useState<'grid' | 'table'>('grid');
   const [activeTab, setActiveTab] = useState('schedule');
-  const { toast } = useToast();
+  const toast = useToast();
 
   const handleGenerateSchedule = async () => {
     setIsGenerating(true);
@@ -132,18 +132,12 @@ export default function Dashboard() {
     }
 
     setIsGenerating(false);
-    toast({
-      title: "Schedule Generated Successfully!",
-      description: "Review the generated schedule and faculty recommendations below.",
-    });
+    toast.success("Schedule Generated Successfully! Review the generated schedule and faculty recommendations below.");
   };
 
   const handleSelectFaculty = (facultyId: string) => {
     const faculty = mockFacultyRecommendations.find(f => f.id === facultyId);
-    toast({
-      title: "Faculty Assigned",
-      description: `${faculty?.name} has been assigned to this subject.`,
-    });
+    toast.success(`Faculty Assigned: ${faculty?.name} has been assigned to this subject.`);
   };
 
   return (

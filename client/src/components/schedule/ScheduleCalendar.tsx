@@ -25,12 +25,15 @@ interface ScheduleCalendarProps {
   schedules: ScheduleItem[];
   onScheduleClick?: (schedule: ScheduleItem) => void;
   showConflicts?: boolean;
+  conflicts?: any[];
+  className?: string;
 }
 
 const ScheduleCalendar: React.FC<ScheduleCalendarProps> = ({ 
   schedules, 
   onScheduleClick, 
-  showConflicts = true 
+  showConflicts = true,
+  className 
 }) => {
   const timeSlots = [
     '07:00', '08:00', '09:00', '10:00', '11:00', '12:00',

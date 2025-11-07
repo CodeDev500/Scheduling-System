@@ -12,6 +12,7 @@ import { Label } from '../../../components/ui/label';
 // Using regular textarea since component doesn't exist
 // Using regular navigation since tabs component doesn't exist
 import { Plus, Search, Filter, Calendar, Clock, MapPin, Users, Save, Edit, Trash2, AlertTriangle } from 'lucide-react';
+import { Alert, AlertDescription } from '../../../components/ui/alert';
 // Alert, Dialog, Table, and Tabs components not available - using regular HTML elements
 
 interface Schedule {

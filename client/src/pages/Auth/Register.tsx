@@ -11,6 +11,7 @@ import {
 import { useSpecializations } from "../../hooks/useSpecializations";
 import { register, clearRegisterError } from "../../services/authSlice";
 import { useAppDispatch, useAppSelector } from "../../hooks/redux";
+import { fetchSubjects } from "../../services/subjectSlice";
 import Profile from "../../components/profile_image/Profile";
 import { useToast } from "../../hooks/useToast";
 import VerifyOTP from "../Verification/VerifyOTP";
@@ -28,6 +29,7 @@ const Register: React.FC<RegisterProps> = ({
 }) => {
   const toast = useToast();
   const { specializations } = useSpecializations(true);
+  const subjects = useAppSelector((state) => state.subject.subjects);
   const [imagePreview, setImagePreview] = useState<string>("");
   const [showOTPModal, setShowOTPModal] = useState(false);
   const [loading, setLoading] = useState(false);
@@ -54,6 +56,22 @@ const Register: React.FC<RegisterProps> = ({
 
   const dispatch = useAppDispatch();
   const error = useAppSelector((state) => state.auth.registerError);
+
+  // Fetch subjects when component mounts
+  useEffect(() => {
+    dispatch(fetchSubjects());
+  }, [dispatch]);
+
+  useEffect(() => {
+    if (error) {
+      // Display first error message if error is an object
+      const errorMessage = typeof error === 'string' 
+        ? error 
+        : Object.values(error)[0]?.[0] || 'Registration failed';
+      toast.error(errorMessage);
+      dispatch(clearRegisterError());
+    }
+  }, [error, toast, dispatch]);
 
   const handleChange = (
     e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>
@@ -298,7 +316,7 @@ const Register: React.FC<RegisterProps> = ({
                         <input
                           type="time"
                           min="07:00"
-                          max="19:00"
+                          max="20:00"
                           className="w-full px-3 text-gray-700 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
                           onChange={(e) => {
                             const timeSlots = form.preferredTimeSlots.filter(slot => !slot.includes('start:'));
@@ -315,7 +333,7 @@ const Register: React.FC<RegisterProps> = ({
                         <input
                           type="time"
                           min="07:00"
-                          max="19:00"
+                          max="20:00"
                           className="w-full px-3 text-gray-700 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
                           onChange={(e) => {
                             const timeSlots = form.preferredTimeSlots.filter(slot => !slot.includes('end:'));
@@ -362,18 +380,10 @@ const Register: React.FC<RegisterProps> = ({
                     onChange={handleMultiSelectChange}
                     error={error?.previousSubjects?.[0] || ""}
                     placeholder="Select subjects you have previously taught..."
-                    options={[
-                      { value: "Programming", label: "Programming" },
-                      { value: "Database Systems", label: "Database Systems" },
-                      { value: "Web Development", label: "Web Development" },
-                      { value: "Data Structures", label: "Data Structures" },
-                      { value: "Algorithms", label: "Algorithms" },
-                      { value: "Computer Networks", label: "Computer Networks" },
-                      { value: "Operating Systems", label: "Operating Systems" },
-                      { value: "Software Engineering", label: "Software Engineering" },
-                      { value: "Mathematics", label: "Mathematics" },
-                      { value: "Statistics", label: "Statistics" },
-                    ]}
+                    options={subjects.length > 0 ? subjects.map((subject) => ({
+                      value: subject.subjectCode,
+                      label: `${subject.subjectCode} - ${subject.subjectDescription}`,
+                    })) : []}
                   />
 
                   <InputField

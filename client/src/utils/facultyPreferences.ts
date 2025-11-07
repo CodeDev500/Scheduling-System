@@ -235,7 +235,7 @@ export function importPreferences(jsonString: string): TimeSlot[] {
  * @param allPreferences - All faculty preferences
  * @returns Array of time slots preferred by the faculty member
  */
-export function getFacultyPreferences(facultyId: string, allPreferences: TimeSlot[]): TimeSlot[] {
+export function getFacultyPreferences(_facultyId: string, allPreferences: TimeSlot[]): TimeSlot[] {
   // For now, return all preferences since we don't have faculty-specific preferences
   // In a real implementation, this would filter by facultyId
   return allPreferences;

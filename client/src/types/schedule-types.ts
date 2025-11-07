@@ -18,9 +18,9 @@ export interface Room {
   id: string;
   name: string;
   capacity: number;
-  type: 'Lecture' | 'Laboratory' | 'Both';
-  equipment: string[];
-  building: string;
+  type: 'Lecture' | 'Laboratory' | 'Both' | string;
+  equipment?: string[];
+  building?: string;
 }
 
 export interface ScheduleItem {
@@ -28,6 +28,7 @@ export interface ScheduleItem {
   subjectId: string;
   subjectCode: string;
   subjectName: string;
+  subjectDescription?: string;
   facultyId: string;
   facultyName: string;
   roomId: string;
@@ -43,8 +44,35 @@ export interface ScheduleItem {
   semester: string | number;
   program?: string;
   hasConflict?: boolean;
+  hasConflicts?: boolean;
   status?: string;
   conflictType?: 'faculty' | 'room' | 'section' | 'none';
+  section?: string;
+  faculty?: {
+    id?: string;
+    name?: string;
+    department?: string;
+  };
+  room?: {
+    id?: string;
+    name?: string;
+    type?: string;
+    capacity?: number;
+  };
+  timeSlots?: any[];
+  assignedRoom?: any;
+  assignedFaculty?: {
+    id?: string;
+    name?: string;
+    matchScore?: number;
+  };
+  lectureHours?: number;
+  labHours?: number;
+  enrolledStudents?: number;
+  code?: string;
+  name?: string;
+  prerequisites?: string[];
+  programId?: string;
 }
 
 export interface GenerationStep {
@@ -69,18 +97,18 @@ export interface ConflictDetectionResult {
 export interface Faculty {
   id: string;
   name: string;
-  department: string;
+  department?: string;
   specializations: string[];
-  maxHoursPerWeek: number;
-  preferredTimeSlots: string[];
-  unavailableSlots: string[];
+  maxHoursPerWeek?: number;
+  preferredTimeSlots?: string[];
+  unavailableSlots?: string[];
   experienceYears: number;
-  subjectExperience: SubjectExperience[];
-  currentLoad: FacultyLoad;
-  maxLoad: number;
-  performanceRating: number;
-  availability: AvailabilitySlot[];
-  preferences: FacultyPreferences;
+  subjectExperience?: SubjectExperience[];
+  currentLoad?: FacultyLoad;
+  maxLoad?: number;
+  performanceRating?: number;
+  availability?: AvailabilitySlot[];
+  preferences?: FacultyPreferences;
 }
 
 export interface SubjectExperience {
@@ -117,20 +145,34 @@ export interface FacultyPreferences {
 
 export interface Subject {
   id: string;
-  code: string;
-  name: string;
+  code?: string;
+  name?: string;
   units: number;
-  lectureHours: number;
-  labHours: number;
-  yearLevel: number;
-  semester: number;
-  prerequisites: string[];
-  programId: string;
+  lectureHours?: number;
+  labHours?: number;
+  yearLevel?: number | string;
+  semester?: number | string;
+  prerequisites?: string[];
+  programId?: string;
+  subjectCode?: string;
+  subjectDescription?: string;
+  type?: string;
+  subjectId?: string;
+  subjectName?: string;
+  facultyId?: string;
+  facultyName?: string;
+  roomId?: string;
+  roomName?: string;
+  day?: string;
+  startTime?: string;
+  endTime?: string;
+  lec?: number;
+  lab?: number;
 }
 
 export interface TimeSlot {
   id: string;
-  day: 'Monday' | 'Tuesday' | 'Wednesday' | 'Thursday' | 'Friday' | 'Saturday';
+  day: 'Monday' | 'Tuesday' | 'Wednesday' | 'Thursday' | 'Friday' | 'Saturday' | string;
   startTime: string;
   endTime: string;
   duration: number;
@@ -151,7 +193,9 @@ export interface GeneratedSchedule {
   name?: string;
   createdAt?: Date;
   departmentId?: string;
+  department?: string;
   programId?: string;
+  program?: string;
   yearLevel?: number;
   semester?: number;
   subjects: ScheduleItem[];
@@ -159,7 +203,7 @@ export interface GeneratedSchedule {
   faculty?: string[];
   totalSubjects?: number;
   totalFaculty?: number;
-  optimizationScore?: number;
+  optimizationScore?: OptimizationScore;
   score?: OptimizationScore;
   generatedAt?: Date;
   constraints?: OptimizationConstraints;
@@ -180,6 +224,7 @@ export interface RoomUtilization {
   roomId: string;
   roomName: string;
   utilizationPercentage: number;
+  utilizationRate?: number;
   totalHours: number;
   availableHours: number;
 }
@@ -255,6 +300,20 @@ export interface FacultyRecommendation {
   matchScore: number;
   reasons: string[];
   alternatives: FacultyCandidate[];
+  faculty?: {
+    id?: string;
+    name?: string;
+    specializations?: string[];
+    experienceYears?: number;
+    overallScore?: number;
+    matchScore?: number;
+    experienceScore?: number;
+    availabilityScore?: number;
+  };
+  subjectId?: string;
+  potentialConflicts?: string[];
+  rank?: number;
+  confidence?: string;
 }
 
 export interface FacultyCandidate {
@@ -284,6 +343,8 @@ export interface OptimizationScore {
   breakdown: ScoreBreakdown;
   improvements: string[];
   warnings: string[];
+  facultyWorkload?: number;
+  roomUtilization?: number;
 }
 
 export interface ScoreBreakdown {

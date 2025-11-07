@@ -41,7 +41,10 @@ const Subjects = () => {
       <SubjectsTable subjects={subjects} />
 
       {isAddModalOpen && (
-        <AddSubject onClose={() => setIsAddModalOpen(false)} />
+        <AddSubject 
+          onClose={() => setIsAddModalOpen(false)} 
+          onSubjectAdded={() => dispatch(fetchSubjects())}
+        />
       )}
     </div>
   );

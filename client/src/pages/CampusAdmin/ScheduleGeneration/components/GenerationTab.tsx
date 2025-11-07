@@ -160,7 +160,7 @@ const GenerationTab: React.FC<GenerationTabProps> = ({
                       <div>
                         <div className="font-medium mb-1 text-foreground">{schedule.algorithm}</div>
                         <div className="text-sm text-muted-foreground">
-                          Generated on {new Date(schedule.generatedAt).toLocaleString()}
+                          Generated on {schedule.generatedAt ? new Date(schedule.generatedAt).toLocaleString() : 'N/A'}
                         </div>
                         <div className="text-sm text-muted-foreground">
                           {schedule.subjects.length} subjects scheduled • {schedule.processingTime}ms processing time
@@ -170,12 +170,12 @@ const GenerationTab: React.FC<GenerationTabProps> = ({
                         <div className="flex items-center gap-2 mb-2">
                           <Badge 
                             variant={
-                              schedule.optimizationScore.overall >= 80 ? 'default' : 
-                              schedule.optimizationScore.overall >= 60 ? 'secondary' : 'destructive'
+                              (schedule.optimizationScore?.overall || 0) >= 80 ? 'default' : 
+                              (schedule.optimizationScore?.overall || 0) >= 60 ? 'secondary' : 'destructive'
                             }
                             className="text-lg px-3 py-1 font-semibold"
                           >
-                            {schedule.optimizationScore.overall}% Overall Score
+                            {schedule.optimizationScore?.overall || 0}% Overall Score
                           </Badge>
                         </div>
                         {schedule.conflicts.length > 0 && (

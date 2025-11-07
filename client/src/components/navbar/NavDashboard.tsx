@@ -1,11 +1,10 @@
 import React, { useState } from "react";
 import { useLocation } from "react-router-dom";
 import { FaBars } from "react-icons/fa";
-import { IoMdNotificationsOutline } from "react-icons/io";
 import userIcon from "../../assets/images/user (1).png";
 import NavProfile from "../NavProfile";
 import { useAppSelector } from "../../hooks/redux";
-import api from "../../api/axios";
+import { getImageUrl } from "../../utils/imageUtils";
 
 interface NavDashboardProps {
   handleBurger: () => void;
@@ -15,10 +14,9 @@ interface NavDashboardProps {
 const NavDashboard: React.FC<NavDashboardProps> = ({ handleBurger }) => {
   const location = useLocation();
   const userData = useAppSelector((state) => state.auth.user);
-  const [unread, setUnread] = useState(2);
   const [showProfile, setShowProfile] = useState(false);
   
-  const profilePic = userData?.image ? `${api.defaults.baseURL}/${userData.image}` : userIcon;
+  const profilePic = getImageUrl(userData?.image, userIcon);
 
   const pageTitles: { [key: string]: string } = {
     "/dashboard": "Dashboard",

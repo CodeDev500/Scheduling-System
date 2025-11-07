@@ -13,7 +13,7 @@ interface UpdateSubjectProps {
   onSubjectUpdated: () => void;
 }
 
-const UpdateSubject: FC<UpdateSubjectProps> = ({ subject, onClose, onSubjectUpdated }) => {
+const UpdateSubject: FC<UpdateSubjectProps> = ({ subject, onClose }) => {
   const dispatch = useAppDispatch();
   const toast = useToast();
   const { specializations } = useSpecializations(true);

@@ -120,6 +120,10 @@ const Subjects: FC<SubjectsProps> = ({ subjects }) => {
         <UpdateSubject
           subject={editSubject}
           onClose={() => setEditModalOpen(false)}
+          onSubjectUpdated={() => {
+            setEditModalOpen(false);
+            // Refresh subjects list if needed
+          }}
         />
       )}
 
