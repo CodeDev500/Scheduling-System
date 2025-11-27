@@ -81,11 +81,11 @@ function App() {
       path: "/admin-dashboard",
       component: <Dashboard />,
     },
-    {
-      title: "View Schedules",
-      path: "/view-schedules",
-      component: <ViewSchedules />,
-    },
+    // {
+    //   title: "View Schedules",
+    //   path: "/view-schedules",
+    //   component: <ViewSchedules />,
+    // },
     {
       title: "Schedule Generation",
       path: "/schedule-generation",

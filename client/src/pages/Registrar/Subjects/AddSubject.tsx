@@ -48,14 +48,14 @@ const AddSubject: React.FC<AddSubjectProps> = ({ onClose, onSubjectAdded }) => {
         [name]:
           name === "subjectCode" || name === "subjectDescription"
             ? value
-            : parseInt(value) || 0,
+            : parseFloat(value) || 0,
       };
       
       // Auto-calculate total units when lec or lab changes
       if (name === "lec" || name === "lab") {
-        const lecUnits = name === "lec" ? (parseInt(value) || 0) : prev.lec;
-        const labUnits = name === "lab" ? (parseInt(value) || 0) : prev.lab;
-        updatedData.units = lecUnits + labUnits;
+        const lecUnits = name === "lec" ? (parseFloat(value) || 0) : prev.lec;
+        const labUnits = name === "lab" ? (parseFloat(value) || 0) : prev.lab;
+        updatedData.units = Math.round((lecUnits + labUnits) * 100) / 100; // Round to 2 decimal places
         
         // Clear units error if total is now valid
         if (lecUnits + labUnits > 0) {
@@ -202,6 +202,7 @@ const AddSubject: React.FC<AddSubjectProps> = ({ onClose, onSubjectAdded }) => {
                 type="number"
                 name="lec"
                 min="0"
+                step="0.5"
                 value={formData.lec}
                 onChange={handleChange}
                 className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
@@ -213,6 +214,7 @@ const AddSubject: React.FC<AddSubjectProps> = ({ onClose, onSubjectAdded }) => {
                 type="number"
                 name="lab"
                 min="0"
+                step="0.5"
                 value={formData.lab}
                 onChange={handleChange}
                 className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"

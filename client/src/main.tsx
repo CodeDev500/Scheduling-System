@@ -2,7 +2,7 @@
 import { createRoot } from "react-dom/client";
 import "./index.css";
 import App from "./App.tsx";
-import { BrowserRouter as Router } from "react-router-dom";
+import { HashRouter as Router } from "react-router-dom";
 import { Provider } from "react-redux";
 import { ToastProvider } from "./hooks/useToast.jsx";
 import { store } from "./app/store";

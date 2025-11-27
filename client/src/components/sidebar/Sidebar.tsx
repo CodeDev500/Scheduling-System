@@ -45,7 +45,7 @@ const Sidebar = ({ sidebar, handleBurger }: SidebarProps) => {
         src: <MdSpaceDashboard />,
       },
       {
-        title: "View Schedules",
+        title: "Schedule Generation",
         path: "/schedule-generation",
         src: <FaRobot />,
       },
@@ -87,11 +87,11 @@ const Sidebar = ({ sidebar, handleBurger }: SidebarProps) => {
         path: "/subjects",
         src: <FaRegListAlt />,
       },
-      // {
-      //   title: "View Schedules",
-      //   path: "/registrar-schedules",
-      //   src: <AiOutlineCalendar />,
-      // },
+      {
+        title: "View Schedules",
+        path: "/registrar-schedules",
+        src: <AiOutlineCalendar />,
+      },
       {
         title: "Prospectus Management",
         path: "/registrar-prospectus",

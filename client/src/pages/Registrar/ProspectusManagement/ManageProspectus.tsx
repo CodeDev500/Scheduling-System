@@ -77,6 +77,7 @@ const ManageProspectus = () => {
   } | null>(null);
   const [academicYears, setAcademicYears] = useState<any[]>([]);
   const [currentCurriculumYear, setCurrentCurriculumYear] = useState<string>("");
+  const [selectedSemester, setSelectedSemester] = useState<Semester | "All">("All");
 
 
   useEffect(() => {
@@ -86,7 +87,6 @@ const ManageProspectus = () => {
     const loadAcademicYears = async () => {
     try {
       const response = await api.get('/academic-years');
-      console.log(response.data)
       if (response.data.success) {
         setAcademicYears(response.data.data);
         // Set the active academic year as default
@@ -107,7 +107,8 @@ const ManageProspectus = () => {
 
   // Fetch curriculum when curriculum year changes
   useEffect(() => {
-    if (programCode && yearLevel) {
+    if (programCode && yearLevel && currentCurriculumYear) {
+      console.log('📚 Fetching curriculum for:', { programCode, yearLevel, currentCurriculumYear });
       dispatch(
         fetchCurriculumByProgramAndYear({
           programCode,
@@ -115,11 +116,15 @@ const ManageProspectus = () => {
         })
       );
     }
-  }, [dispatch, programCode, yearLevel]);
+  }, [dispatch, programCode, yearLevel, currentCurriculumYear]);
 
 
   useEffect(() => {
-    console.log('📚 Loading curriculum data...', { curriculums, currentCurriculumYear });
+    // Don't process if curriculum year is not set yet
+    if (!currentCurriculumYear) {
+      console.log('⏳ Waiting for curriculum year to be set...');
+      return;
+    }
     
     if (curriculums && typeof curriculums === "object") {
       const loadedSubjects: Record<Semester, Subject[]> = {
@@ -128,34 +133,34 @@ const ManageProspectus = () => {
         Summer: [],
       };
 
+      let hasAnySubjects = false;
+
       Object.entries(curriculums).forEach(([semester, subjectArray]) => {
         if (Array.isArray(subjectArray) && subjectArray.length > 0) {
-          // Filter subjects by curriculum year if selected
-          const filteredSubjects = currentCurriculumYear
-            ? subjectArray.filter((subj: any) => subj.curriculumYear === currentCurriculumYear)
-            : subjectArray;
+          // Filter subjects by curriculum year
+          const filteredSubjects = subjectArray.filter((subj: any) => subj.curriculumYear === currentCurriculumYear);
 
-          console.log(`📖 ${semester}: Found ${filteredSubjects.length} subjects for year ${currentCurriculumYear}`);
-
-          loadedSubjects[semester as Semester] = filteredSubjects.map(
-            (subj: any) => {
-              const mappedSubject = {
-                id: subj.id || Date.now() + Math.random(),
-                code: subj.subjectCode || subj.code || "",
-                name: subj.subjectDescription || subj.name || "",
-                lec: subj.lec || 0,
-                lab: subj.lab || 0,
-                units: subj.units || 0,
-                programCode: programCode,
-                yearLevel: yearLevel,
-                curriculumId: subj.id,
-                curriculumYear: subj.curriculumYear,
-                isExisting: true,
-              };
-              console.log('  ✓ Loaded:', mappedSubject.code, mappedSubject.name);
-              return mappedSubject;
-            }
-          );
+          if (filteredSubjects.length > 0) {
+            hasAnySubjects = true;
+            loadedSubjects[semester as Semester] = filteredSubjects.map(
+              (subj: any) => {
+                const mappedSubject = {
+                  id: subj.id || Date.now() + Math.random(),
+                  code: subj.subjectCode || subj.code || "",
+                  name: subj.subjectDescription || subj.name || "",
+                  lec: subj.lec || 0,
+                  lab: subj.lab || 0,
+                  units: subj.units || 0,
+                  programCode: programCode,
+                  yearLevel: yearLevel,
+                  curriculumId: subj.id,
+                  curriculumYear: subj.curriculumYear,
+                  isExisting: true,
+                };
+                return mappedSubject;
+              }
+            );
+          }
         }
       });
 
@@ -165,12 +170,8 @@ const ManageProspectus = () => {
           loadedSubjects[semester as Semester] = [createEmptySubject()];
         }
       });
-
-      console.log('✅ Final loaded subjects:', loadedSubjects);
       setSubjects(loadedSubjects);
-    } else if (currentCurriculumYear) {
-      // If no curriculums loaded but curriculum year is selected, show empty subjects
-      console.log('⚠️ No curriculum data, showing empty subjects');
+    } else {
       setSubjects(initialSubjects);
     }
   }, [curriculums, programCode, yearLevel, currentCurriculumYear]);
@@ -415,34 +416,54 @@ const ManageProspectus = () => {
               </div>
             </div>
             
-            {/* Curriculum Filter */}
-            <div className="flex flex-col items-end gap-2">
-              <label className="text-sm font-medium text-gray-700 flex items-center gap-2">
-                <Calendar className="w-4 h-4 text-primary" />
-                Curriculum Year
-              </label>
-              <select
-                value={currentCurriculumYear}
-                onChange={(e) => setCurrentCurriculumYear(e.target.value)}
-                className="px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary/20 focus:border-primary transition-all min-w-[200px] font-semibold"
-              >
-                {academicYears.map((year) => (
-                  <option key={year.id} value={year.year}>
-                    {year.year} {year.isActive && "✓ Active"}
-                  </option>
-                ))}
-              </select>
-              <span className="text-xs text-green-600 font-medium">
-                Saving to: {currentCurriculumYear}
-              </span>
+            {/* Filters */}
+            <div className="flex items-end gap-4">
+              {/* Semester Filter */}
+              <div className="flex flex-col gap-2">
+                <label className="text-sm font-medium text-gray-700 flex items-center gap-2">
+                  <BookOpen className="w-4 h-4 text-primary" />
+                  Semester
+                </label>
+                <select
+                  value={selectedSemester}
+                  onChange={(e) => setSelectedSemester(e.target.value as Semester | "All")}
+                  className="px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary/20 focus:border-primary transition-all min-w-[180px] font-semibold"
+                >
+                  <option value="All">All Semesters</option>
+                  <option value="1st Semester">1st Semester</option>
+                  <option value="2nd Semester">2nd Semester</option>
+                  <option value="Summer">Summer</option>
+                </select>
+              </div>
+              
+              {/* Curriculum Year Filter */}
+              <div className="flex flex-col gap-2">
+                <label className="text-sm font-medium text-gray-700 flex items-center gap-2">
+                  <Calendar className="w-4 h-4 text-primary" />
+                  Curriculum Year
+                </label>
+                <select
+                  value={currentCurriculumYear}
+                  onChange={(e) => setCurrentCurriculumYear(e.target.value)}
+                  className="px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary/20 focus:border-primary transition-all min-w-[200px] font-semibold"
+                >
+                  {academicYears.map((year) => (
+                    <option key={year.id} value={year.year}>
+                      {year.year} {year.isActive && "✓ Active"}
+                    </option>
+                  ))}
+                </select>
+               
+              </div>
             </div>
           </div>
           <div className="h-1 bg-gradient-to-r from-primary to-primary_hover rounded-full"></div>
         </div>
 
         {/* Semester Cards */}
-        {(["1st Semester", "2nd Semester", "Summer"] as Semester[]).map(
-          (semester) => (
+        {(["1st Semester", "2nd Semester", "Summer"] as Semester[])
+          .filter((semester) => selectedSemester === "All" || selectedSemester === semester)
+          .map((semester) => (
             <div
               key={semester}
               className={`bg-white rounded-2xl shadow-lg border-l-4 ${getSemesterColor(

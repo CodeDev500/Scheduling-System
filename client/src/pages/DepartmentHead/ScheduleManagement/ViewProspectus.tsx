@@ -219,10 +219,10 @@ const ViewProspectus: React.FC = () => {
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-50 via-blue-50 to-indigo-50 ">
+    <div className="min-h-screen  from-slate-50 via-blue-50 to-indigo-50 ">
       <div className="max-w-7xl mx-auto space-y-6">
         {/* Header Section */}
-        <Card className="border-0 shadow-lg bg-gradient-to-r from-blue-600 via-purple-600 to-indigo-600 text-white">
+        <Card className="border-0 shadow-lg bg-blue-500 from-blue-600 via-purple-600 to-indigo-600 text-white">
           <CardHeader className="pb-8">
             <div className="flex items-center space-x-3">
               <div className="p-3 bg-white/20 rounded-full">

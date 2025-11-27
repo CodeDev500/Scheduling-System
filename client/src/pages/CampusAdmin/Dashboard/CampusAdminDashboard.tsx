@@ -268,7 +268,7 @@ const CampusAdminDashboard: React.FC = () => {
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-6">
           <div 
             className="bg-white rounded-lg shadow-sm p-6 hover:shadow-md transition-shadow cursor-pointer"
-            onClick={() => navigate('/view-schedules')}
+            onClick={() => navigate('/schedule-generation')}
           >
             <div className="flex items-center space-x-4">
               <div className="p-3 bg-blue-100 rounded-lg">

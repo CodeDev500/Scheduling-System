@@ -60,7 +60,7 @@ const Register: React.FC<RegisterProps> = ({
   // Fetch subjects when component mounts
   useEffect(() => {
     dispatch(fetchSubjects());
-  }, [dispatch]);
+  }, [dispatch, subjects]);
 
   useEffect(() => {
     if (error) {
@@ -82,7 +82,19 @@ const Register: React.FC<RegisterProps> = ({
       const matched = designationList.find(
         (d) => d.designation === updatedForm.designation
       );
-      if (matched) updatedForm.role = matched.role;
+      if (matched) {
+        updatedForm.role = matched.role;
+        
+        // Auto-fill time slots for Regular Faculty
+        if (matched.designation === "Regular Faculty") {
+          updatedForm.preferredTimeSlots = ["start:08:00", "end:17:00"];
+        }
+        
+        // Clear department for Registrar and Campus Registrar
+        if (matched.designation === "Registrar" || matched.designation === "Campus Registrar") {
+          updatedForm.department = "";
+        }
+      }
       return updatedForm;
     });
   };
@@ -106,6 +118,10 @@ const Register: React.FC<RegisterProps> = ({
     const formData = new FormData();
     for (const key in form) {
       const value = form[key as keyof typeof form];
+      // Skip department if it's empty (for Registrar/Campus Registrar)
+      if (key === 'department' && (!value || value === '')) {
+        continue;
+      }
       if (value !== null) {
         if (Array.isArray(value)) {
           // Handle array fields by converting to JSON string
@@ -263,18 +279,21 @@ const Register: React.FC<RegisterProps> = ({
                     }))}
                   />
 
-                  <SelectField
-                    label="Program"
-                    id="department"
-                    name="department"
-                    value={form.department}
-                    onChange={handleChange}
-                    error={error?.department?.[0] || ""}
-                    options={program?.map((program) => ({
-                      value: program.programCode,
-                      label: program.programName,
-                    }))}
-                  />
+                  {/* Hide Program field for Registrar and Campus Registrar */}
+                  {form.designation !== "Registrar" && form.designation !== "Campus Registrar" && (
+                    <SelectField
+                      label="Program"
+                      id="department"
+                      name="department"
+                      value={form.department}
+                      onChange={handleChange}
+                      error={error?.department?.[0] || ""}
+                      options={program?.map((program) => ({
+                        value: program.programCode,
+                        label: program.programName,
+                      }))}
+                    />
+                  )}
 
                   <MultiSelectField
                     label="Specialization"
@@ -293,16 +312,30 @@ const Register: React.FC<RegisterProps> = ({
                   {/* Faculty Availability Fields - Always show */}
                   <div className="w-full m-0 flex sm:flex-row flex-col items-center justify-center sm:gap-2">
                     <div className="w-full">
-                      <InputField
-                        label="Years of Experience"
-                        id="yearsOfExperience"
-                        name="yearsOfExperience"
-                        type="number"
-                        value={form.yearsOfExperience}
-                        onChange={(e) => setForm(prev => ({ ...prev, yearsOfExperience: parseInt(e.target.value) || 0 }))}
-                        placeholder="0"
-                        error={error?.yearsOfExperience?.[0] || ""}
-                      />
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700 mb-1">
+                          Years of Experience
+                        </label>
+                        <input
+                          type="number"
+                          id="yearsOfExperience"
+                          name="yearsOfExperience"
+                          min="0"
+                          value={form.yearsOfExperience || ''}
+                          onChange={(e) => {
+                            const value = e.target.value;
+                            // Allow empty string or positive numbers only
+                            if (value === '' || parseInt(value) >= 0) {
+                              setForm(prev => ({ ...prev, yearsOfExperience: value === '' ? 0 : parseInt(value) }));
+                            }
+                          }}
+                          placeholder="Enter years of experience"
+                          className="w-full text-gray-700 px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                        />
+                        {error?.yearsOfExperience?.[0] && (
+                          <p className="text-xs text-red-500 mt-1">{error.yearsOfExperience[0]}</p>
+                        )}
+                      </div>
                     </div>
                   </div>
 
@@ -317,6 +350,7 @@ const Register: React.FC<RegisterProps> = ({
                           type="time"
                           min="07:00"
                           max="20:00"
+                          value={form.preferredTimeSlots.find(slot => slot.includes('start:'))?.replace('start:', '') || ''}
                           className="w-full px-3 text-gray-700 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
                           onChange={(e) => {
                             const timeSlots = form.preferredTimeSlots.filter(slot => !slot.includes('start:'));
@@ -334,6 +368,7 @@ const Register: React.FC<RegisterProps> = ({
                           type="time"
                           min="07:00"
                           max="20:00"
+                          value={form.preferredTimeSlots.find(slot => slot.includes('end:'))?.replace('end:', '') || ''}
                           className="w-full px-3 text-gray-700 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
                           onChange={(e) => {
                             const timeSlots = form.preferredTimeSlots.filter(slot => !slot.includes('end:'));

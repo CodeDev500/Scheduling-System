@@ -317,6 +317,63 @@ const filteredSchedules = useMemo(() => {
     }
   };
 
+  // Helper function to convert day names to abbreviations
+  const getDayAbbreviation = (day: string): string => {
+    const dayMap: Record<string, string> = {
+      'Monday': 'M',
+      'Tuesday': 'T',
+      'Wednesday': 'W',
+      'Thursday': 'Th',
+      'Friday': 'F',
+      'Saturday': 'S',
+      'Sunday': 'Su'
+    };
+    return dayMap[day] || day;
+  };
+
+  // Helper function to sort days in proper weekly order
+  const sortDays = (days: string[]): string[] => {
+    const dayOrder: Record<string, number> = {
+      'Monday': 1,
+      'Tuesday': 2,
+      'Wednesday': 3,
+      'Thursday': 4,
+      'Friday': 5,
+      'Saturday': 6,
+      'Sunday': 7
+    };
+    return days.sort((a, b) => (dayOrder[a] || 8) - (dayOrder[b] || 8));
+  };
+
+  // Helper function to group schedules by subject
+  const groupSchedulesBySubject = (schedules: Schedule[]) => {
+    const grouped: Record<string, Schedule[]> = {};
+    
+    schedules.forEach(schedule => {
+      const key = `${schedule.subjectCode}-${schedule.program}-${schedule.yearLevel}-${schedule.semester}-${schedule.facultyName}`;
+      if (!grouped[key]) {
+        grouped[key] = [];
+      }
+      grouped[key].push(schedule);
+    });
+    
+    return Object.values(grouped).map(group => {
+      const first = group[0];
+      const uniqueDays = [...new Set(group.map(s => s.day || ''))];
+      const sortedDays = sortDays(uniqueDays);
+      const days = sortedDays.map(d => getDayAbbreviation(d)).join('');
+      const timeRanges = group.map(s => `${s.startTime}-${s.endTime}`).join(', ');
+      const rooms = [...new Set(group.map(s => s.roomName))].join(', ');
+      
+      return {
+        ...first,
+        day: days,
+        timeRange: timeRanges,
+        roomName: rooms
+      };
+    });
+  };
+
   // Export to PDF using displayed table data
   const exportScheduleToPDF = (schedules: Schedule[], curriculumYear?: string, semester?: string) => {
     const doc = new jsPDF('landscape');
@@ -333,22 +390,26 @@ const filteredSchedules = useMemo(() => {
     }
     doc.text(`Generated: ${new Date().toLocaleDateString()}`, 14, 39);
     
-    const tableData = schedules.map((item) => [
+    // Group schedules by subject with sorted days
+    const groupedSchedules = groupSchedulesBySubject(schedules);
+    
+    const tableData = groupedSchedules.map((item) => [
       item.subjectCode || '',
       item.subjectName || '',
       item.day || '',
-      `${item.startTime || ''} - ${item.endTime || ''}`,
+      item.timeRange || `${item.startTime || ''} - ${item.endTime || ''}`,
       item.roomName || '',
       item.facultyName || '',
       `${item.units || 0}`,
       `${item.lec || 0} | ${item.lab || 0}`,
+      item.students || '0/50',
       item.yearLevel || '',
       item.program || ''
     ]);
     
     autoTable(doc, {
       startY: 45,
-      head: [['Code', 'Subject', 'Days', 'Time', 'Room', 'Faculty', 'Units', 'Lec|Lab', 'Year', 'Program']],
+      head: [['Code', 'Subject', 'Days', 'Time', 'Room', 'Faculty', 'Units', 'Lec|Lab', 'Students', 'Year', 'Program']],
       body: tableData,
       theme: 'striped',
       headStyles: { fillColor: [59, 130, 246], textColor: 255, fontSize: 9 },
@@ -360,16 +421,17 @@ const filteredSchedules = useMemo(() => {
         cellWidth: 'wrap'
       },
       columnStyles: {
-        0: { cellWidth: 20 },
-        1: { cellWidth: 45 },
-        2: { cellWidth: 20 },
-        3: { cellWidth: 35 },
-        4: { cellWidth: 25 },
-        5: { cellWidth: 35 },
-        6: { cellWidth: 15 },
-        7: { cellWidth: 20 },
-        8: { cellWidth: 20 },
-        9: { cellWidth: 25 }
+        0: { cellWidth: 18 },
+        1: { cellWidth: 40 },
+        2: { cellWidth: 18 },
+        3: { cellWidth: 30 },
+        4: { cellWidth: 20 },
+        5: { cellWidth: 30 },
+        6: { cellWidth: 12 },
+        7: { cellWidth: 18 },
+        8: { cellWidth: 15 },
+        9: { cellWidth: 18 },
+        10: { cellWidth: 20 }
       }
     });
     
@@ -379,17 +441,20 @@ const filteredSchedules = useMemo(() => {
 
   // Export to Excel using displayed table data
   const exportScheduleToExcel = (schedules: Schedule[], curriculumYear?: string, semester?: string) => {
-    const excelData = schedules.map((item) => ({
+    // Group schedules by subject
+    const groupedSchedules = groupSchedulesBySubject(schedules);
+    
+    const excelData = groupedSchedules.map((item) => ({
       'Subject Code': item.subjectCode || '',
       'Subject Name': item.subjectName || '',
       'Days': item.day || '',
-      'Start Time': item.startTime || '',
-      'End Time': item.endTime || '',
+      'Time': item.timeRange || `${item.startTime || ''} - ${item.endTime || ''}`,
       'Room': item.roomName || '',
       'Faculty': item.facultyName || '',
       'Units': item.units || 0,
       'Lecture': item.lec || 0,
       'Lab': item.lab || 0,
+      'Students': item.students || '0/50',
       'Year Level': item.yearLevel || '',
       'Semester': item.semester || '',
       'Program': item.program || ''
@@ -400,7 +465,7 @@ const filteredSchedules = useMemo(() => {
     
     ws['!cols'] = [
       { wch: 12 }, { wch: 35 }, { wch: 10 }, { wch: 12 }, { wch: 12 },
-      { wch: 20 }, { wch: 25 }, { wch: 8 }, { wch: 8 }, { wch: 8 },
+      { wch: 20 }, { wch: 25 }, { wch: 8 }, { wch: 8 }, { wch: 12 },
       { wch: 12 }, { wch: 15 }, { wch: 15 }
     ];
     
@@ -412,17 +477,20 @@ const filteredSchedules = useMemo(() => {
 
   // Export to CSV using displayed table data
   const exportScheduleToCSV = (schedules: Schedule[], curriculumYear?: string, semester?: string) => {
-    const csvData = schedules.map((item) => ({
+    // Group schedules by subject
+    const groupedSchedules = groupSchedulesBySubject(schedules);
+    
+    const csvData = groupedSchedules.map((item) => ({
       'Subject Code': item.subjectCode || '',
       'Subject Name': item.subjectName || '',
       'Days': item.day || '',
-      'Start Time': item.startTime || '',
-      'End Time': item.endTime || '',
+      'Time': item.timeRange || `${item.startTime || ''} - ${item.endTime || ''}`,
       'Room': item.roomName || '',
       'Faculty': item.facultyName || '',
       'Units': item.units || 0,
       'Lecture': item.lec || 0,
       'Lab': item.lab || 0,
+      'Students': item.students || '0/50',
       'Year Level': item.yearLevel || '',
       'Semester': item.semester || '',
       'Program': item.program || ''
@@ -509,7 +577,7 @@ const filteredSchedules = useMemo(() => {
     if (!editScheduleItem) return;
 
     try {
-      // Prepare the base data with all fields including totalStudents
+      // Prepare the base data with all fields including totalStudents and students
       const baseData = {
         subjectCode: editScheduleItem.subjectCode,
         subjectName: editScheduleItem.subjectName,
@@ -522,6 +590,7 @@ const filteredSchedules = useMemo(() => {
         academicYear: editScheduleItem.academicYear,
         program: editScheduleItem.program,
         yearLevel: editScheduleItem.yearLevel,
+        students: editScheduleItem.students || '0/50',
         totalStudents: editScheduleItem.totalStudents || 0
       };
 
@@ -923,6 +992,14 @@ const filteredSchedules = useMemo(() => {
                           <span>Schedule & Room</span>
                         </div>
                       </th>
+                      {/* Number of Students */}
+                      <th className="px-6 py-4 text-left text-xs font-bold text-gray-700 uppercase tracking-wider">
+                        <div className="flex items-center space-x-2">
+                          <Users className="h-4 w-4 text-indigo-500" />
+                          <span>Number of Students</span>
+                        </div>
+                      </th>
+                      
                       {/* Faculty */}
                       <th className="px-6 py-4 text-left text-xs font-bold text-gray-700 uppercase tracking-wider">
                         <div className="flex items-center space-x-2">
@@ -1079,6 +1156,14 @@ const filteredSchedules = useMemo(() => {
                                     });
                                   })()}
                                 </div>
+                              </td>
+
+                              {/* Number of Students */}
+                              <td className="px-6 py-5 whitespace-nowrap">
+                                <Badge variant="outline" className="bg-indigo-50 text-indigo-700 border-indigo-300">
+                                  <Users className="h-3 w-3 mr-1 inline" />
+                                  {firstSubject.students || '0/50'}
+                                </Badge>
                               </td>
                               
                               {/* Removed separate Room column since it's now integrated in Schedule */}
@@ -1598,6 +1683,23 @@ const filteredSchedules = useMemo(() => {
                     </div>
                   </div>
                 </div>
+
+                {/* Number of Students */}
+                <div className="bg-gradient-to-r from-indigo-50 to-blue-50 rounded-lg p-4 border border-indigo-200">
+                  <h3 className="text-sm font-semibold text-indigo-900 mb-3 flex items-center gap-2">
+                    <Users className="h-4 w-4" />
+                    Number of Students
+                  </h3>
+                  <div className="flex items-center gap-3">
+                    <Badge variant="outline" className="text-lg px-4 py-2 bg-indigo-100 text-indigo-800 border-indigo-300 font-bold">
+                      <Users className="h-4 w-4 mr-2 inline" />
+                      {viewScheduleItem.students || '0/50'}
+                    </Badge>
+                    <p className="text-xs text-indigo-600">
+                      Current enrollment / Maximum capacity
+                    </p>
+                  </div>
+                </div>
               </div>
 
               <div className="flex justify-end gap-3 mt-6 pt-4 border-t">
@@ -1954,20 +2056,29 @@ const filteredSchedules = useMemo(() => {
                         className="w-full px-3 py-2 border border-yellow-300 rounded-lg text-sm bg-yellow-100 cursor-not-allowed"
                       />
                     </div>
-                    {/* <div>
-                      <label className="text-xs text-yellow-700 font-medium block mb-1">Total Students *</label>
-                      <input
-                        type="number"
-                        min="0"
-                        value={editScheduleItem.totalStudents || 0}
-                        onChange={(e) => {
-                          const totalStudents = parseInt(e.target.value) || 0;
-                          setEditScheduleItem({ ...editScheduleItem, totalStudents });
-                        }}
-                        className="w-full px-3 py-2 border border-yellow-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-yellow-500"
-                        placeholder="e.g., 40"
-                      />
-                    </div> */}
+                  </div>
+                </div>
+
+                {/* Number of Students */}
+                <div className="bg-gradient-to-r from-indigo-50 to-blue-50 rounded-lg p-4 border border-indigo-200">
+                  <h3 className="text-sm font-semibold text-indigo-900 mb-4 flex items-center gap-2">
+                    <Users className="h-4 w-4" />
+                    Number of Students
+                  </h3>
+                  <div>
+                    <label className="text-xs text-indigo-700 font-medium block mb-1">
+                      Number of Students (format: current/max) *
+                    </label>
+                    <input
+                      type="text"
+                      value={editScheduleItem.students || '0/50'}
+                      onChange={(e) => setEditScheduleItem({ ...editScheduleItem, students: e.target.value })}
+                      className="w-full px-3 py-2 border border-indigo-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                      placeholder="e.g., 0/50"
+                    />
+                    <p className="text-xs text-indigo-600 mt-1">
+                      Enter the current enrollment and maximum capacity (e.g., 25/50)
+                    </p>
                   </div>
                 </div>
               </div>

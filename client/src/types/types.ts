@@ -56,6 +56,7 @@ export interface AcademicProgram {
   department?: string | null;
   programCode: string | null;
   programName: string | null;
+  priority?: number; // Lower number = higher priority
 }
 
 export interface CurriculumCourse {

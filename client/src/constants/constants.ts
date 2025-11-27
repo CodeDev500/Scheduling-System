@@ -8,7 +8,8 @@ export const UserRoles = [
 export const UserStatuses = ["PENDING", "VERIFIED", "APPROVED"] as const;
 
 export const program = [
-  { programCode: "BSED", programName: "Bachelor of Science in Education" },
+  { programCode:"BSED-SCI", programName: "Bachelor of Secondary Education Major in Science"},
+  { programCode:"BSED-ENG", programName: "Bachelor of Secondary Education Major in English" },
   { programCode: "BSCRIM", programName: "Bachelor of Science in Criminology" },
   { programCode: "BSSW", programName: "Bachelor of Science in Social Work" },
   {

@@ -38,7 +38,7 @@ const FacultyProfile = () => {
   const toast = useToast();
   const userData = useAppSelector((state) => state.auth.user);
 
-  // Fetch faculty from API filtered by department
+  // Fetch all faculty from API
   useEffect(() => {
     fetchFaculty();
   }, []);
@@ -49,12 +49,12 @@ const FacultyProfile = () => {
       const response = await api.get('/user/faculty/with-load');
       console.log('Fetched faculty with load:', response.data);
       
-      // Filter only APPROVED faculty from the same department as the logged-in user
-      const departmentFaculty = response.data.filter((user: Faculty) => 
-        user.status === 'APPROVED' && user.department === userData?.department
+      // Filter only APPROVED faculty (all departments)
+      const approvedFaculty = response.data.filter((user: Faculty) => 
+        user.status === 'APPROVED'
       );
       
-      setFaculty(departmentFaculty);
+      setFaculty(approvedFaculty);
     } catch (error) {
       console.error('Error fetching faculty:', error);
       toast.error('Failed to fetch faculty');
@@ -113,13 +113,13 @@ const FacultyProfile = () => {
       <DashboardHeader title="Faculty Profiles" />
       
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-        {/* Header with Search and Department Info */}
+        {/* Header with Search and Faculty Info */}
         <div className="bg-white rounded-lg shadow-sm p-6 mb-6">
           <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
-            {/* Department Info */}
+            {/* Faculty Info */}
             <div>
               <h2 className="text-lg font-semibold text-gray-900">
-                {userData?.department} Faculty
+                All Faculty Members
               </h2>
               <p className="text-sm text-gray-500 mt-1">
                 {filteredFaculty.length} faculty member{filteredFaculty.length !== 1 ? 's' : ''}
@@ -221,7 +221,7 @@ const FacultyProfile = () => {
                   )} */}
 
                   {/* Subjects and Date Info */}
-                  <div className="flex items-center justify-between text-sm text-gray-600 mb-4">
+                  {/* <div className="flex items-center justify-between text-sm text-gray-600 mb-4">
                     <div className="flex items-center">
                       <BookOpen className="w-4 h-4 mr-1" />
                       {member.totalSubjects || 0} subjects
@@ -230,7 +230,7 @@ const FacultyProfile = () => {
                       <Calendar className="w-4 h-4 mr-1" />
                       Since {new Date(member.createdAt).getFullYear()}
                     </div>
-                  </div>
+                  </div> */}
 
                   {/* Actions */}
                   <div className="flex space-x-2">
@@ -258,7 +258,7 @@ const FacultyProfile = () => {
             <p className="mt-1 text-sm text-gray-500">
               {searchTerm 
                 ? 'Try adjusting your search criteria.' 
-                : `No faculty members in ${userData?.department} department.`}
+                : 'No faculty members found.'}
             </p>
           </div>
         )}
@@ -335,7 +335,7 @@ const FacultyProfile = () => {
                   <div>
                     <h3 className="text-lg font-semibold text-gray-900 mb-3">Teaching Experience</h3>
                     <p className="text-sm font-medium text-gray-900">
-                      {selectedFaculty.yearsOfExperience ? selectedFaculty.yearsOfExperience : 'Not Specified'}
+                      {selectedFaculty.yearsOfExperience ? selectedFaculty.yearsOfExperience + `${selectedFaculty.yearsOfExperience > 1 ? ' years' : ' year'}` : 'Not Specified'}
                     </p>
                   </div>
                 )}

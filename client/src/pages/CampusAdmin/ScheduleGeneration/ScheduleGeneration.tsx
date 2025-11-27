@@ -56,7 +56,7 @@ import { useAppDispatch, useAppSelector } from '../../../hooks/redux';
 import { fetchAcademicPrograms } from '../../../services/academicProgramSlice';
 import { fetchCurriculums } from '../../../services/curriculumSlice';
 
-import { fetchProgramPriorities, saveProgramPriorities } from '../../../services/programPrioritySlice';
+// Using academic program priorities directly
 
 // Import types
 import type { Subject } from '../../../types';
@@ -94,6 +94,7 @@ interface Schedule {
   yearLevel: string;
   courseCode?: string;
   students?: string;
+  numberOfStudents?: string;
   recommendedFaculty?: any[];
   roomName?: string;
   type?: string;
@@ -117,7 +118,7 @@ const ScheduleGeneration: React.FC = () => {
   // Redux hooks
   const dispatch = useAppDispatch();
   const { academicPrograms, isLoading: programsLoading, error: programsError } = useAppSelector((state) => state.academicProgram);
-  const { programPriorities: savedProgramPriorities, isLoading: prioritiesLoading, error: prioritiesError } = useAppSelector((state) => state.programPriority);
+  // Using academic program priorities
 
   const toast = useToast();
   const [showFacultyRecommendations, setShowFacultyRecommendations] = useState(false);
@@ -137,7 +138,6 @@ const ScheduleGeneration: React.FC = () => {
     const getInstructors = async () => {
       try {
         const response = await api.get('/user/instructor');
-        console.log('Instructors fetched:', response.data);
         setInstructors(response.data);
       } catch (error) {
         console.error('Error fetching instructors:', error);
@@ -189,18 +189,18 @@ const ScheduleGeneration: React.FC = () => {
     return program?.programName || programCode;
   };
 
-  // Save program priorities to database
+  // Save program priorities to academic programs table
   const handleSaveProgramPriorities = async () => {
     try {
+      const priorities = programPriorities.map((programCode, index) => {
+        const program = academicPrograms?.find((p: AcademicProgram) => p.programCode === programCode);
+        return {
+          id: program?.id!,
+          priority: index + 1
+        };
+      });
       
-      const prioritiesData = programPriorities.map((programCode, index) => ({
-        programCode,
-        programName: getProgramName(programCode),
-        priority: index + 1,
-        department: selectedDepartment || undefined
-      }));
-      await dispatch(saveProgramPriorities(prioritiesData)).unwrap();
-
+      await api.put('/program/priorities/update', priorities);
       toast.success('Program priorities saved successfully!');
     } catch (error) {
       toast.error('Failed to save program priorities. Please try again.');
@@ -222,32 +222,21 @@ const ScheduleGeneration: React.FC = () => {
   } = useScheduleGeneration(instructors, curriculumYear);
 
   useEffect(() => {
-    // Fetch academic programs and program priorities when component mounts
+    // Fetch academic programs when component mounts
     dispatch(fetchAcademicPrograms());
-    dispatch(fetchProgramPriorities());
     dispatch(fetchCurriculums());
   }, [dispatch]);
 
   // Update program priorities when academic programs are loaded
   useEffect(() => {
     if (academicPrograms && academicPrograms.length > 0) {
-      const programCodes = academicPrograms.map((program: AcademicProgram) => program.programCode);
+      // Sort programs by priority (lower number = higher priority)
+      const sortedPrograms = [...academicPrograms].sort((a, b) => (a.priority || 999) - (b.priority || 999));
+      const programCodes = sortedPrograms.map((program: AcademicProgram) => program.programCode).filter((code): code is string => code !== null);
       setPrograms(programCodes);
-      
-      // If we have saved priorities, use them; otherwise use default order
-      if (savedProgramPriorities && savedProgramPriorities.length > 0) {
-        const savedPriorityCodes = [...savedProgramPriorities]
-          .sort((a, b) => a.priority - b.priority)
-          .map(p => p.programCode);
-        
-        // Include any new programs that aren't in saved priorities
-        const newPrograms = programCodes.filter((code): code is string => code !== null && !savedPriorityCodes.includes(code));
-        setProgramPriorities([...savedPriorityCodes, ...newPrograms]);
-      } else {
-        setProgramPriorities(programCodes.filter((code): code is string => code !== null));
-      }
+      setProgramPriorities(programCodes);
     }
-  }, [academicPrograms, savedProgramPriorities]);
+  }, [academicPrograms]);
 
   useEffect(() => {  
     const fetchLatestSavedSchedule = async () => {
@@ -541,6 +530,63 @@ const SortableItem = ({ id, children }: { id: string; children: React.ReactNode 
     }
   };
 
+  // Helper function to convert day names to abbreviations
+  const getDayAbbreviation = (day: string): string => {
+    const dayMap: Record<string, string> = {
+      'Monday': 'M',
+      'Tuesday': 'T',
+      'Wednesday': 'W',
+      'Thursday': 'Th',
+      'Friday': 'F',
+      'Saturday': 'S',
+      'Sunday': 'Su'
+    };
+    return dayMap[day] || day;
+  };
+
+  // Helper function to sort days in proper weekly order
+  const sortDays = (days: string[]): string[] => {
+    const dayOrder: Record<string, number> = {
+      'Monday': 1,
+      'Tuesday': 2,
+      'Wednesday': 3,
+      'Thursday': 4,
+      'Friday': 5,
+      'Saturday': 6,
+      'Sunday': 7
+    };
+    return days.sort((a, b) => (dayOrder[a] || 8) - (dayOrder[b] || 8));
+  };
+
+  // Helper function to group schedules by subject
+  const groupSchedulesBySubject = (schedules: Schedule[]) => {
+    const grouped: Record<string, Schedule[]> = {};
+    
+    schedules.forEach(schedule => {
+      const key = `${schedule.subjectCode}-${schedule.program}-${schedule.yearLevel}-${schedule.semester}-${schedule.facultyName}`;
+      if (!grouped[key]) {
+        grouped[key] = [];
+      }
+      grouped[key].push(schedule);
+    });
+    
+    return Object.values(grouped).map(group => {
+      const first = group[0];
+      const uniqueDays = [...new Set(group.map(s => s.day || ''))];
+      const sortedDays = sortDays(uniqueDays);
+      const days = sortedDays.map(d => getDayAbbreviation(d)).join('');
+      const timeRanges = group.map(s => `${s.startTime}-${s.endTime}`).join(', ');
+      const rooms = [...new Set(group.map(s => s.roomName))].join(', ');
+      
+      return {
+        ...first,
+        day: days,
+        timeRange: timeRanges,
+        roomName: rooms
+      };
+    });
+  };
+
   // Export to PDF using displayed table data
   const exportScheduleToPDF = (schedules: Schedule[], curriculumYear?: string, semester?: string) => {
     const doc = new jsPDF('landscape');
@@ -557,22 +603,26 @@ const SortableItem = ({ id, children }: { id: string; children: React.ReactNode 
     }
     doc.text(`Generated: ${new Date().toLocaleDateString()}`, 14, 39);
     
-    const tableData = schedules.map((item) => [
+    // Group schedules by subject with sorted days
+    const groupedSchedules = groupSchedulesBySubject(schedules);
+    
+    const tableData = groupedSchedules.map((item) => [
       item.subjectCode || '',
       item.subjectName || '',
       item.day || '',
-      `${item.startTime || ''} - ${item.endTime || ''}`,
+      item.timeRange || `${item.startTime || ''} - ${item.endTime || ''}`,
       item.roomName || '',
       item.facultyName || '',
       `${item.units || 0}`,
       `${item.lec || 0} | ${item.lab || 0}`,
+      item.students || '0/50',
       item.yearLevel || '',
       item.program || ''
     ]);
     
     autoTable(doc, {
       startY: 45,
-      head: [['Code', 'Subject', 'Days', 'Time', 'Room', 'Faculty', 'Units', 'Lec|Lab', 'Year', 'Program']],
+      head: [['Code', 'Subject', 'Days', 'Time', 'Room', 'Faculty', 'Units', 'Lec|Lab', 'Students', 'Year', 'Program']],
       body: tableData,
       theme: 'striped',
       headStyles: { fillColor: [59, 130, 246], textColor: 255, fontSize: 9 },
@@ -584,16 +634,17 @@ const SortableItem = ({ id, children }: { id: string; children: React.ReactNode 
         cellWidth: 'wrap'
       },
       columnStyles: {
-        0: { cellWidth: 20 },
-        1: { cellWidth: 45 },
-        2: { cellWidth: 20 },
-        3: { cellWidth: 35 },
-        4: { cellWidth: 25 },
-        5: { cellWidth: 35 },
-        6: { cellWidth: 15 },
-        7: { cellWidth: 20 },
-        8: { cellWidth: 20 },
-        9: { cellWidth: 25 }
+        0: { cellWidth: 18 },
+        1: { cellWidth: 40 },
+        2: { cellWidth: 18 },
+        3: { cellWidth: 30 },
+        4: { cellWidth: 20 },
+        5: { cellWidth: 30 },
+        6: { cellWidth: 12 },
+        7: { cellWidth: 18 },
+        8: { cellWidth: 15 },
+        9: { cellWidth: 18 },
+        10: { cellWidth: 20 }
       }
     });
     
@@ -603,17 +654,20 @@ const SortableItem = ({ id, children }: { id: string; children: React.ReactNode 
 
   // Export to Excel using displayed table data
   const exportScheduleToExcel = (schedules: Schedule[], curriculumYear?: string, semester?: string) => {
-    const excelData = schedules.map((item) => ({
+    // Group schedules by subject
+    const groupedSchedules = groupSchedulesBySubject(schedules);
+    
+    const excelData = groupedSchedules.map((item) => ({
       'Subject Code': item.subjectCode || '',
       'Subject Name': item.subjectName || '',
       'Days': item.day || '',
-      'Start Time': item.startTime || '',
-      'End Time': item.endTime || '',
+      'Time': item.timeRange || `${item.startTime || ''} - ${item.endTime || ''}`,
       'Room': item.roomName || '',
       'Faculty': item.facultyName || '',
       'Units': item.units || 0,
       'Lecture': item.lec || 0,
       'Lab': item.lab || 0,
+      'Students': item.students || '0/50',
       'Year Level': item.yearLevel || '',
       'Semester': item.semester || '',
       'Program': item.program || ''
@@ -624,7 +678,7 @@ const SortableItem = ({ id, children }: { id: string; children: React.ReactNode 
     
     ws['!cols'] = [
       { wch: 12 }, { wch: 35 }, { wch: 10 }, { wch: 12 }, { wch: 12 },
-      { wch: 20 }, { wch: 25 }, { wch: 8 }, { wch: 8 }, { wch: 8 },
+      { wch: 20 }, { wch: 25 }, { wch: 8 }, { wch: 8 }, { wch: 12 },
       { wch: 12 }, { wch: 15 }, { wch: 15 }
     ];
     
@@ -636,17 +690,20 @@ const SortableItem = ({ id, children }: { id: string; children: React.ReactNode 
 
   // Export to CSV using displayed table data
   const exportScheduleToCSV = (schedules: Schedule[], curriculumYear?: string, semester?: string) => {
-    const csvData = schedules.map((item) => ({
+    // Group schedules by subject
+    const groupedSchedules = groupSchedulesBySubject(schedules);
+    
+    const csvData = groupedSchedules.map((item) => ({
       'Subject Code': item.subjectCode || '',
       'Subject Name': item.subjectName || '',
       'Days': item.day || '',
-      'Start Time': item.startTime || '',
-      'End Time': item.endTime || '',
+      'Time': item.timeRange || `${item.startTime || ''} - ${item.endTime || ''}`,
       'Room': item.roomName || '',
       'Faculty': item.facultyName || '',
       'Units': item.units || 0,
       'Lecture': item.lec || 0,
       'Lab': item.lab || 0,
+      'Students': item.students || '0/50',
       'Year Level': item.yearLevel || '',
       'Semester': item.semester || '',
       'Program': item.program || ''
@@ -919,6 +976,13 @@ const SortableItem = ({ id, children }: { id: string; children: React.ReactNode 
                           <span>Units</span>
                         </div>
                       </th>
+                      {/* Students */}
+                      <th className="px-6 py-4 text-left text-xs font-bold text-gray-700 uppercase tracking-wider">
+                        <div className="flex items-center space-x-2">
+                          <Users className="h-4 w-4 text-orange-500" />
+                          <span>Students</span>
+                        </div>
+                      </th>
                       {/* Actions */}
                       <th className="px-6 py-4 text-left text-xs font-bold text-gray-700 uppercase tracking-wider">
                         <div className="flex items-center space-x-2">
@@ -1088,6 +1152,14 @@ const SortableItem = ({ id, children }: { id: string; children: React.ReactNode 
                                     Lec: {firstSubject.lec || 0} | Lab: {firstSubject.lab || 0}
                                   </div>
                                 </div>
+                              </td>
+                              
+                              {/* Number of Students */}
+                              <td className="px-6 py-5 whitespace-nowrap">
+                                <Badge variant="outline" className="bg-orange-50 text-orange-700 border-orange-300">
+                                  <Users className="h-3 w-3 mr-1 inline" />
+                                  {firstSubject.numberOfStudents || '0/50'}
+                                </Badge>
                               </td>
                               
                               {/* Actions */}

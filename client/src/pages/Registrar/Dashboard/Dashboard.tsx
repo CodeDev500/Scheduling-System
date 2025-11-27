@@ -158,7 +158,7 @@ const RegistrarDashboard: React.FC = () => {
         </div>
 
         {/* Statistics Cards */}
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-6">
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
           <div className="bg-gradient-to-r from-blue-500 to-blue-600 rounded-lg shadow-lg p-6 text-white">
             <div className="flex items-center justify-between">
               <div>
@@ -185,7 +185,7 @@ const RegistrarDashboard: React.FC = () => {
             </div>
           </div>
 
-          <div className="bg-gradient-to-r from-purple-500 to-purple-600 rounded-lg shadow-lg p-6 text-white">
+          {/* <div className="bg-gradient-to-r from-purple-500 to-purple-600 rounded-lg shadow-lg p-6 text-white">
             <div className="flex items-center justify-between">
               <div>
                 <div className="flex items-center space-x-2 mb-2">
@@ -196,7 +196,7 @@ const RegistrarDashboard: React.FC = () => {
                 <p className="text-sm text-purple-100 mt-1">Across all programs</p>
               </div>
             </div>
-          </div>
+          </div> */}
 
           <div className="bg-gradient-to-r from-orange-500 to-orange-600 rounded-lg shadow-lg p-6 text-white">
             <div className="flex items-center justify-between">
@@ -227,7 +227,7 @@ const RegistrarDashboard: React.FC = () => {
         </div>
 
         {/* Quick Actions */}
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+        {/* <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
           <div 
             className="bg-white rounded-lg shadow-sm p-6 hover:shadow-md transition-shadow cursor-pointer"
             onClick={() => navigate('/academic-programs')}
@@ -287,7 +287,7 @@ const RegistrarDashboard: React.FC = () => {
               </div>
             </div>
           </div>
-        </div>
+        </div> */}
 
         {/* Program Overview - Kept original design */}
         <div className="bg-white rounded-lg shadow-sm p-6">

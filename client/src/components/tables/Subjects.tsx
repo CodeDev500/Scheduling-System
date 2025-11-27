@@ -1,12 +1,16 @@
 import type { FC } from "react";
-import { useState } from "react";
+import { useState, useMemo } from "react";
 import { type SubjectTypes } from "../../types/types";
-import { FaRegTrashAlt, FaRegEdit, FaRegEye } from "react-icons/fa";
+import { FaRegTrashAlt, FaRegEdit, FaRegEye, FaSortUp, FaSortDown, FaSort } from "react-icons/fa";
 import { useAppDispatch } from "../../hooks/redux";
 import { deleteSubject } from "../../services/subjectSlice";
 import { useToast } from "../../hooks/useToast";
 import UpdateSubject from "../../pages/Registrar/Subjects/UpdateSubject";
 import ViewSubjectModal from "../modals/ViewSubjectModal";
+
+type SortField = 'subjectCode' | 'subjectDescription' | 'units' | null;
+type SortOrder = 'asc' | 'desc';
+
 interface SubjectsProps {
   subjects: SubjectTypes[];
 }
@@ -17,7 +21,53 @@ const Subjects: FC<SubjectsProps> = ({ subjects }) => {
   const [editSubject, setEditSubject] = useState<SubjectTypes | null>(null);
   const [viewModalOpen, setViewModalOpen] = useState(false);
   const [viewSubject, setViewSubject] = useState<SubjectTypes | null>(null);
+  const [sortField, setSortField] = useState<SortField>('subjectCode'); // Default sort by subject code
+  const [sortOrder, setSortOrder] = useState<SortOrder>('asc');
   const dispatch = useAppDispatch();
+
+  const handleSort = (field: SortField) => {
+    if (sortField === field) {
+      // Toggle sort order
+      setSortOrder(sortOrder === 'asc' ? 'desc' : 'asc');
+    } else {
+      // New field, default to ascending
+      setSortField(field);
+      setSortOrder('asc');
+    }
+  };
+
+  const getSortIcon = (field: SortField) => {
+    if (sortField !== field) {
+      return <FaSort className="inline ml-1 text-gray-400" />;
+    }
+    return sortOrder === 'asc' 
+      ? <FaSortUp className="inline ml-1 text-blue-600" />
+      : <FaSortDown className="inline ml-1 text-blue-600" />;
+  };
+
+  const sortedSubjects = useMemo(() => {
+    if (!sortField) return subjects;
+
+    return [...subjects].sort((a, b) => {
+      let aValue: string | number = '';
+      let bValue: string | number = '';
+
+      if (sortField === 'subjectCode') {
+        aValue = (a.subjectCode || '').toLowerCase();
+        bValue = (b.subjectCode || '').toLowerCase();
+      } else if (sortField === 'subjectDescription') {
+        aValue = (a.subjectDescription || '').toLowerCase();
+        bValue = (b.subjectDescription || '').toLowerCase();
+      } else if (sortField === 'units') {
+        aValue = a.units || 0;
+        bValue = b.units || 0;
+      }
+
+      if (aValue < bValue) return sortOrder === 'asc' ? -1 : 1;
+      if (aValue > bValue) return sortOrder === 'asc' ? 1 : -1;
+      return 0;
+    });
+  }, [subjects, sortField, sortOrder]);
 
   const handleEdit = (id: number) => {
     const subject = subjects.find((s) => s.id === id) || null;
@@ -41,26 +91,38 @@ const Subjects: FC<SubjectsProps> = ({ subjects }) => {
       <table className="w-full text-sm border-separate border-spacing-0 shadow-md rounded-lg overflow-hidden">
         <thead className="bg-gray-100 text-gray-700">
           <tr>
-            {[
-              "Subject Code",
-              "Subject Description",
-              "Lec",
-              "Lab",
-              "Units",
-              "Actions",
-            ].map((header) => (
-              <th
-                key={header}
-                className="border-y  border-gray-200 px-4 py-2 text-center"
-              >
-                {header}
-              </th>
-            ))}
+            <th 
+              className="border-y border-gray-200 px-4 py-2 text-center cursor-pointer hover:bg-gray-200 transition-colors"
+              onClick={() => handleSort('subjectCode')}
+            >
+              Subject Code {getSortIcon('subjectCode')}
+            </th>
+            <th 
+              className="border-y border-gray-200 px-4 py-2 text-center cursor-pointer hover:bg-gray-200 transition-colors"
+              onClick={() => handleSort('subjectDescription')}
+            >
+              Subject Description {getSortIcon('subjectDescription')}
+            </th>
+            <th className="border-y border-gray-200 px-4 py-2 text-center">
+              Lec
+            </th>
+            <th className="border-y border-gray-200 px-4 py-2 text-center">
+              Lab
+            </th>
+            <th 
+              className="border-y border-gray-200 px-4 py-2 text-center cursor-pointer hover:bg-gray-200 transition-colors"
+              onClick={() => handleSort('units')}
+            >
+              Units {getSortIcon('units')}
+            </th>
+            <th className="border-y border-gray-200 px-4 py-2 text-center">
+              Actions
+            </th>
           </tr>
         </thead>
         <tbody className="bg-white">
-          {Array.isArray(subjects) && subjects.length > 0 ? (
-            subjects.map((sched, idx) => (
+          {Array.isArray(sortedSubjects) && sortedSubjects.length > 0 ? (
+            sortedSubjects.map((sched, idx) => (
               <tr
                 key={idx}
                 className="hover:bg-gray-100 transition-colors duration-150 text-gray-600"

@@ -14,17 +14,18 @@ const Subjects = () => {
   const dispatch = useAppDispatch();
 
   const handleSearch = (e: React.ChangeEvent<HTMLInputElement>) => {
-    setSearchTerm(e.target.value);
+    const value = e.target.value;
+    setSearchTerm(value);
+    if (value.trim()) {
+      dispatch(searchSubject(value));
+    } else {
+      dispatch(fetchSubjects());
+    }
   };
 
   useEffect(() => {
     dispatch(fetchSubjects());
-    if (searchTerm) {
-      dispatch(searchSubject(searchTerm));
-    } else {
-      dispatch(fetchSubjects());
-    }
-  }, [searchTerm, dispatch]);
+  }, [dispatch]);
 
   return (
     <div>

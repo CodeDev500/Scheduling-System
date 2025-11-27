@@ -122,7 +122,7 @@ const Navbar = () => {
           <ul className="flex md:gap-5 gap-3 items-center text-white lg:text-lg text-sm">
             {userData ? (
               <>
-                <li>
+                {/* <li>
                   <div className="relative">
                     {unread > 0 && (
                       <span className="text-sm absolute right-0 top-0 text-white bg-red-600 rounded-full px-1.5">
@@ -135,10 +135,10 @@ const Navbar = () => {
                   </div>
                   {showNotification && (
                     <div className="absolute z-50 right-5">
-                      {/* <Notification /> */}
+                      
                     </div>
                   )}
-                </li>
+                </li> */}
                 <li className="font-bold">
                   {userData?.firstname} {userData?.lastname}
                 </li>

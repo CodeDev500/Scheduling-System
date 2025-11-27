@@ -24,6 +24,7 @@ import SelectField from '../../components/input_field/SelectField';
 import MultiSelectField from '../../components/input_field/MultiSelectField';
 import { designationList, program } from '../../constants/constants';
 import { useSpecializations } from '../../hooks/useSpecializations';
+import { fetchSubjects } from '../../services/subjectSlice';
 
 // Define User type to avoid conflict with Lucide icon
 interface User {
@@ -51,6 +52,7 @@ const UserProfile: React.FC = () => {
   const toast = useToast();
   const { specializations } = useSpecializations(true);
   const userData = useAppSelector((state) => state.auth.user);
+  const subjects = useAppSelector((state) => state.subject.subjects);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [user, setUser] = useState<User | null>(null);
   
@@ -84,6 +86,11 @@ const UserProfile: React.FC = () => {
     newPassword: '',
     confirmPassword: ''
   });
+
+  // Fetch subjects when component mounts
+  useEffect(() => {
+    dispatch(fetchSubjects());
+  }, [dispatch]);
 
   // Fetch user data from database when component mounts or userData.id changes
   useEffect(() => {
@@ -186,6 +193,10 @@ const UserProfile: React.FC = () => {
       formData.append('designation', editedData.designation);
       formData.append('department', editedData.department);
       formData.append('specialization', JSON.stringify(editedData.specialization));
+      formData.append('yearsOfExperience', editedData.yearsOfExperience.toString());
+      formData.append('previousSubjects', JSON.stringify(editedData.previousSubjects));
+      formData.append('availableDays', JSON.stringify(editedData.availableDays));
+      formData.append('preferredTimeSlots', JSON.stringify(editedData.preferredTimeSlots));
       
       if (imageFile) {
         formData.append('image', imageFile);
@@ -656,35 +667,32 @@ const UserProfile: React.FC = () => {
                   </div>
 
                   {/* Years of Experience */}
-                  {user.role === 'FACULTY' && (
-                    <div>
-                      <label className="flex items-center text-sm font-medium text-gray-700 mb-2">
-                        <Briefcase className="w-4 h-4 mr-2 text-gray-500" />
-                        Years of Experience
-                      </label>
-                      {isEditing ? (
-                        <input
-                          type="number"
-                          name="yearsOfExperience"
-                          value={editedData.yearsOfExperience || 0}
-                          onChange={handleInputChange}
-                          min="0"
-                          className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-red-500 focus:border-transparent transition-all"
-                        />
-                      ) : (
-                        <p className="text-gray-900 bg-gray-50 px-4 py-2 rounded-lg">{user.yearsOfExperience || 0} years</p>
-                      )}
-                    </div>
-                  )}
+                  <div>
+                    <label className="flex items-center text-sm font-medium text-gray-700 mb-2">
+                      <Briefcase className="w-4 h-4 mr-2 text-gray-500" />
+                      Years of Experience
+                    </label>
+                    {isEditing ? (
+                      <input
+                        type="number"
+                        name="yearsOfExperience"
+                        value={editedData.yearsOfExperience || 0}
+                        onChange={handleInputChange}
+                        min="0"
+                        className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-red-500 focus:border-transparent transition-all"
+                      />
+                    ) : (
+                      <p className="text-gray-900 bg-gray-50 px-4 py-2 rounded-lg">{user.yearsOfExperience || 0} years</p>
+                    )}
+                  </div>
 
                   {/* Preferred Time Slots */}
-                  {user.role === 'FACULTY' && (
-                    <div>
-                      <label className="flex items-center text-sm font-medium text-gray-700 mb-2">
-                        <Clock className="w-4 h-4 mr-2 text-gray-500" />
-                        Preferred Time Slots (7:00 AM - 7:00 PM)
-                      </label>
-                      {isEditing ? (
+                  <div>
+                    <label className="flex items-center text-sm font-medium text-gray-700 mb-2">
+                      <Clock className="w-4 h-4 mr-2 text-gray-500" />
+                      Preferred Time Slots (7:00 AM - 7:00 PM)
+                    </label>
+                    {isEditing ? (
                         <div className="flex gap-2 items-center">
                           <div className="flex-1">
                             <label className="block text-xs text-gray-500 mb-1">Start Time</label>
@@ -749,108 +757,91 @@ const UserProfile: React.FC = () => {
                             return <p className="text-gray-900">Not specified</p>;
                           })()}
                         </div>
-                      )}
-                    </div>
-                  )}
+                    )}
+                  </div>
 
                   {/* Available Days */}
-                  {user.role === 'FACULTY' && (
-                    <div>
-                      {isEditing ? (
-                        <MultiSelectField
-                          label="Available Days"
-                          id="availableDays"
-                          name="availableDays"
-                          value={editedData.availableDays || []}
-                          onChange={handleMultiSelectChange}
-                          placeholder="Select days you are available to teach..."
-                          options={[
-                            { value: "Monday", label: "Monday" },
-                            { value: "Tuesday", label: "Tuesday" },
-                            { value: "Wednesday", label: "Wednesday" },
-                            { value: "Thursday", label: "Thursday" },
-                            { value: "Friday", label: "Friday" },
-                            { value: "Saturday", label: "Saturday" },
-                            { value: "Sunday", label: "Sunday" },
-                          ]}
-                        />
-                      ) : (
-                        <>
-                          <label className="flex items-center text-sm font-medium text-gray-700 mb-2">
-                            <Calendar className="w-4 h-4 mr-2 text-gray-500" />
-                            Available Days
-                          </label>
-                          <div className="bg-gray-50 px-4 py-2 rounded-lg">
-                            {user.availableDays && user.availableDays.length > 0 ? (
-                              <div className="flex flex-wrap gap-2">
-                                {user.availableDays.map((day, index) => (
-                                  <span key={index} className="inline-flex items-center px-2 py-1 rounded-md text-xs font-medium bg-green-100 text-green-800">
-                                    {day}
-                                  </span>
-                                ))}
-                              </div>
-                            ) : (
-                              <p className="text-gray-900">Not specified</p>
-                            )}
-                          </div>
-                        </>
-                      )}
-                    </div>
-                  )}
+                  <div>
+                    {isEditing ? (
+                      <MultiSelectField
+                        label="Available Days"
+                        id="availableDays"
+                        name="availableDays"
+                        value={editedData.availableDays || []}
+                        onChange={handleMultiSelectChange}
+                        placeholder="Select days you are available to teach..."
+                        options={[
+                          { value: "Monday", label: "Monday" },
+                          { value: "Tuesday", label: "Tuesday" },
+                          { value: "Wednesday", label: "Wednesday" },
+                          { value: "Thursday", label: "Thursday" },
+                          { value: "Friday", label: "Friday" },
+                          { value: "Saturday", label: "Saturday" },
+                          { value: "Sunday", label: "Sunday" },
+                        ]}
+                      />
+                    ) : (
+                      <>
+                        <label className="flex items-center text-sm font-medium text-gray-700 mb-2">
+                          <Calendar className="w-4 h-4 mr-2 text-gray-500" />
+                          Available Days
+                        </label>
+                        <div className="bg-gray-50 px-4 py-2 rounded-lg">
+                          {user.availableDays && user.availableDays.length > 0 ? (
+                            <div className="flex flex-wrap gap-2">
+                              {user.availableDays.map((day, index) => (
+                                <span key={index} className="inline-flex items-center px-2 py-1 rounded-md text-xs font-medium bg-green-100 text-green-800">
+                                  {day}
+                                </span>
+                              ))}
+                            </div>
+                          ) : (
+                            <p className="text-gray-900">Not specified</p>
+                          )}
+                        </div>
+                      </>
+                    )}
+                  </div>
 
                   {/* Previous Subjects */}
-                  {user.role === 'FACULTY' && (
-                    <div>
-                      {isEditing ? (
-                        <MultiSelectField
-                          label="Previous Subjects Taught"
-                          id="previousSubjects"
-                          name="previousSubjects"
-                          value={editedData.previousSubjects || []}
-                          onChange={handleMultiSelectChange}
-                          placeholder="Select subjects you have previously taught..."
-                          options={[
-                            { value: "Programming", label: "Programming" },
-                            { value: "Database Systems", label: "Database Systems" },
-                            { value: "Web Development", label: "Web Development" },
-                            { value: "Data Structures", label: "Data Structures" },
-                            { value: "Algorithms", label: "Algorithms" },
-                            { value: "Computer Networks", label: "Computer Networks" },
-                            { value: "Operating Systems", label: "Operating Systems" },
-                            { value: "Software Engineering", label: "Software Engineering" },
-                            { value: "Mathematics", label: "Mathematics" },
-                            { value: "Physics", label: "Physics" },
-                            { value: "English", label: "English" },
-                            { value: "Artificial Intelligence", label: "Artificial Intelligence" },
-                            { value: "Machine Learning", label: "Machine Learning" },
-                            { value: "Mobile Development", label: "Mobile Development" },
-                          ]}
-                        />
-                      ) : (
-                        <>
-                          <label className="flex items-center text-sm font-medium text-gray-700 mb-2">
-                            <BookOpen className="w-4 h-4 mr-2 text-gray-500" />
-                            Previous Subjects Taught
-                          </label>
-                          <div className="bg-gray-50 px-4 py-2 rounded-lg">
-                            {user.previousSubjects && user.previousSubjects.length > 0 ? (
-                              <div className="flex flex-wrap gap-2">
-                                {user.previousSubjects.map((subject, index) => (
-                                  <span key={index} className="inline-flex items-center px-2 py-1 rounded-md text-xs font-medium bg-blue-100 text-blue-800">
-                                    {subject}
-                                  </span>
-                                ))}
-                              </div>
-                            ) : (
-                              <p className="text-gray-900">Not specified</p>
-                            )}
-                          </div>
-                        </>
-                      )}
-                    </div>
-                  )}
+                  <div>
+                    {isEditing ? (
+                      <MultiSelectField
+                        label="Previous Subjects Taught"
+                        id="previousSubjects"
+                        name="previousSubjects"
+                        value={editedData.previousSubjects || []}
+                        onChange={handleMultiSelectChange}
+                        placeholder="Select subjects you have previously taught..."
+                        options={subjects.length > 0 ? subjects.map((subject) => ({
+                          value: subject.subjectCode,
+                          label: `${subject.subjectCode} - ${subject.subjectDescription}`,
+                        })) : []}
+                      />
+                    ) : (
+                      <>
+                        <label className="flex items-center text-sm font-medium text-gray-700 mb-2">
+                          <BookOpen className="w-4 h-4 mr-2 text-gray-500" />
+                          Previous Subjects Taught
+                        </label>
+                        <div className="bg-gray-50 px-4 py-2 rounded-lg">
+                          {user.previousSubjects && user.previousSubjects.length > 0 ? (
+                            <div className="flex flex-wrap gap-2">
+                              {user.previousSubjects.map((subject, index) => (
+                                <span key={index} className="inline-flex items-center px-2 py-1 rounded-md text-xs font-medium bg-blue-100 text-blue-800">
+                                  {subject}
+                                </span>
+                              ))}
+                            </div>
+                          ) : (
+                            <p className="text-gray-900">Not specified</p>
+                          )}
+                        </div>
+                      </>
+                    )}
+                  </div>
 
-                  {/* Role */}
+                 
                   <div>
                     <label className="flex items-center text-sm font-medium text-gray-700 mb-2">
                       <Shield className="w-4 h-4 mr-2 text-gray-500" />
