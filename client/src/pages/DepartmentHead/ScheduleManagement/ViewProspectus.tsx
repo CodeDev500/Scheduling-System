@@ -213,7 +213,9 @@ const ViewProspectus: React.FC = () => {
             </tr>
           </tbody>
         </table>
-        <p className="text-xs mt-1 text-gray-600">*NOTE: 1 Laboratory Unit = _3_ number of contact hours</p>
+        <p className="text-xs mt-1 text-gray-600">
+          *NOTE: 1 Laboratory Unit = {programCode === 'BSCS' || programCode === 'ACT' ? '_3_' : '_1_'} number of contact hours
+        </p>
       </div>
     );
   };

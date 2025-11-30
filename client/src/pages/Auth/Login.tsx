@@ -7,6 +7,7 @@ import { useNavigate } from "react-router-dom";
 import { useToast } from "../../hooks/useToast";
 import ForgotPassword from "./ForgotPassword";
 import { UserRoles } from "../../constants/constants";
+import { Eye, EyeOff } from "lucide-react";
 type LoginProps = {
   isOpen: boolean;
   closeModal: () => void;
@@ -25,6 +26,7 @@ const Login: React.FC<LoginProps> = ({
   const [password, setPassword] = useState<string>("");
   const [forgotPassword, setForgotPassword] = useState(false);
   const [loading, setLoading] = useState(false);
+  const [showPassword, setShowPassword] = useState(false);
 
   useEffect(() => {
     return () => {
@@ -72,8 +74,7 @@ const Login: React.FC<LoginProps> = ({
             aria-hidden={!isOpen}
             tabIndex={-1}
           >
-            <div className="relative p-4 w-full max-w-lg">
-              <div className="relative bg-white rounded-lg shadow ">
+            <div className="relative bg-white rounded-lg shadow max-w-lg w-full mx-4">
                 {/* Header */}
                 <div className="flex items-center justify-between p-4 md:p-5 border-b rounded-t border-gray-200 ">
                   <h3 className="text-xl font-semibold text-gray-900 ">
@@ -108,7 +109,7 @@ const Login: React.FC<LoginProps> = ({
                   <form className="space-y-4">
                     <InputFiled
                       label="Email"
-                      id="email"
+                      id="login-email"
                       type="email"
                       value={email}
                       onChange={(e) => setEmail(e.target.value)}
@@ -116,16 +117,25 @@ const Login: React.FC<LoginProps> = ({
                       error={error?.email?.[0] || ""}
                       // required
                     />
-                    <InputFiled
-                      label="Password"
-                      id="password"
-                      type="password"
-                      value={password}
-                      onChange={(e) => setPassword(e.target.value)}
-                      placeholder="Enter your password"
-                      error={error?.password?.[0] || ""}
-                      // required
-                    />
+                    <div className="relative">
+                      <InputFiled
+                        label="Password"
+                        id="login-password"
+                        type={showPassword ? "text" : "password"}
+                        value={password}
+                        onChange={(e) => setPassword(e.target.value)}
+                        placeholder="Enter your password"
+                        error={error?.password?.[0] || ""}
+                        // required
+                      />
+                      <button
+                        type="button"
+                        onClick={() => setShowPassword(!showPassword)}
+                        className="absolute right-3 top-12 -translate-y-1/2 text-gray-500 hover:text-gray-700"
+                      >
+                        {showPassword ? <EyeOff size={20} /> : <Eye size={20} />}
+                      </button>
+                    </div>
                     <div className="flex justify-end">
                       <button
                         onClick={() => setForgotPassword(true)}
@@ -162,7 +172,6 @@ const Login: React.FC<LoginProps> = ({
                     </div>
                   </form>
                 </div>
-              </div>
             </div>
           </div>
         )

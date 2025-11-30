@@ -185,29 +185,43 @@ const UserProfile: React.FC = () => {
     try {
       setIsSaving(true);
 
-      const formData = new FormData();
-      formData.append('firstname', editedData.firstname);
-      formData.append('lastname', editedData.lastname);
-      formData.append('middleInitial', editedData.middleInitial);
-      formData.append('email', editedData.email);
-      formData.append('designation', editedData.designation);
-      formData.append('department', editedData.department);
-      formData.append('specialization', JSON.stringify(editedData.specialization));
-      formData.append('yearsOfExperience', editedData.yearsOfExperience.toString());
-      formData.append('previousSubjects', JSON.stringify(editedData.previousSubjects));
-      formData.append('availableDays', JSON.stringify(editedData.availableDays));
-      formData.append('preferredTimeSlots', JSON.stringify(editedData.preferredTimeSlots));
-      
       if (imageFile) {
+        // If there's an image, use FormData
+        const formData = new FormData();
+        formData.append('firstname', editedData.firstname);
+        formData.append('lastname', editedData.lastname);
+        formData.append('middleInitial', editedData.middleInitial);
+        formData.append('email', editedData.email);
+        formData.append('designation', editedData.designation);
+        formData.append('department', editedData.department);
+        formData.append('specialization', JSON.stringify(editedData.specialization));
+        formData.append('yearsOfExperience', editedData.yearsOfExperience.toString());
+        formData.append('previousSubjects', JSON.stringify(editedData.previousSubjects));
+        formData.append('availableDays', JSON.stringify(editedData.availableDays));
+        formData.append('preferredTimeSlots', JSON.stringify(editedData.preferredTimeSlots));
         formData.append('image', imageFile);
-      }
 
-      // Use the existing /user/:id endpoint
-      await api.put(`/user/${userData?.id}`, formData, {
-        headers: {
-          'Content-Type': 'multipart/form-data',
-        },
-      });
+        await api.put(`/user/${userData?.id}`, formData, {
+          headers: {
+            'Content-Type': 'multipart/form-data',
+          },
+        });
+      } else {
+        // If no image, send as JSON
+        await api.put(`/user/${userData?.id}`, {
+          firstname: editedData.firstname,
+          lastname: editedData.lastname,
+          middleInitial: editedData.middleInitial,
+          email: editedData.email,
+          designation: editedData.designation,
+          department: editedData.department,
+          specialization: editedData.specialization,
+          yearsOfExperience: editedData.yearsOfExperience,
+          previousSubjects: editedData.previousSubjects,
+          availableDays: editedData.availableDays,
+          preferredTimeSlots: editedData.preferredTimeSlots,
+        });
+      }
 
       // Fetch fresh user data directly from database by ID
       const response = await api.get(`/user/id/${userData?.id}`);
@@ -247,10 +261,10 @@ const UserProfile: React.FC = () => {
   };
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const { name, value } = e.target;
+    const { name, value, type } = e.target;
     setEditedData(prev => ({
       ...prev,
-      [name]: value
+      [name]: type === 'number' ? (value === '' ? 0 : parseInt(value)) : value
     }));
   };
 
@@ -748,9 +762,19 @@ const UserProfile: React.FC = () => {
                                 if (slot.startsWith('start:')) start = slot.replace('start:', '');
                                 if (slot.startsWith('end:')) end = slot.replace('end:', '');
                               });
+                              
+                              // Convert to 12-hour format with AM/PM
+                              const formatTo12Hour = (time24: string) => {
+                                const [hours, minutes] = time24.split(':');
+                                const hour = parseInt(hours);
+                                const ampm = hour >= 12 ? 'PM' : 'AM';
+                                const hour12 = hour === 0 ? 12 : hour > 12 ? hour - 12 : hour;
+                                return `${hour12}:${minutes} ${ampm}`;
+                              };
+                              
                               return (
                                 <span className="inline-flex items-center px-3 py-1 rounded-md text-sm font-medium bg-purple-100 text-purple-800">
-                                  {start} - {end}
+                                  {formatTo12Hour(start)} - {formatTo12Hour(end)}
                                 </span>
                               );
                             }

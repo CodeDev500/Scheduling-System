@@ -156,6 +156,7 @@ const ManageUser = () => {
         role: selectedUser.role,
         designation: selectedUser.designation,
         department: selectedUser.department,
+        specialization: selectedUser.specialization,
       });
       toast.success('User updated successfully');
       setShowEditModal(false);
@@ -363,6 +364,30 @@ const ManageUser = () => {
                 <div>
                   <label className="block text-xs font-medium text-gray-500 uppercase tracking-wider mb-1">Last Updated</label>
                   <p className="text-sm font-medium text-gray-900">{new Date(selectedUser.updatedAt).toLocaleDateString()}</p>
+                </div>
+              </div>
+
+              {/* Additional Information */}
+              <div className="col-span-2 mt-4 pt-4 border-t border-gray-200">
+                <h4 className="text-sm font-semibold text-gray-900 mb-3">Additional Information</h4>
+                <div className="grid grid-cols-2 gap-6">
+                  {/* Specialization */}
+                  {selectedUser.specialization && (
+                    <div className="col-span-2">
+                      <label className="block text-xs font-medium text-gray-500 uppercase tracking-wider mb-2">Specialization</label>
+                      <div className="flex flex-wrap gap-2">
+                        {Array.isArray(selectedUser.specialization) && selectedUser.specialization.length > 0 ? (
+                          selectedUser.specialization.map((spec: string, index: number) => (
+                            <span key={index} className="inline-flex items-center px-2 py-1 rounded-md text-xs font-medium bg-blue-100 text-blue-800">
+                              {spec}
+                            </span>
+                          ))
+                        ) : (
+                          <p className="text-sm text-gray-500">Not specified</p>
+                        )}
+                      </div>
+                    </div>
+                  )}
                 </div>
               </div>
             </div>

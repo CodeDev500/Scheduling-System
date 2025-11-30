@@ -311,8 +311,10 @@ const TeachingLoad = () => {
   const userData = useAppSelector((state) => state.auth.user);
   const id = userData?.id;
   const printRef = useRef<HTMLDivElement>(null);
+  const dataLoadedRef = useRef<boolean>(false); // Track if data is already loaded
+  const currentParamsRef = useRef<string>(''); // Track current parameters
 
-  const handlePrint = useReactToPrint({
+  const reactToPrintFn = useReactToPrint({
     contentRef: printRef,
     documentTitle: `Teaching_Load_${selectedFaculty?.name || 'Schedule'}_${curriculumYear}`,
     pageStyle: `
@@ -331,6 +333,29 @@ const TeachingLoad = () => {
       }
     `
   });
+
+  const handlePrint = () => {
+    // Check if data is loaded before printing
+    if (isLoading) {
+      toast.error('Please wait for data to load before printing');
+      return;
+    }
+    
+    if (!selectedFaculty || !selectedFaculty.schedule) {
+      toast.error('No schedule data available to print');
+      return;
+    }
+
+    // Ensure data is available and DOM is rendered before printing
+    // Using requestAnimationFrame ensures the browser has finished rendering
+    requestAnimationFrame(() => {
+      setTimeout(() => {
+        if (reactToPrintFn) {
+          reactToPrintFn();
+        }
+      }, 150); // Slightly longer delay to ensure stability
+    });
+  };
 
   const timeSlots: TimeSlot[] = [
     { time: '7:00', display: '7:00 AM', endTime: '8:00' },
@@ -467,28 +492,46 @@ const TeachingLoad = () => {
 
   // Fetch real data from API
   useEffect(() => {
-      const fetchFacultySchedules = async () => {
-    try {
-      setIsLoading(true);
-      
-      // Fetch faculty with teaching load
-      const facultyResponse = await api.get(`/user/faculty/with-load`);
-      const facultyData = facultyResponse.data.filter((f: any) => f.status === 'APPROVED');
+    // Guard: Don't fetch if userData is not available
+    if (!userData?.id) {
+      console.log('Waiting for user data...');
+      return;
+    }
+
+    // Create a unique key for current parameters
+    const currentParams = `${userData.id}-${curriculumYear}-${semester}`;
+    
+    // Skip fetch if parameters haven't changed (prevents re-fetch during print)
+    if (currentParamsRef.current === currentParams && dataLoadedRef.current) {
+      console.log('Data already loaded for these parameters, skipping fetch');
+      return;
+    }
+
+    const fetchFacultySchedules = async () => {
+      try {
+        setIsLoading(true);
+        
+        // Fetch only the logged-in user's data
+        const facultyResponse = await api.get(`/user/id/${userData?.id}`);
+        const loggedInFaculty = facultyResponse.data;
 
       // Fetch all subject schedules
       const schedulesResponse = await api.get('/schedules/latest');
       const schedules = schedulesResponse.data?.scheduleItems || [];
 
-      // Group schedules by faculty
-      const facultySchedules: FacultySchedule[] = facultyData.map((faculty: any) => {
-        const facultyScheduleItems = schedules.filter(
-          (s: any) => String(s.facultyId) === String(userData?.id) && s.academicYear === String(curriculumYear) && s.semester === String(semester)
-        );
+      // Filter schedules for ONLY the logged-in user
+      const facultyScheduleItems = schedules.filter(
+        (s: any) => String(s.facultyId) === String(userData?.id) && 
+                    s.academicYear === String(curriculumYear) && 
+                    s.semester === String(semester)
+      );
 
-        // Transform schedules into the required format
-        const schedule: any = {};
-        
-        facultyScheduleItems.forEach((item: any) => {
+      // Transform schedules into the required format
+      const schedule: any = {};
+      let totalUnits = 0;
+      
+      facultyScheduleItems.forEach((item: any) => {
+        totalUnits += item.units || 0;
           const dayMap: any = {
             'M': 'MON',
             'T': 'TUE',
@@ -551,30 +594,36 @@ const TeachingLoad = () => {
           });
         });
 
-        return {
-          id: String(faculty.id),
-          name: `${faculty.firstname} ${faculty.middleInitial}. ${faculty.lastname}`,
-          department: faculty.department,
-          employmentType: 'Full Time',
-          totalUnits: faculty.totalUnits || 0,
-          schedule
-        };
-      });
+      // Create the faculty schedule array with only the logged-in user
+      const facultySchedules: FacultySchedule[] = [{
+        id: String(loggedInFaculty.id),
+        name: `${loggedInFaculty.firstname} ${loggedInFaculty.middleInitial}. ${loggedInFaculty.lastname}`,
+        department: loggedInFaculty.department,
+        employmentType: 'Full Time',
+        totalUnits: totalUnits,
+        schedule
+      }];
 
       setFacultyList(facultySchedules);
       if (facultySchedules.length > 0) {
         setSelectedFaculty(facultySchedules[0]);
       }
+      
+      // Mark data as loaded and store current parameters
+      dataLoadedRef.current = true;
+      currentParamsRef.current = `${userData.id}-${curriculumYear}-${semester}`;
+      console.log('Data loaded successfully');
     } catch (error) {
       console.error('Error fetching faculty schedules:', error);
       toast.error('Failed to load faculty schedules');
+      dataLoadedRef.current = false; // Reset on error
     } finally {
       setIsLoading(false);
     }
   };
 
     fetchFacultySchedules();
-  }, [curriculumYear, semester]);
+  }, [curriculumYear, semester, userData?.id, toast]); // Added toast to dependencies
 
 
   // Simplified schedule processing with improved duration calculation
@@ -668,17 +717,6 @@ const TeachingLoad = () => {
     const baseHeight = isMobile ? 48 : 64; // Base height for 1 hour in pixels
     return Math.round(duration * baseHeight); // Round to avoid fractional pixels
   };
-
-  // Add window resize listener to recalculate heights on screen size change
-  useEffect(() => {
-    const handleResize = () => {
-      // Force re-render when screen size changes
-      setSelectedFaculty(prev => prev ? { ...prev } : null);
-    };
-
-    window.addEventListener('resize', handleResize);
-    return () => window.removeEventListener('resize', handleResize);
-  }, []);
 
   const renderGridCell = (day: string, time: string, processedSchedule: any) => {
     const cellData = processedSchedule[day]?.[time];

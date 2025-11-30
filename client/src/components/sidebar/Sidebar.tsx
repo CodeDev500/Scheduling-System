@@ -14,6 +14,9 @@ import { useAppSelector } from "../../hooks/redux";
 import { UserRoles } from "../../constants/constants";
 import { FaRegListAlt } from "react-icons/fa";
 import { FaRobot } from "react-icons/fa";
+import { logout } from "../../services/authSlice";
+import { useAppDispatch } from "../../hooks/redux";
+import { useNavigate } from "react-router-dom";
 
 type LinkItem = {
   title: string;
@@ -34,7 +37,8 @@ const Sidebar = ({ sidebar, handleBurger }: SidebarProps) => {
   const user = useAppSelector((state) => state.auth.user);
   const location = useLocation();
   const [links, setLinks] = useState<LinkItem[]>([]);
-
+  const navigate = useNavigate();
+  const dispatch = useAppDispatch();
   const [openSubmenus, setOpenSubmenus] = useState<{[key: string]: boolean}>({});
 
   useEffect(() => {
@@ -180,9 +184,14 @@ const Sidebar = ({ sidebar, handleBurger }: SidebarProps) => {
     }));
   };
 
-  const handleLogout = () => {
-    alert("Logged out");
-  };
+   const handleLogout = async () => {
+     try {
+       await dispatch(logout()).unwrap();
+       navigate("/home");
+     } catch (error) {
+       console.error("Logout failed:", error);
+     }
+   };
 
   return (
     <>

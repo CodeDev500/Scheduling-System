@@ -161,32 +161,18 @@ const Navbar = () => {
                 <li>
                   <button
                     className="px-4 h-10 bg-yellow rounded-lg bg-primary_hover hover:bg-[#5c0011] cursor-pointer"
-                    onClick={() => setLoginModal(!loginModal)}
+                    onClick={() => setLoginModal(true)}
                   >
                     Login
                   </button>
-                  {loginModal && (
-                    <Login
-                      isOpen={loginModal}
-                      closeModal={closeModal}
-                      toggleRegisterModal={toggleRegisterModal}
-                    />
-                  )}
                 </li>
                 <li>
                   <button
                     className="px-4 h-10 bg-yellow rounded-lg bg-primary_hover hover:bg-[#5c0011]"
-                    onClick={() => setRegisterModal(!registerModal)}
+                    onClick={() => setRegisterModal(true)}
                   >
                     Register
                   </button>
-                  {registerModal && (
-                    <Register
-                      isOpen={registerModal}
-                      closeModal={closeModal}
-                      toggleLoginModal={toggleLoginModal}
-                    />
-                  )}
                 </li>
               </>
             )}
@@ -268,7 +254,7 @@ const Navbar = () => {
                 <button
                   className="w-full px-4 h-10 bg-rose-600 hover:bg-rose-700 rounded-lg text-white font-medium transition-colors duration-200"
                   onClick={() => {
-                    setLoginModal(!loginModal);
+                    setLoginModal(true);
                     setIsMenuOpen(false);
                   }}
                 >
@@ -277,7 +263,7 @@ const Navbar = () => {
                 <button
                   className="w-full px-4 h-10 border-2 border-rose-600 hover:bg-rose-50 rounded-lg text-rose-600 font-medium transition-colors duration-200"
                   onClick={() => {
-                    setRegisterModal(!registerModal);
+                    setRegisterModal(true);
                     setIsMenuOpen(false);
                   }}
                 >
@@ -288,6 +274,22 @@ const Navbar = () => {
           </div>
         )}
       </div>
+
+      {/* Login and Register Modals - Rendered outside navbar for proper z-index */}
+      {loginModal && (
+        <Login
+          isOpen={loginModal}
+          closeModal={closeModal}
+          toggleRegisterModal={toggleRegisterModal}
+        />
+      )}
+      {registerModal && (
+        <Register
+          isOpen={registerModal}
+          closeModal={closeModal}
+          toggleLoginModal={toggleLoginModal}
+        />
+      )}
     </div>
   );
 };

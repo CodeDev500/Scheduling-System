@@ -23,7 +23,7 @@ const About = () => {
     {
       icon: <FaBrain className="text-4xl" />,
       title: "Smart Allocation",
-      description: "AI-powered faculty and room assignment based on specialization and availability",
+      description: "Intelligent faculty recommendation system based on specialization matching, teaching experience, years of service, and workload availability",
       color: "from-purple-500 to-purple-600"
     },
     {

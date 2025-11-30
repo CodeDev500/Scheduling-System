@@ -15,6 +15,7 @@ import { fetchSubjects } from "../../services/subjectSlice";
 import Profile from "../../components/profile_image/Profile";
 import { useToast } from "../../hooks/useToast";
 import VerifyOTP from "../Verification/VerifyOTP";
+import { Eye, EyeOff } from "lucide-react";
 
 type RegisterProps = {
   isOpen: boolean;
@@ -33,6 +34,8 @@ const Register: React.FC<RegisterProps> = ({
   const [imagePreview, setImagePreview] = useState<string>("");
   const [showOTPModal, setShowOTPModal] = useState(false);
   const [loading, setLoading] = useState(false);
+  const [showPassword, setShowPassword] = useState(false);
+  const [showConfirmPassword, setShowConfirmPassword] = useState(false);
 
   const [form, setForm] = useState({
     image: null as File | null,
@@ -257,7 +260,7 @@ const Register: React.FC<RegisterProps> = ({
 
                   <InputField
                     label="Email"
-                    id="email"
+                    id="register-email"
                     name="email"
                     type="email"
                     value={form.email}
@@ -421,27 +424,45 @@ const Register: React.FC<RegisterProps> = ({
                     })) : []}
                   />
 
-                  <InputField
-                    label="Password"
-                    id="password"
-                    name="password"
-                    type="password"
-                    value={form.password}
-                    onChange={handleChange}
-                    placeholder="Enter password"
-                    error={error?.password?.[0] || ""}
-                  />
+                  <div className="relative">
+                    <InputField
+                      label="Password"
+                      id="register-password"
+                      name="password"
+                      type={showPassword ? "text" : "password"}
+                      value={form.password}
+                      onChange={handleChange}
+                      placeholder="Enter password"
+                      error={error?.password?.[0] || ""}
+                    />
+                    <button
+                      type="button"
+                      onClick={() => setShowPassword(!showPassword)}
+                      className="absolute right-3 top-10 text-gray-500 hover:text-gray-700"
+                    >
+                      {showPassword ? <EyeOff size={20} /> : <Eye size={20} />}
+                    </button>
+                  </div>
 
-                  <InputField
-                    label="Confirm Password"
-                    id="confirmPassword"
-                    name="confirmPassword"
-                    type="password"
-                    value={form.confirmPassword}
-                    onChange={handleChange}
-                    placeholder="Confirm password"
-                    error={error?.confirmPassword?.[0] || ""}
-                  />
+                  <div className="relative">
+                    <InputField
+                      label="Confirm Password"
+                      id="register-confirmPassword"
+                      name="confirmPassword"
+                      type={showConfirmPassword ? "text" : "password"}
+                      value={form.confirmPassword}
+                      onChange={handleChange}
+                      placeholder="Confirm password"
+                      error={error?.confirmPassword?.[0] || ""}
+                    />
+                    <button
+                      type="button"
+                      onClick={() => setShowConfirmPassword(!showConfirmPassword)}
+                      className="absolute right-3 top-10 text-gray-500 hover:text-gray-700"
+                    >
+                      {showConfirmPassword ? <EyeOff size={20} /> : <Eye size={20} />}
+                    </button>
+                  </div>
 
                   <Button
                     type="submit"

@@ -7,6 +7,16 @@ import { useToast } from "../../../hooks/useToast";
 import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
 
+// Utility function to convert 24-hour time to 12-hour format with AM/PM
+const formatTimeTo12Hour = (time: string): string => {
+  if (!time) return '';
+  const [hours, minutes] = time.split(':');
+  const hour = parseInt(hours);
+  const ampm = hour >= 12 ? 'PM' : 'AM';
+  const hour12 = hour % 12 || 12;
+  return `${hour12}:${minutes} ${ampm}`;
+};
+
 interface Schedule {
   id: string;
   subject: string;
@@ -120,6 +130,48 @@ const ViewSchedules: React.FC = () => {
     return matchesSearch && matchesCurriculumYear && matchesSemester && matchesDay;
   });
 
+  // Group schedules by subject, curriculum year, and semester
+  const groupedSchedules = filteredSchedules.reduce((acc: any[], schedule) => {
+    const key = `${schedule.code}-${schedule.academicYear}-${schedule.semester}-${schedule.yearLevel}-${schedule.section}`;
+    const existing = acc.find(item => 
+      item.code === schedule.code && 
+      item.academicYear === schedule.academicYear && 
+      item.semester === schedule.semester &&
+      item.yearLevel === schedule.yearLevel &&
+      item.section === schedule.section
+    );
+
+    if (existing) {
+      // Add this schedule to the existing group
+      existing.schedules.push({
+        day: schedule.day,
+        startTime: schedule.startTime,
+        endTime: schedule.endTime,
+        room: schedule.room
+      });
+    } else {
+      // Create new group
+      acc.push({
+        id: key,
+        subject: schedule.subject,
+        code: schedule.code,
+        program: schedule.program,
+        yearLevel: schedule.yearLevel,
+        section: schedule.section,
+        academicYear: schedule.academicYear,
+        semester: schedule.semester,
+        totalStudents: schedule.totalStudents,
+        schedules: [{
+          day: schedule.day,
+          startTime: schedule.startTime,
+          endTime: schedule.endTime,
+          room: schedule.room
+        }]
+      });
+    }
+    return acc;
+  }, []);
+
   // Export to PDF function
   const handleExportToPDF = () => {
     if (!filteredSchedules || filteredSchedules.length === 0) {
@@ -141,23 +193,27 @@ const ViewSchedules: React.FC = () => {
       }
       doc.text(`Generated: ${new Date().toLocaleDateString()}`, 14, 32);
       
-      // Prepare table data
-      const tableData = filteredSchedules.map((schedule) => [
-        schedule.code,
-        schedule.subject,
-        schedule.day,
-        `${schedule.startTime} - ${schedule.endTime}`,
-        schedule.room,
-        `${schedule.yearLevel} - ${schedule.section}`,
-        schedule.totalStudents || 0,
-        schedule.semester,
-        schedule.program
-      ]);
+      // Prepare table data with grouped schedules
+      const tableData = groupedSchedules.map((group) => {
+        const scheduleText = group.schedules.map((s: any) => 
+          `${s.day}: ${formatTimeTo12Hour(s.startTime)} - ${formatTimeTo12Hour(s.endTime)} (${s.room})`
+        ).join('\n');
+        
+        return [
+          group.code,
+          group.subject,
+          scheduleText,
+          `${group.yearLevel} - ${group.section}`,
+          group.totalStudents || 0,
+          group.semester,
+          group.program
+        ];
+      });
       
       // Add table
       autoTable(doc, {
         startY: 38,
-        head: [['Code', 'Subject', 'Day', 'Time', 'Room', 'Class', 'Students', 'Semester', 'Program']],
+        head: [['Code', 'Subject', 'Schedule', 'Class', 'Students', 'Semester', 'Program']],
         body: tableData,
         theme: 'striped',
         headStyles: { fillColor: [127, 29, 29], textColor: 255, fontSize: 9 },
@@ -166,18 +222,17 @@ const ViewSchedules: React.FC = () => {
         margin: { top: 38 },
         styles: {
           overflow: 'linebreak',
-          cellWidth: 'wrap'
+          cellWidth: 'wrap',
+          valign: 'top'
         },
         columnStyles: {
           0: { cellWidth: 25 },
-          1: { cellWidth: 50 },
-          2: { cellWidth: 25 },
-          3: { cellWidth: 35 },
-          4: { cellWidth: 25 },
-          5: { cellWidth: 25 },
-          6: { cellWidth: 20 },
-          7: { cellWidth: 30 },
-          8: { cellWidth: 30 }
+          1: { cellWidth: 55 },
+          2: { cellWidth: 70 },
+          3: { cellWidth: 25 },
+          4: { cellWidth: 20 },
+          5: { cellWidth: 30 },
+          6: { cellWidth: 35 }
         }
       });
       
@@ -284,38 +339,46 @@ const ViewSchedules: React.FC = () => {
                 </tr>
               </thead>
               <tbody className="divide-y divide-gray-200">
-                {filteredSchedules.map((schedule) => (
-                  <tr key={schedule.id} className="hover:bg-gray-50">
+                {groupedSchedules.map((group) => (
+                  <tr key={group.id} className="hover:bg-gray-50">
                     <td className="px-6 py-4">
                       <div>
-                        <div className="font-medium text-gray-900">{schedule.subject}</div>
-                        <div className="text-sm text-gray-500">{schedule.program}</div>
+                        <div className="font-medium text-gray-900">{group.subject}</div>
+                        <div className="text-sm text-gray-500">{group.program}</div>
                       </div>
                     </td>
-                    <td className="px-6 py-4 text-sm text-gray-900">{schedule.code}</td>
+                    <td className="px-6 py-4 text-sm text-gray-900">{group.code}</td>
                     <td className="px-6 py-4">
-                      <div className="text-sm text-gray-900">
-                        <div className="flex items-center">
-                          <Calendar className="w-4 h-4 mr-1 text-gray-400" />
-                          {schedule.day}
-                        </div>
-                        <div className="flex items-center mt-1 whitespace-nowrap">
-                          <Clock className="w-4 h-4 mr-1 text-gray-400" />
-                          {schedule.startTime} - {schedule.endTime}
-                        </div>
+                      <div className="text-sm text-gray-900 space-y-2">
+                        {group.schedules.map((sched: any, idx: number) => (
+                          <div key={idx} className="border-b border-gray-100 last:border-0 pb-2 last:pb-0">
+                            <div className="flex items-center">
+                              <Calendar className="w-4 h-4 mr-1 text-gray-400" />
+                              <span className="font-medium">{sched.day}</span>
+                            </div>
+                            <div className="flex items-center mt-1 whitespace-nowrap">
+                              <Clock className="w-4 h-4 mr-1 text-gray-400" />
+                              {formatTimeTo12Hour(sched.startTime)} - {formatTimeTo12Hour(sched.endTime)}
+                            </div>
+                            <div className="flex items-center mt-1">
+                              <MapPin className="w-4 h-4 mr-1 text-gray-400" />
+                              {sched.room}
+                            </div>
+                          </div>
+                        ))}
                       </div>
                     </td>
                     <td className="px-6 py-4">
                       <div className="flex items-center text-sm text-gray-900">
                         <MapPin className="w-4 h-4 mr-1 text-gray-400" />
-                        {schedule.room}
+                        {group.schedules[0].room}
                       </div>
                     </td>
                     <td className="px-6 py-4 text-sm text-gray-900">
-                      {schedule.yearLevel} - {schedule.section}
+                      {group.yearLevel} - {group.section}
                     </td>
                     {/* <td className="px-6 py-4 text-sm text-gray-900">
-                      {schedule.totalStudents || 0}
+                      {group.totalStudents || 0}
                     </td> */}
                   </tr>
                 ))}

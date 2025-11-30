@@ -575,7 +575,7 @@ const SortableItem = ({ id, children }: { id: string; children: React.ReactNode 
       const uniqueDays = [...new Set(group.map(s => s.day || ''))];
       const sortedDays = sortDays(uniqueDays);
       const days = sortedDays.map(d => getDayAbbreviation(d)).join('');
-      const timeRanges = group.map(s => `${s.startTime}-${s.endTime}`).join(', ');
+      const timeRanges = group.map(s => formatTimeRange(s.startTime || '', s.endTime || '')).join(', ');
       const rooms = [...new Set(group.map(s => s.roomName))].join(', ');
       
       return {
@@ -610,7 +610,7 @@ const SortableItem = ({ id, children }: { id: string; children: React.ReactNode 
       item.subjectCode || '',
       item.subjectName || '',
       item.day || '',
-      item.timeRange || `${item.startTime || ''} - ${item.endTime || ''}`,
+      item.timeRange || formatTimeRange(item.startTime || '', item.endTime || ''),
       item.roomName || '',
       item.facultyName || '',
       `${item.units || 0}`,
@@ -661,7 +661,7 @@ const SortableItem = ({ id, children }: { id: string; children: React.ReactNode 
       'Subject Code': item.subjectCode || '',
       'Subject Name': item.subjectName || '',
       'Days': item.day || '',
-      'Time': item.timeRange || `${item.startTime || ''} - ${item.endTime || ''}`,
+      'Time': item.timeRange || formatTimeRange(item.startTime || '', item.endTime || ''),
       'Room': item.roomName || '',
       'Faculty': item.facultyName || '',
       'Units': item.units || 0,
@@ -697,7 +697,7 @@ const SortableItem = ({ id, children }: { id: string; children: React.ReactNode 
       'Subject Code': item.subjectCode || '',
       'Subject Name': item.subjectName || '',
       'Days': item.day || '',
-      'Time': item.timeRange || `${item.startTime || ''} - ${item.endTime || ''}`,
+      'Time': item.timeRange || formatTimeRange(item.startTime || '', item.endTime || ''),
       'Room': item.roomName || '',
       'Faculty': item.facultyName || '',
       'Units': item.units || 0,
@@ -1116,10 +1116,13 @@ const SortableItem = ({ id, children }: { id: string; children: React.ReactNode 
                                     {(() => {
                                       const facultyId = firstSubject.facultyId || firstSubject.faculty;
                                       const assignedUnits = facultyLoads[facultyId] || 0;
-                                      const isOverloaded = assignedUnits > facultyMaxUnits;
+                                      // Get the specific faculty's max units based on their role
+                                      const faculty = instructors.find(i => i.id.toString() === facultyId);
+                                      const maxUnits = faculty?.role === 'CAMPUS_ADMIN' ? 6 : facultyMaxUnits;
+                                      const isOverloaded = assignedUnits > maxUnits;
                                       return (
                                         <span className={isOverloaded ? 'text-red-600 font-medium' : ''}>
-                                          {assignedUnits}/{facultyMaxUnits} units
+                                          {assignedUnits}/{maxUnits} units
                                         </span>
                                       );
                                     })()}

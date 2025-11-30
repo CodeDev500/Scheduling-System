@@ -108,6 +108,7 @@ const userData = useAppSelector((state) => state.auth.user);
   const [curriculumYear, setCurriculumYear] = useState<string>("");
   const [academicYears, setAcademicYears] = useState<any[]>([]);
   const [facultyMaxUnits, setFacultyMaxUnits] = useState<number>(18);
+  const [instructors, setInstructors] = useState<any[]>([]);
     // State for faculty recommendations
     const [facultyRecommendations, setFacultyRecommendations] = useState<any[]>([]);
     const [loadingRecommendations, setLoadingRecommendations] = useState(false);
@@ -139,6 +140,20 @@ const userData = useAppSelector((state) => state.auth.user);
   const [showFacultyDropdown, setShowFacultyDropdown] = useState(false);
   const [roomSuggestions, setRoomSuggestions] = useState<string[]>([]);
   const [showRoomDropdown, setShowRoomDropdown] = useState<number | null>(null);
+  
+  // Fetch instructors
+  useEffect(() => {
+    const getInstructors = async () => {
+      try {
+        const response = await api.get('/user/instructor');
+        setInstructors(response.data);
+      } catch (error) {
+        console.error('Error fetching instructors:', error);
+      }
+    };
+    getInstructors();
+  }, []);
+
     useEffect(() => {  
     const fetchLatestSavedSchedule = async () => {
     // Only fetch if curriculumYear is set
@@ -362,7 +377,7 @@ const filteredSchedules = useMemo(() => {
       const uniqueDays = [...new Set(group.map(s => s.day || ''))];
       const sortedDays = sortDays(uniqueDays);
       const days = sortedDays.map(d => getDayAbbreviation(d)).join('');
-      const timeRanges = group.map(s => `${s.startTime}-${s.endTime}`).join(', ');
+      const timeRanges = group.map(s => formatTimeRange(s.startTime || '', s.endTime || '')).join(', ');
       const rooms = [...new Set(group.map(s => s.roomName))].join(', ');
       
       return {
@@ -397,7 +412,7 @@ const filteredSchedules = useMemo(() => {
       item.subjectCode || '',
       item.subjectName || '',
       item.day || '',
-      item.timeRange || `${item.startTime || ''} - ${item.endTime || ''}`,
+      item.timeRange || formatTimeRange(item.startTime || '', item.endTime || ''),
       item.roomName || '',
       item.facultyName || '',
       `${item.units || 0}`,
@@ -448,7 +463,7 @@ const filteredSchedules = useMemo(() => {
       'Subject Code': item.subjectCode || '',
       'Subject Name': item.subjectName || '',
       'Days': item.day || '',
-      'Time': item.timeRange || `${item.startTime || ''} - ${item.endTime || ''}`,
+      'Time': item.timeRange || formatTimeRange(item.startTime || '', item.endTime || ''),
       'Room': item.roomName || '',
       'Faculty': item.facultyName || '',
       'Units': item.units || 0,
@@ -484,7 +499,7 @@ const filteredSchedules = useMemo(() => {
       'Subject Code': item.subjectCode || '',
       'Subject Name': item.subjectName || '',
       'Days': item.day || '',
-      'Time': item.timeRange || `${item.startTime || ''} - ${item.endTime || ''}`,
+      'Time': item.timeRange || formatTimeRange(item.startTime || '', item.endTime || ''),
       'Room': item.roomName || '',
       'Faculty': item.facultyName || '',
       'Units': item.units || 0,
@@ -1176,10 +1191,13 @@ const filteredSchedules = useMemo(() => {
                                     {(() => {
                                       const facultyId = firstSubject.facultyId || firstSubject.faculty;
                                       const assignedUnits = facultyLoads[facultyId] || 0;
-                                      const isOverloaded = assignedUnits > facultyMaxUnits;
+                                      // Get the specific faculty's max units based on their role
+                                      const faculty = instructors.find(i => i.id.toString() === facultyId);
+                                      const maxUnits = faculty?.role === 'CAMPUS_ADMIN' ? 6 : facultyMaxUnits;
+                                      const isOverloaded = assignedUnits > maxUnits;
                                       return (
                                         <span className={isOverloaded ? 'text-red-600 font-medium' : ''}>
-                                          {assignedUnits}/{facultyMaxUnits} units
+                                          {assignedUnits}/{maxUnits} units
                                         </span>
                                       );
                                     })()}
